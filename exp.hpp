@@ -1,339 +1,397 @@
 /**
- * @file  fast_exp.hpp
- * @brief Speed-optimised exp() for float32, float64, AVX2 (x8 float, x4 double).
+ * @file  exp.hpp
+ * @brief Faithful C++ port of glibc-2.43 exp() — baseline for benchmarking.
  *
- * ─── ALGORITHM (all variants) ────────────────────────────────────────────────
+ * float32: follows sysdeps/ieee754/flt-32/e_expf.c
+ *   N=32 table of 2^(j/N), degree-3 poly, all arithmetic in double.
  *
- *  Step 1 — Range reduction (Cody-Waite 2-part)
- *    k  = round( x · log₂e )         integer exponent
- *    r  = x − k·ln2_hi − k·ln2_lo    reduced arg, |r| ≤ ln2/2 ≈ 0.347
+ * float64: follows sysdeps/ieee754/dbl-64/e_exp.c
+ *   N=128 table of (tail, H) pairs, degree-4 poly (C2..C5),
+ *   Shift-trick integer rounding, Cody-Waite 2-part range reduction.
  *
- *  Step 2 — Minimax polynomial approximation of eʳ
- *    float  : degree-7, Cephes coefficients    → < 2 ULP
- *    double : degree-12 Taylor (1/n!)          → ≈ 1.7 × 10⁻¹⁶ (< ε_mach)
+ * AVX2 symbols are scalar-loop stubs so benchmark.cpp compiles unchanged.
  *
- *  Step 3 — Reconstruction via IEEE 754 bit manipulation
- *    result = P(r) · 2^k
- *    2^k built by writing (k + bias) into the exponent field directly,
- *    avoiding ldexp() overhead.
- *
- * ─── VALID INPUT RANGES ──────────────────────────────────────────────────────
- *  float  : [-88.376, 88.376]   (clamped; outside → 0.0f or clamps to max)
- *  double : [-708.0,  709.0]    (clamped; deliberately avoids k=1024 overflow;
- *                                exp(709.0)≈8.68e307, < DBL_MAX≈1.80e308)
- *
- * ─── COMPILATION ─────────────────────────────────────────────────────────────
- *  g++ -O3 -march=native -mavx2 -mfma -std=c++20 benchmark.cpp -o bench
- *
- * ─── REFERENCES ──────────────────────────────────────────────────────────────
- *  [1] Cephes Math Library   — https://www.netlib.org/cephes/
- *  [2] avx_mathfun (Garberoglio) — http://software-lisc.fbk.eu/avx_mathfun/
- *  [3] Musl libc exp.c       — https://git.musl-libc.org/cgit/musl/tree/src/math/exp.c
- *  [4] Cody & Waite, "Software Manual for the Elementary Functions", 1980
+ * Compile:
+ *   g++ -O3 -march=native -mavx2 -mfma -std=c++20 benchmark.cpp -o bench
  */
 
 #pragma once
 
-#include <immintrin.h>   // AVX2, FMA3
+#include <immintrin.h>
+#include <bit>
 #include <cstdint>
 #include <cmath>
-#include <bit>           // std::bit_cast  (C++20)
-#include <algorithm>     // std::clamp
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  SECTION 1 — Compile-time constants
-// ═════════════════════════════════════════════════════════════════════════════
-
-namespace fexp::detail {
-
-// ── float32 ──────────────────────────────────────────────────────────────────
-
-/// log₂(e) — multiplier for computing k = round(x · log₂e)
-inline constexpr float LOG2EF    =  1.44269504088896341f;
-/// ln(2) high part (exact in float) — Cody-Waite decomposition
-inline constexpr float LN2H_F    =  6.93145751953125e-1f;
-/// ln(2) low part = ln(2) − LN2H_F — corrects range-reduction error
-inline constexpr float LN2L_F    =  1.42860682030941723212e-6f;
-/// Upper clamp: k_max = 127, scale = 2^127 ≈ 1.7e38 (just below FLT_MAX)
-inline constexpr float EXP_HI_F  =  88.3762626647950f;
-/// Lower clamp: k_min = -126 → scale = 2^-126 = FLT_MIN (avoids scale=0)
-/// = -126 * ln2 ≈ -87.337.  Values below this clamp return exp(-87.337) ≈ 5.6e-39.
-inline constexpr float EXP_LO_F  = -87.33654f;
-/// IEEE 754 float exponent bias
-inline constexpr int   BIAS_F    = 127;
-
-/**
- * Polynomial P for e^r = 1 + r + r² · P(r), degree-5 in r, r ∈ [-ln2/2, ln2/2]
- * Cephes expf coefficients [1].
- * Evaluated as Horner:  ((((P0·r + P1)·r + P2)·r + P3)·r + P4)·r + P5
- * P5 ≈ 1/2!, P4 ≈ 1/3!, P3 ≈ 1/4!, P2 ≈ 1/5!, P1 ≈ 1/6!, P0 ≈ 1/7!
- * Small deviations from exact 1/n! are the minimax adjustment.
- */
-inline constexpr float P0F = 1.9875691500E-4f;  //  ≈ 1/7!
-inline constexpr float P1F = 1.3981999507E-3f;  //  ≈ 1/6!
-inline constexpr float P2F = 8.3334519073E-3f;  //  ≈ 1/5!
-inline constexpr float P3F = 4.1665795894E-2f;  //  ≈ 1/4!
-inline constexpr float P4F = 1.6666665459E-1f;  //  ≈ 1/3!
-inline constexpr float P5F = 5.0000001201E-1f;  //  ≈ 1/2!
-
-// ── float64 ──────────────────────────────────────────────────────────────────
-
-inline constexpr double LOG2E    =  1.4426950408889634073599;
-inline constexpr double LN2H_D   =  6.93147180369123816490e-1;
-inline constexpr double LN2L_D   =  1.90821492927058770002e-10;
-/// Safe upper bound: avoids k = 1024 which would set exponent field to 2047 (±INF)
-inline constexpr double EXP_HI_D =  709.0;
-/// Safe lower bound: k_min = −1022 → scale = 2^−1022 = DBL_MIN (no denormals)
-inline constexpr double EXP_LO_D = -708.0;
-inline constexpr int64_t BIAS_D  = 1023LL;
-
-/**
- * Taylor coefficients D[n] = 1/n! for n = 0..12.
- * Degree-12 Horner: p = D12; p = p·r + D11; ... ; p = p·r + D0
- * Truncation error for |r| ≤ ln2/2:
- *   |r|^13 / 13! ≤ (0.347)^13 / 6227020800 ≈ 1.67 × 10⁻¹⁶  (< ε_mach = 2.22e-16)
- */
-inline constexpr double D0  = 1.0;
-inline constexpr double D1  = 1.0;
-inline constexpr double D2  = 5.000000000000000000e-1;   // 1/2!
-inline constexpr double D3  = 1.666666666666666667e-1;   // 1/3!
-inline constexpr double D4  = 4.166666666666666667e-2;   // 1/4!
-inline constexpr double D5  = 8.333333333333333333e-3;   // 1/5!
-inline constexpr double D6  = 1.388888888888888889e-3;   // 1/6!
-inline constexpr double D7  = 1.984126984126984127e-4;   // 1/7!
-inline constexpr double D8  = 2.480158730158730159e-5;   // 1/8!
-inline constexpr double D9  = 2.755731922398589065e-6;   // 1/9!
-inline constexpr double D10 = 2.755731922398589065e-7;   // 1/10!
-inline constexpr double D11 = 2.505210838544171878e-8;   // 1/11!
-inline constexpr double D12 = 2.087675698786809897e-9;   // 1/12!
-
-} // namespace fexp::detail
-
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  SECTION 2 — Scalar float32
-// ═════════════════════════════════════════════════════════════════════════════
+#include <limits>
 
 namespace fexp {
+namespace detail {
 
-/**
- * @brief  Scalar single-precision fast_expf
- * @param  x  Input angle (radians). Clamped to [EXP_LO_F, EXP_HI_F].
- * @return    Approximation of eˣ, < 2 ULP error.
- *
- * @note   Reconstruction:
- *           IEEE 754 float layout: [sign:1][exponent:8][mantissa:23]
- *           2^k = reinterpret_cast<float>((k + 127) << 23)
- *           k range after clamp: [-127, 127] → exponent field [0, 254], no special vals.
- */
-[[nodiscard]] inline float fast_expf(float x) noexcept {
+static inline uint32_t asuint(float f)     { return std::bit_cast<uint32_t>(f); }
+static inline uint64_t asuint64(double f)  { return std::bit_cast<uint64_t>(f); }
+static inline double   asdouble(uint64_t i){ return std::bit_cast<double>(i); }
+
+// Top 12 bits of a float  (sign + exponent + top-3 mantissa).
+static inline uint32_t top12f(float x)  { return asuint(x) >> 20; }
+// Top 12 bits of a double (sign + exponent).
+static inline uint32_t top12d(double x) { return static_cast<uint32_t>(asuint64(x) >> 52); }
+
+// ─── flt-32 data (glibc sysdeps/ieee754/flt-32/e_exp2f_data.c) ──────────────
+
+static constexpr int    EXP2F_BITS = 5;
+static constexpr int    EXP2F_N    = 1 << EXP2F_BITS;  // 32
+
+// N / ln2  (= log2e * N)
+static constexpr double EXPF_INV_LN2N = 0x1.71547652b82fep+0 * EXP2F_N;
+// Rounding magic: adding this to a double in [-150*N, 128*N] yields an integer
+// in the lower bits without a branch.
+static constexpr double EXPF_SHIFT    = 0x1.8p52;
+
+// T[j] = asuint64(2^(j/N)) - (j << (52 - EXP2F_BITS))
+// Adding (ki << (52-5)) back reconstructs the IEEE bits of 2^(k/N).
+static constexpr uint64_t EXPF_T[32] = {
+    0x3ff0000000000000, 0x3fefd9b0d3158574, 0x3fefb5586cf9890f, 0x3fef9301d0125b51,
+    0x3fef72b83c7d517b, 0x3fef54873168b9aa, 0x3fef387a6e756238, 0x3fef1e9df51fdee1,
+    0x3fef06fe0a31b715, 0x3feef1a7373aa9cb, 0x3feedea64c123422, 0x3feece086061892d,
+    0x3feebfdad5362a27, 0x3feeb42b569d4f82, 0x3feeab07dd485429, 0x3feea47eb03a5585,
+    0x3feea09e667f3bcd, 0x3fee9f75e8ec5f74, 0x3feea11473eb0187, 0x3feea589994cce13,
+    0x3feeace5422aa0db, 0x3feeb737b0cdc5e5, 0x3feec49182a3f090, 0x3feed503b23e255d,
+    0x3feee89f995ad3ad, 0x3feeff76f2fb5e47, 0x3fef199bdd85529c, 0x3fef3720dcef9069,
+    0x3fef5818dcfba487, 0x3fef7c97337b9b5f, 0x3fefa4afa2a490da, 0x3fefd0765b6e4540,
+};
+
+// poly_scaled[k] = coeff_k / N^(k+1), approximates 2^(r/N) for r in [-1/2, 1/2]
+// Evaluation: z = C[0]*r + C[1]; r2 = r*r; y = C[2]*r + 1; y = z*r2 + y
+static constexpr double EXPF_C[3] = {
+    0x1.c6af84b912394p-5 / ((double)EXP2F_N * EXP2F_N * EXP2F_N),
+    0x1.ebfce50fac4f3p-3 / ((double)EXP2F_N * EXP2F_N),
+    0x1.62e42ff0c52d6p-1 /  (double)EXP2F_N,
+};
+
+// ─── dbl-64 data (glibc sysdeps/ieee754/dbl-64/e_exp_data.c) ────────────────
+
+static constexpr int    EXP_BITS = 7;
+static constexpr int    EXP_N    = 1 << EXP_BITS;  // 128
+
+static constexpr double EXP_INV_LN2N     =  0x1.71547652b82fep0 * EXP_N;
+static constexpr double EXP_NEG_LN2HI_N  = -0x1.62e42fefa0000p-8;   // -ln2_hi / N
+static constexpr double EXP_NEG_LN2LO_N  = -0x1.cf79abc9e3b3ap-47;  // -ln2_lo / N
+static constexpr double EXP_SHIFT        =  0x1.8p52;
+
+// Minimax poly coefficients C2..C5  (abs error 1.555*2^-66, ulp error 0.509)
+// Used as: tmp = tail + r + r2*(C2 + r*C3) + r2*r2*(C4 + r*C5)
+static constexpr double EXP_C2 = 0x1.ffffffffffdbdp-2;
+static constexpr double EXP_C3 = 0x1.555555555543cp-3;
+static constexpr double EXP_C4 = 0x1.55555cf172b91p-5;
+static constexpr double EXP_C5 = 0x1.1111167a4d017p-7;
+
+// 128 pairs: EXP_TAB[2j]   = asuint64(tail_j)  (small error correction)
+//            EXP_TAB[2j+1] = asuint64(H_j) - (j << (52 - EXP_BITS))
+// H_j * 2^(ki >> EXP_BITS) approximates 2^(k/N).
+static constexpr uint64_t EXP_TAB[256] = {
+    0x0,                0x3ff0000000000000,
+    0x3c9b3b4f1a88bf6e, 0x3feff63da9fb3335,
+    0xbc7160139cd8dc5d, 0x3fefec9a3e778061,
+    0xbc905e7a108766d1, 0x3fefe315e86e7f85,
+    0x3c8cd2523567f613, 0x3fefd9b0d3158574,
+    0xbc8bce8023f98efa, 0x3fefd06b29ddf6de,
+    0x3c60f74e61e6c861, 0x3fefc74518759bc8,
+    0x3c90a3e45b33d399, 0x3fefbe3ecac6f383,
+    0x3c979aa65d837b6d, 0x3fefb5586cf9890f,
+    0x3c8eb51a92fdeffc, 0x3fefac922b7247f7,
+    0x3c3ebe3d702f9cd1, 0x3fefa3ec32d3d1a2,
+    0xbc6a033489906e0b, 0x3fef9b66affed31b,
+    0xbc9556522a2fbd0e, 0x3fef9301d0125b51,
+    0xbc5080ef8c4eea55, 0x3fef8abdc06c31cc,
+    0xbc91c923b9d5f416, 0x3fef829aaea92de0,
+    0x3c80d3e3e95c55af, 0x3fef7a98c8a58e51,
+    0xbc801b15eaa59348, 0x3fef72b83c7d517b,
+    0xbc8f1ff055de323d, 0x3fef6af9388c8dea,
+    0x3c8b898c3f1353bf, 0x3fef635beb6fcb75,
+    0xbc96d99c7611eb26, 0x3fef5be084045cd4,
+    0x3c9aecf73e3a2f60, 0x3fef54873168b9aa,
+    0xbc8fe782cb86389d, 0x3fef4d5022fcd91d,
+    0x3c8a6f4144a6c38d, 0x3fef463b88628cd6,
+    0x3c807a05b0e4047d, 0x3fef3f49917ddc96,
+    0x3c968efde3a8a894, 0x3fef387a6e756238,
+    0x3c875e18f274487d, 0x3fef31ce4fb2a63f,
+    0x3c80472b981fe7f2, 0x3fef2b4565e27cdd,
+    0xbc96b87b3f71085e, 0x3fef24dfe1f56381,
+    0x3c82f7e16d09ab31, 0x3fef1e9df51fdee1,
+    0xbc3d219b1a6fbffa, 0x3fef187fd0dad990,
+    0x3c8b3782720c0ab4, 0x3fef1285a6e4030b,
+    0x3c6e149289cecb8f, 0x3fef0cafa93e2f56,
+    0x3c834d754db0abb6, 0x3fef06fe0a31b715,
+    0x3c864201e2ac744c, 0x3fef0170fc4cd831,
+    0x3c8fdd395dd3f84a, 0x3feefc08b26416ff,
+    0xbc86a3803b8e5b04, 0x3feef6c55f929ff1,
+    0xbc924aedcc4b5068, 0x3feef1a7373aa9cb,
+    0xbc9907f81b512d8e, 0x3feeecae6d05d866,
+    0xbc71d1e83e9436d2, 0x3feee7db34e59ff7,
+    0xbc991919b3ce1b15, 0x3feee32dc313a8e5,
+    0x3c859f48a72a4c6d, 0x3feedea64c123422,
+    0xbc9312607a28698a, 0x3feeda4504ac801c,
+    0xbc58a78f4817895b, 0x3feed60a21f72e2a,
+    0xbc7c2c9b67499a1b, 0x3feed1f5d950a897,
+    0x3c4363ed60c2ac11, 0x3feece086061892d,
+    0x3c9666093b0664ef, 0x3feeca41ed1d0057,
+    0x3c6ecce1daa10379, 0x3feec6a2b5c13cd0,
+    0x3c93ff8e3f0f1230, 0x3feec32af0d7d3de,
+    0x3c7690cebb7aafb0, 0x3feebfdad5362a27,
+    0x3c931dbdeb54e077, 0x3feebcb299fddd0d,
+    0xbc8f94340071a38e, 0x3feeb9b2769d2ca7,
+    0xbc87deccdc93a349, 0x3feeb6daa2cf6642,
+    0xbc78dec6bd0f385f, 0x3feeb42b569d4f82,
+    0xbc861246ec7b5cf6, 0x3feeb1a4ca5d920f,
+    0x3c93350518fdd78e, 0x3feeaf4736b527da,
+    0x3c7b98b72f8a9b05, 0x3feead12d497c7fd,
+    0x3c9063e1e21c5409, 0x3feeab07dd485429,
+    0x3c34c7855019c6ea, 0x3feea9268a5946b7,
+    0x3c9432e62b64c035, 0x3feea76f15ad2148,
+    0xbc8ce44a6199769f, 0x3feea5e1b976dc09,
+    0xbc8c33c53bef4da8, 0x3feea47eb03a5585,
+    0xbc845378892be9ae, 0x3feea34634ccc320,
+    0xbc93cedd78565858, 0x3feea23882552225,
+    0x3c5710aa807e1964, 0x3feea155d44ca973,
+    0xbc93b3efbf5e2228, 0x3feea09e667f3bcd,
+    0xbc6a12ad8734b982, 0x3feea012750bdabf,
+    0xbc6367efb86da9ee, 0x3fee9fb23c651a2f,
+    0xbc80dc3d54e08851, 0x3fee9f7df9519484,
+    0xbc781f647e5a3ecf, 0x3fee9f75e8ec5f74,
+    0xbc86ee4ac08b7db0, 0x3fee9f9a48a58174,
+    0xbc8619321e55e68a, 0x3fee9feb564267c9,
+    0x3c909ccb5e09d4d3, 0x3feea0694fde5d3f,
+    0xbc7b32dcb94da51d, 0x3feea11473eb0187,
+    0x3c94ecfd5467c06b, 0x3feea1ed0130c132,
+    0x3c65ebe1abd66c55, 0x3feea2f336cf4e62,
+    0xbc88a1c52fb3cf42, 0x3feea427543e1a12,
+    0xbc9369b6f13b3734, 0x3feea589994cce13,
+    0xbc805e843a19ff1e, 0x3feea71a4623c7ad,
+    0xbc94d450d872576e, 0x3feea8d99b4492ed,
+    0x3c90ad675b0e8a00, 0x3feeaac7d98a6699,
+    0x3c8db72fc1f0eab4, 0x3feeace5422aa0db,
+    0xbc65b6609cc5e7ff, 0x3feeaf3216b5448c,
+    0x3c7bf68359f35f44, 0x3feeb1ae99157736,
+    0xbc93091fa71e3d83, 0x3feeb45b0b91ffc6,
+    0xbc5da9b88b6c1e29, 0x3feeb737b0cdc5e5,
+    0xbc6c23f97c90b959, 0x3feeba44cbc8520f,
+    0xbc92434322f4f9aa, 0x3feebd829fde4e50,
+    0xbc85ca6cd7668e4b, 0x3feec0f170ca07ba,
+    0x3c71affc2b91ce27, 0x3feec49182a3f090,
+    0x3c6dd235e10a73bb, 0x3feec86319e32323,
+    0xbc87c50422622263, 0x3feecc667b5de565,
+    0x3c8b1c86e3e231d5, 0x3feed09bec4a2d33,
+    0xbc91bbd1d3bcbb15, 0x3feed503b23e255d,
+    0x3c90cc319cee31d2, 0x3feed99e1330b358,
+    0x3c8469846e735ab3, 0x3feede6b5579fdbf,
+    0xbc82dfcd978e9db4, 0x3feee36bbfd3f37a,
+    0x3c8c1a7792cb3387, 0x3feee89f995ad3ad,
+    0xbc907b8f4ad1d9fa, 0x3feeee07298db666,
+    0xbc55c3d956dcaeba, 0x3feef3a2b84f15fb,
+    0xbc90a40e3da6f640, 0x3feef9728de5593a,
+    0xbc68d6f438ad9334, 0x3feeff76f2fb5e47,
+    0xbc91eee26b588a35, 0x3fef05b030a1064a,
+    0x3c74ffd70a5fddcd, 0x3fef0c1e904bc1d2,
+    0xbc91bdfbfa9298ac, 0x3fef12c25bd71e09,
+    0x3c736eae30af0cb3, 0x3fef199bdd85529c,
+    0x3c8ee3325c9ffd94, 0x3fef20ab5fffd07a,
+    0x3c84e08fd10959ac, 0x3fef27f12e57d14b,
+    0x3c63cdaf384e1a67, 0x3fef2f6d9406e7b5,
+    0x3c676b2c6c921968, 0x3fef3720dcef9069,
+    0xbc808a1883ccb5d2, 0x3fef3f0b555dc3fa,
+    0xbc8fad5d3ffffa6f, 0x3fef472d4a07897c,
+    0xbc900dae3875a949, 0x3fef4f87080d89f2,
+    0x3c74a385a63d07a7, 0x3fef5818dcfba487,
+    0xbc82919e2040220f, 0x3fef60e316c98398,
+    0x3c8e5a50d5c192ac, 0x3fef69e603db3285,
+    0x3c843a59ac016b4b, 0x3fef7321f301b460,
+    0xbc82d52107b43e1f, 0x3fef7c97337b9b5f,
+    0xbc892ab93b470dc9, 0x3fef864614f5a129,
+    0x3c74b604603a88d3, 0x3fef902ee78b3ff6,
+    0x3c83c5ec519d7271, 0x3fef9a51fbc74c83,
+    0xbc8ff7128fd391f0, 0x3fefa4afa2a490da,
+    0xbc8dae98e223747d, 0x3fefaf482d8e67f1,
+    0x3c8ec3bc41aa2008, 0x3fefba1bee615a27,
+    0x3c842b94c3a9eb32, 0x3fefc52b376bba97,
+    0x3c8a64a931d185ee, 0x3fefd0765b6e4540,
+    0xbc8e37bae43be3ed, 0x3fefdbfdad9cbe14,
+    0x3c77893b4d91cd9d, 0x3fefe7c1819e90d8,
+    0x3c5305c14160cc89, 0x3feff3c22b8f71f1,
+};
+
+} // namespace detail
+
+
+// ─── Scalar float32  (glibc flt-32/e_expf.c) ─────────────────────────────────
+
+[[nodiscard]] inline float expf(float x) noexcept {
     using namespace detail;
 
-    // 1. Clamp ─────────────────────────────────────────────────────────────────
-    x = std::clamp(x, EXP_LO_F, EXP_HI_F);
+    // top12f strips sign; &0x7ff gives exp(8 bits) + top-3 mantissa bits.
+    // top12f(88.0f) = 0x42B.  Inputs |x| >= 88 need special handling.
+    const uint32_t abstop = top12f(x) & 0x7ffu;
 
-    // 2. Range reduction ───────────────────────────────────────────────────────
-    float kf = std::roundf(x * LOG2EF);
-    int   k  = static_cast<int>(kf);
+    if (__builtin_expect(abstop >= 0x42Bu, 0)) {
+        if (asuint(x) == asuint(-std::numeric_limits<float>::infinity()))
+            return 0.0f;
+        if (abstop >= 0x7f8u)           // NaN or +Inf
+            return x + x;
+        if (x > 0x1.62e42ep+6f)         // x > ln(2^128) ≈ 88.72
+            return std::numeric_limits<float>::infinity();
+        if (x < -0x1.9fe368p+6f)        // x < ln(2^-150) ≈ -103.97
+            return 0.0f;
+    }
 
-    // Cody-Waite 2-part: r = x − k·ln2_hi − k·ln2_lo
-    // Two subtractions prevent catastrophic cancellation near multiples of ln2.
-    float r  = x - kf * LN2H_F - kf * LN2L_F;
+    // x * N/ln2 = k + r,  r ∈ [-1/2, 1/2],  k integer
+    double xd = static_cast<double>(x);
+    double z  = EXPF_INV_LN2N * xd;
 
-    // 3. Polynomial: e^r = 1 + r + r² · P(r) ──────────────────────────────────
-    // Horner from highest degree down:
-    float p = P0F;
-    p = p * r + P1F;
-    p = p * r + P2F;
-    p = p * r + P3F;
-    p = p * r + P4F;
-    p = p * r + P5F;
-    // p now = P5 + P4·r + P3·r² + P2·r³ + P1·r⁴ + P0·r⁵
+    // Shift trick: kd = round(z) as a double, ki encodes k in its low bits
+    double   kd = z + EXPF_SHIFT;
+    uint64_t ki = asuint64(kd);
+    kd -= EXPF_SHIFT;
 
-    float r2 = r * r;
-    p = p * r2 + r + 1.0f;
-    // p = 1 + r + r²·(P5 + P4·r + ... + P0·r⁵) ≈ eʳ
+    double r = z - kd;
 
-    // 4. Reconstruct 2^k via bit manipulation ──────────────────────────────────
-    // Avoids ldexpf() function-call overhead.
-    uint32_t bits = static_cast<uint32_t>(k + BIAS_F) << 23;
-    float    scale = std::bit_cast<float>(bits);
+    // Reconstruct 2^(k/N) from table:
+    //   EXPF_T[ki%N] + (ki << (52-5))  =  asuint64(2^(k/N))
+    uint64_t t = EXPF_T[ki % (uint64_t)EXP2F_N];
+    t += ki << (52 - EXP2F_BITS);
+    double s = asdouble(t);
 
-    return p * scale;
+    // Degree-3 polynomial approximating 2^(r/N)
+    double z2 = EXPF_C[0] * r + EXPF_C[1];
+    double r2 = r * r;
+    double y  = EXPF_C[2] * r + 1.0;
+    y = z2 * r2 + y;
+    y = y * s;
+
+    return static_cast<float>(y);
 }
 
 
-// ═════════════════════════════════════════════════════════════════════════════
-//  SECTION 3 — Scalar float64
-// ═════════════════════════════════════════════════════════════════════════════
+// ─── Scalar float64  (glibc dbl-64/e_exp.c) ──────────────────────────────────
 
-/**
- * @brief  Scalar double-precision fast_exp
- * @param  x  Input. Clamped to [EXP_LO_D, EXP_HI_D] = [-708, 709].
- * @return    Approximation of eˣ.
- *
- * @note   Uses degree-12 Taylor polynomial. Truncation error ≈ 1.67e-16 < ε_mach.
- *           Reconstruction:
- *           IEEE 754 double layout: [sign:1][exponent:11][mantissa:52]
- *           2^k = reinterpret_cast<double>((k + 1023) << 52)
- *           k range after clamp: [-1022, 1023] → exponent field [1, 2046], no INF/NaN.
- */
-[[nodiscard]] inline double fast_exp(double x) noexcept {
+[[nodiscard]] inline double exp(double x) noexcept {
     using namespace detail;
 
-    // 1. Clamp
-    x = std::clamp(x, EXP_LO_D, EXP_HI_D);
+    // top12d(0x1p-54) = 0x3C9,  top12d(512.0) = 0x408
+    // Unsigned trick: catches abstop < 0x3C9 (tiny) and >= 0x408 (large/special).
+    uint32_t abstop = top12d(x) & 0x7ffu;
 
-    // 2. Range reduction
-    double kd = std::round(x * LOG2E);
-    int64_t k = static_cast<int64_t>(kd);
-    double r  = x - kd * LN2H_D - kd * LN2L_D;
+    if (__builtin_expect(abstop - 0x3C9u >= 0x408u - 0x3C9u, 0)) {
+        if (abstop - 0x3C9u >= 0x80000000u)
+            return 1.0 + x;            // |x| tiny: exp(x) ≈ 1 + x
 
-    // 3. Polynomial: degree-12 Horner (12 FMAs with -O3 -mfma)
-    double p = D12;
-    p = p * r + D11;
-    p = p * r + D10;
-    p = p * r + D9;
-    p = p * r + D8;
-    p = p * r + D7;
-    p = p * r + D6;
-    p = p * r + D5;
-    p = p * r + D4;
-    p = p * r + D3;
-    p = p * r + D2;
-    p = p * r + D1;
-    p = p * r + D0;
-    // p ≈ eʳ
+        if (abstop >= 0x409u) {        // |x| >= 1024, or NaN/Inf
+            if (asuint64(x) == asuint64(-std::numeric_limits<double>::infinity()))
+                return 0.0;
+            if (abstop >= 0x7ffu)      // NaN or +Inf
+                return x + x;
+            if (asuint64(x) >> 63)
+                return 0.0;            // large negative → underflow
+            return std::numeric_limits<double>::infinity();  // overflow
+        }
+        // |x| in [512, 1024): computation is valid but sbits exponent may have
+        // wrapped; set abstop=0 to trigger specialcase reconstruction below.
+        abstop = 0;
+    }
 
-    // 4. Reconstruct 2^k
-    uint64_t bits = static_cast<uint64_t>(k + BIAS_D) << 52;
-    double   scale = std::bit_cast<double>(bits);
+    // x * N/ln2 = k + r,  |r| <= ln2/(2N)
+    double z  = EXP_INV_LN2N * x;
 
-    return p * scale;
+    double   kd = z + EXP_SHIFT;
+    uint64_t ki = asuint64(kd);
+    kd -= EXP_SHIFT;
+
+    // Cody-Waite 2-part: r = x - k*(ln2/N),  negated constants pre-multiplied
+    double r = x + kd * EXP_NEG_LN2HI_N + kd * EXP_NEG_LN2LO_N;
+
+    // 2^(k/N) = scale * (1 + tail),  fetched from paired table
+    uint64_t idx   = 2 * (ki % (uint64_t)EXP_N);
+    uint64_t top   = ki << (52 - EXP_BITS);
+    double   tail  = asdouble(EXP_TAB[idx]);
+    uint64_t sbits = EXP_TAB[idx + 1] + top;
+
+    // exp(r) - 1 ≈ r + C2*r^2 + C3*r^3 + C4*r^4 + C5*r^5
+    double r2  = r * r;
+    double tmp = tail + r + r2 * (EXP_C2 + r * EXP_C3)
+                       + r2 * r2 * (EXP_C4 + r * EXP_C5);
+
+    // specialcase: sbits exponent overflowed or underflowed
+    if (__builtin_expect(abstop == 0, 0)) {
+        if ((ki & 0x80000000u) == 0) {
+            // k > 0: exponent in sbits overflowed by up to 460; correct by offset
+            sbits -= 1009ull << 52;
+            double sc = asdouble(sbits);
+            return 0x1p1009 * (sc + sc * tmp);
+        }
+        // k < 0: underflow territory; scale up then down to avoid subnormals
+        sbits += 1022ull << 52;
+        double sc = asdouble(sbits);
+        return 0x1p-1022 * (sc + sc * tmp);
+    }
+
+    double scale = asdouble(sbits);
+    return scale + scale * tmp;
 }
 
 
-// ═════════════════════════════════════════════════════════════════════════════
-//  SECTION 4 — AVX2 float32 (8-wide)
-// ═════════════════════════════════════════════════════════════════════════════
+// ─── AVX2 stubs (scalar loop — not vectorised) ───────────────────────────────
+// Kept so benchmark.cpp compiles without modification.
 
 #ifdef __AVX2__
 
-/**
- * @brief  AVX2 single-precision exp — processes 8 floats per call.
- * @param  x  __m256 register with 8 input values.
- * @return    __m256 register with 8 approximations of eˣ.
- *
- * @note   Same algorithm as fast_expf; all operations vectorised.
- *           _mm256_fnmadd_ps(a,b,c) = c − a·b  (negated FMA, for Cody-Waite)
- *           _mm256_fmadd_ps(a,b,c)  = a·b + c  (FMA, for Horner)
- *           Reconstruction: add BIAS to integer k, shift left 23 into exponent field.
- */
 [[nodiscard]] inline __m256 fast_expf_avx2(__m256 x) noexcept {
-    using namespace detail;
-
-    const __m256 vLOG2EF = _mm256_set1_ps(LOG2EF);
-    const __m256 vLN2H   = _mm256_set1_ps(LN2H_F);
-    const __m256 vLN2L   = _mm256_set1_ps(LN2L_F);
-    const __m256 vHI     = _mm256_set1_ps(EXP_HI_F);
-    const __m256 vLO     = _mm256_set1_ps(EXP_LO_F);
-    const __m256i vBIAS  = _mm256_set1_epi32(BIAS_F);
-
-    // 1. Clamp
-    x = _mm256_min_ps(_mm256_max_ps(x, vLO), vHI);
-
-    // 2. Range reduction
-    __m256 kf = _mm256_round_ps(
-        _mm256_mul_ps(x, vLOG2EF),
-        _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC
-    );
-    // r = x − kf·ln2_hi − kf·ln2_lo  (Cody-Waite 2-part)
-    __m256 r = _mm256_fnmadd_ps(kf, vLN2H, x);
-    r        = _mm256_fnmadd_ps(kf, vLN2L, r);
-
-    // 3. Polynomial: Horner with FMA
-    __m256 p = _mm256_set1_ps(P0F);
-    p = _mm256_fmadd_ps(p, r, _mm256_set1_ps(P1F));
-    p = _mm256_fmadd_ps(p, r, _mm256_set1_ps(P2F));
-    p = _mm256_fmadd_ps(p, r, _mm256_set1_ps(P3F));
-    p = _mm256_fmadd_ps(p, r, _mm256_set1_ps(P4F));
-    p = _mm256_fmadd_ps(p, r, _mm256_set1_ps(P5F));
-
-    __m256 r2 = _mm256_mul_ps(r, r);
-    p = _mm256_fmadd_ps(p, r2, r);
-    p = _mm256_add_ps(p, _mm256_set1_ps(1.0f));
-
-    // 4. Reconstruct: build 8 floats = 2^k[i]
-    // Convert rounded kf to int32, add bias, shift into exponent field.
-    __m256i ki = _mm256_cvtps_epi32(kf);          // float→int32 (round-to-nearest)
-    ki = _mm256_add_epi32(ki, vBIAS);
-    ki = _mm256_slli_epi32(ki, 23);               // place in exponent bits [30:23]
-    __m256 scale = _mm256_castsi256_ps(ki);
-
-    return _mm256_mul_ps(p, scale);
+    float in[8], out[8];
+    _mm256_storeu_ps(in, x);
+    for (int i = 0; i < 8; ++i) out[i] = expf(in[i]);
+    return _mm256_loadu_ps(out);
 }
 
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  SECTION 5 — AVX2 float64 (4-wide)
-// ═════════════════════════════════════════════════════════════════════════════
-
-/**
- * @brief  AVX2 double-precision exp — processes 4 doubles per call.
- * @param  x  __m256d register with 4 input values.
- * @return    __m256d register with 4 approximations of eˣ.
- *
- * @note   Reconstruction detail (AVX2 has no _mm256_cvtpd_epi64 before AVX-512):
- *           1. _mm256_cvttpd_epi32(kd)  → __m128i with 4 × int32
- *           2. _mm256_cvtepi32_epi64()  → __m256i with 4 × int64 (sign-extended)
- *           3. _mm256_add_epi64(., bias)
- *           4. _mm256_slli_epi64(., 52) → 4 × 2^k[i] in double IEEE bit layout
- */
 [[nodiscard]] inline __m256d fast_exp_avx2(__m256d x) noexcept {
-    using namespace detail;
-
-    const __m256d vLOG2E = _mm256_set1_pd(LOG2E);
-    const __m256d vLN2H  = _mm256_set1_pd(LN2H_D);
-    const __m256d vLN2L  = _mm256_set1_pd(LN2L_D);
-    const __m256d vHI    = _mm256_set1_pd(EXP_HI_D);
-    const __m256d vLO    = _mm256_set1_pd(EXP_LO_D);
-
-    // 1. Clamp
-    x = _mm256_min_pd(_mm256_max_pd(x, vLO), vHI);
-
-    // 2. Range reduction
-    __m256d kd = _mm256_round_pd(
-        _mm256_mul_pd(x, vLOG2E),
-        _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC
-    );
-    __m256d r = _mm256_fnmadd_pd(kd, vLN2H, x);
-    r         = _mm256_fnmadd_pd(kd, vLN2L, r);
-
-    // 3. Polynomial: degree-12 Horner with FMA
-    __m256d p = _mm256_set1_pd(D12);
-    p = _mm256_fmadd_pd(p, r, _mm256_set1_pd(D11));
-    p = _mm256_fmadd_pd(p, r, _mm256_set1_pd(D10));
-    p = _mm256_fmadd_pd(p, r, _mm256_set1_pd(D9));
-    p = _mm256_fmadd_pd(p, r, _mm256_set1_pd(D8));
-    p = _mm256_fmadd_pd(p, r, _mm256_set1_pd(D7));
-    p = _mm256_fmadd_pd(p, r, _mm256_set1_pd(D6));
-    p = _mm256_fmadd_pd(p, r, _mm256_set1_pd(D5));
-    p = _mm256_fmadd_pd(p, r, _mm256_set1_pd(D4));
-    p = _mm256_fmadd_pd(p, r, _mm256_set1_pd(D3));
-    p = _mm256_fmadd_pd(p, r, _mm256_set1_pd(D2));
-    p = _mm256_fmadd_pd(p, r, _mm256_set1_pd(D1));
-    p = _mm256_fmadd_pd(p, r, _mm256_set1_pd(D0));
-
-    // 4. Reconstruct 2^k[i] (AVX2 workaround — no cvtpd_epi64 until AVX-512)
-    __m128i ki32 = _mm256_cvttpd_epi32(kd);          // 4×double → 4×int32 in __m128i
-    __m256i ki64 = _mm256_cvtepi32_epi64(ki32);       // sign-extend to 4×int64
-    ki64 = _mm256_add_epi64(ki64, _mm256_set1_epi64x(BIAS_D));
-    ki64 = _mm256_slli_epi64(ki64, 52);               // place in double exponent bits
-    __m256d scale = _mm256_castsi256_pd(ki64);
-
-    return _mm256_mul_pd(p, scale);
+    double in[4], out[4];
+    _mm256_storeu_pd(in, x);
+    for (int i = 0; i < 4; ++i) out[i] = exp(in[i]);
+    return _mm256_loadu_pd(out);
 }
 
 #endif // __AVX2__
+
+
+// ─── Polynomial + range-reduction helpers (for isolated benchmarking) ─────────
+
+// Range-reduce x to the fractional z-kd used by the float polynomial path.
+[[nodiscard]] inline double expf_reduce(float x) noexcept {
+    using namespace detail;
+    double z  = EXPF_INV_LN2N * static_cast<double>(x);
+    double kd = z + EXPF_SHIFT;
+    kd       -= EXPF_SHIFT;
+    return z - kd;
+}
+
+// Degree-3 polynomial approximating 2^(r/N_f).  Expects r from expf_reduce().
+[[nodiscard]] inline float expf_poly(double r) noexcept {
+    using namespace detail;
+    double z2 = EXPF_C[0] * r + EXPF_C[1];
+    double r2 = r * r;
+    double y  = EXPF_C[2] * r + 1.0;
+    return static_cast<float>(z2 * r2 + y);
+}
+
+// Range-reduce x to the Cody-Waite r used by the double polynomial path.
+[[nodiscard]] inline double exp_reduce(double x) noexcept {
+    using namespace detail;
+    double z  = EXP_INV_LN2N * x;
+    double kd = z + EXP_SHIFT;
+    kd       -= EXP_SHIFT;
+    return x + kd * EXP_NEG_LN2HI_N + kd * EXP_NEG_LN2LO_N;
+}
+
+// Degree-4 polynomial approximating exp(r)-1.  Expects r from exp_reduce().
+[[nodiscard]] inline double exp_poly(double r) noexcept {
+    using namespace detail;
+    double r2 = r * r;
+    return r + r2 * (EXP_C2 + r * EXP_C3) + r2 * r2 * (EXP_C4 + r * EXP_C5);
+}
 
 } // namespace fexp
