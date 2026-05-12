@@ -7,6 +7,8 @@
  *   - Polynomial-only ns/call via explicit std::chrono timing
  *   - Max relative error + max ULP error vs stdlib
  *
+ * Results are written to both stdout and bench_results.txt.
+ *
  * Compile:
  *   g++ -O3 -march=native -mavx2 -mfma -std=c++20 benchmark.cpp -o bench
  */
@@ -16,6 +18,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdarg>
 #include <cstdio>
 #include <cstdint>
 #include <numeric>
@@ -27,6 +30,24 @@
 // with ::expf / std::exp at call sites.  Use explicit fexp:: qualification.
 
 using Clock = std::chrono::high_resolution_clock;
+
+// ─── Dual-output helper ───────────────────────────────────────────────────────
+
+static FILE* g_log = nullptr;
+
+// Writes to stdout and to g_log (if open) in one call.
+__attribute__((format(printf, 1, 2)))
+static void lprintf(const char* fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    std::vprintf(fmt, ap);
+    va_end(ap);
+    if (g_log) {
+        va_start(ap, fmt);
+        std::vfprintf(g_log, fmt, ap);
+        va_end(ap);
+    }
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -61,6 +82,11 @@ static constexpr int ACC_SAMPLES  = 200'000;
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 int main() {
+    // Open log file — all lprintf output goes here and to stdout.
+    g_log = std::fopen("bench_results.txt", "w");
+    if (!g_log)
+        std::fprintf(stderr, "warning: could not open bench_results.txt\n");
+
     // ── 1. Generate random inputs ──────────────────────────────────────────────
     std::mt19937 rng(42);
     std::uniform_real_distribution<float>  dist_f(-87.0f, 87.0f);
@@ -75,8 +101,8 @@ int main() {
     double max_rel_f = 0.0;
     uint32_t max_ulp = 0;
     for (int i = 0; i < ACC_SAMPLES; ++i) {
-        float ref  = ::expf(in_f[i]);          // stdlib reference
-        float fast = fexp::expf(in_f[i]);      // our implementation
+        float ref  = ::expf(in_f[i]);
+        float fast = fexp::expf(in_f[i]);
         max_rel_f  = std::max(max_rel_f, rel_err(fast, ref));
         max_ulp    = std::max(max_ulp,   ulp_dist(fast, ref));
     }
@@ -84,8 +110,8 @@ int main() {
     // ── 3. Accuracy: scalar double ────────────────────────────────────────────
     double max_rel_d = 0.0;
     for (int i = 0; i < ACC_SAMPLES; ++i) {
-        double ref  = std::exp(in_d[i]);       // stdlib reference
-        double fast = fexp::exp(in_d[i]);      // our implementation
+        double ref  = std::exp(in_d[i]);
+        double fast = fexp::exp(in_d[i]);
         max_rel_d   = std::max(max_rel_d, rel_err(fast, ref));
     }
 
@@ -192,9 +218,6 @@ int main() {
 #endif
 
     // ── 6. Polynomial-only timing (std::chrono) ────────────────────────────────
-    // Pre-reduce inputs via the same range reduction used in the full functions,
-    // then time only the polynomial evaluation kernel.
-
     std::vector<double> in_rf(ACC_SAMPLES), in_rd(ACC_SAMPLES);
     for (int i = 0; i < ACC_SAMPLES; ++i) {
         in_rf[i] = fexp::expf_reduce(in_f[i]);
@@ -215,11 +238,9 @@ int main() {
         sink_d = acc;
     };
 
-    // Warmup
     run_poly_f(WARMUP_ITERS);
     run_poly_d(WARMUP_ITERS);
 
-    // Explicit std::chrono timing for the polynomial step
     auto poly_f_t0 = Clock::now();
     run_poly_f(BENCH_ITERS);
     auto poly_f_t1 = Clock::now();
@@ -235,93 +256,94 @@ int main() {
 
     // ── 7. Report ─────────────────────────────────────────────────────────────
 
-    auto ns_per = [](double ms, int iters) {
-        return (ms * 1e6) / static_cast<double>(iters);
-    };
+    auto ns_per  = [](double ms, int iters) { return (ms * 1e6) / static_cast<double>(iters); };
     auto speedup = [](double base, double fast) { return base / fast; };
     auto pct     = [](double part, double total) { return 100.0 * part / total; };
 
-    std::printf("\n");
-    std::printf("══════════════════════════════════════════════════════════════════\n");
-    std::printf("  exp benchmark   (%d calls per variant)\n", BENCH_ITERS);
-    std::printf("══════════════════════════════════════════════════════════════════\n");
-    std::printf("  %-32s %8s  %8s  %8s\n", "Variant", "ns/call", "ms total", "speedup");
-    std::printf("  %-32s %8s  %8s  %8s\n", "--------------------------------",
-                "--------", "--------", "-------");
+    lprintf("\n");
+    lprintf("══════════════════════════════════════════════════════════════════\n");
+    lprintf("  exp benchmark   (%d calls per variant)\n", BENCH_ITERS);
+    lprintf("══════════════════════════════════════════════════════════════════\n");
+    lprintf("  %-32s %8s  %8s  %8s\n", "Variant", "ns/call", "ms total", "speedup");
+    lprintf("  %-32s %8s  %8s  %8s\n", "--------------------------------",
+            "--------", "--------", "-------");
 
-    std::printf("  %-32s %8.2f  %8.1f\n",
-                "::expf (stdlib f32)",
-                ns_per(t_std_expf, BENCH_ITERS), t_std_expf);
-    std::printf("  %-32s %8.2f  %8.1f  %7.2fx\n",
-                "fexp::expf (glibc f32)",
-                ns_per(t_ours_expf, BENCH_ITERS), t_ours_expf,
-                speedup(t_std_expf, t_ours_expf));
+    lprintf("  %-32s %8.2f  %8.1f\n",
+            "::expf (stdlib f32)",
+            ns_per(t_std_expf, BENCH_ITERS), t_std_expf);
+    lprintf("  %-32s %8.2f  %8.1f  %7.2fx\n",
+            "fexp::expf (glibc f32)",
+            ns_per(t_ours_expf, BENCH_ITERS), t_ours_expf,
+            speedup(t_std_expf, t_ours_expf));
 
-    std::printf("  %-32s\n", "");
+    lprintf("  %-32s\n", "");
 
-    std::printf("  %-32s %8.2f  %8.1f\n",
-                "std::exp (stdlib f64)",
-                ns_per(t_std_exp, BENCH_ITERS), t_std_exp);
-    std::printf("  %-32s %8.2f  %8.1f  %7.2fx\n",
-                "fexp::exp (glibc f64)",
-                ns_per(t_ours_exp, BENCH_ITERS), t_ours_exp,
-                speedup(t_std_exp, t_ours_exp));
+    lprintf("  %-32s %8.2f  %8.1f\n",
+            "std::exp (stdlib f64)",
+            ns_per(t_std_exp, BENCH_ITERS), t_std_exp);
+    lprintf("  %-32s %8.2f  %8.1f  %7.2fx\n",
+            "fexp::exp (glibc f64)",
+            ns_per(t_ours_exp, BENCH_ITERS), t_ours_exp,
+            speedup(t_std_exp, t_ours_exp));
 
 #ifdef __AVX2__
-    std::printf("  %-32s\n", "");
+    lprintf("  %-32s\n", "");
 
-    std::printf("  %-32s %8.2f  %8.1f\n",
-                "::expf (AVX2 8×f32, emul)",
-                ns_per(t_avxf_std, BENCH_ITERS / 8), t_avxf_std);
-    std::printf("  %-32s %8.2f  %8.1f  %7.2fx\n",
-                "fexp::expf (AVX2 8×f32, scalar)",
-                ns_per(t_avxf_ours, BENCH_ITERS / 8), t_avxf_ours,
-                speedup(t_avxf_std, t_avxf_ours));
+    lprintf("  %-32s %8.2f  %8.1f\n",
+            "::expf (AVX2 8×f32, emul)",
+            ns_per(t_avxf_std, BENCH_ITERS / 8), t_avxf_std);
+    lprintf("  %-32s %8.2f  %8.1f  %7.2fx\n",
+            "fexp::expf (AVX2 8×f32, scalar)",
+            ns_per(t_avxf_ours, BENCH_ITERS / 8), t_avxf_ours,
+            speedup(t_avxf_std, t_avxf_ours));
 
-    std::printf("  %-32s\n", "");
+    lprintf("  %-32s\n", "");
 
-    std::printf("  %-32s %8.2f  %8.1f\n",
-                "std::exp (AVX2 4×f64, emul)",
-                ns_per(t_avxd_std, BENCH_ITERS / 4), t_avxd_std);
-    std::printf("  %-32s %8.2f  %8.1f  %7.2fx\n",
-                "fexp::exp (AVX2 4×f64, scalar)",
-                ns_per(t_avxd_ours, BENCH_ITERS / 4), t_avxd_ours,
-                speedup(t_avxd_std, t_avxd_ours));
+    lprintf("  %-32s %8.2f  %8.1f\n",
+            "std::exp (AVX2 4×f64, emul)",
+            ns_per(t_avxd_std, BENCH_ITERS / 4), t_avxd_std);
+    lprintf("  %-32s %8.2f  %8.1f  %7.2fx\n",
+            "fexp::exp (AVX2 4×f64, scalar)",
+            ns_per(t_avxd_ours, BENCH_ITERS / 4), t_avxd_ours,
+            speedup(t_avxd_std, t_avxd_ours));
 #endif
 
-    std::printf("\n");
-    std::printf("──────────────────────────────────────────────────────────────────\n");
-    std::printf("  Polynomial-only  (%d calls, pre-reduced inputs)\n", BENCH_ITERS);
-    std::printf("  Isolates degree-3 (f32) / degree-4 (f64) polynomial kernel.\n");
-    std::printf("──────────────────────────────────────────────────────────────────\n");
-    std::printf("  %-32s %8s  %8s  %9s\n",
-                "Variant", "ns/call", "vs full", "% of full");
-    std::printf("  %-32s %8s  %8s  %9s\n",
-                "--------------------------------", "--------", "-------", "---------");
-    std::printf("  %-32s %8.2f  %8.2f  %8.1f%%\n",
-                "expf poly only (f32)",
-                ns_poly_f,
-                ns_per(t_ours_expf, BENCH_ITERS),
-                pct(ns_poly_f, ns_per(t_ours_expf, BENCH_ITERS)));
-    std::printf("  %-32s %8.2f  %8.2f  %8.1f%%\n",
-                "exp  poly only (f64)",
-                ns_poly_d,
-                ns_per(t_ours_exp, BENCH_ITERS),
-                pct(ns_poly_d, ns_per(t_ours_exp, BENCH_ITERS)));
+    lprintf("\n");
+    lprintf("──────────────────────────────────────────────────────────────────\n");
+    lprintf("  Polynomial-only  (%d calls, pre-reduced inputs)\n", BENCH_ITERS);
+    lprintf("  Isolates degree-3 (f32) / degree-4 (f64) polynomial kernel.\n");
+    lprintf("──────────────────────────────────────────────────────────────────\n");
+    lprintf("  %-32s %8s  %8s  %9s\n",
+            "Variant", "ns/call", "vs full", "% of full");
+    lprintf("  %-32s %8s  %8s  %9s\n",
+            "--------------------------------", "--------", "-------", "---------");
+    lprintf("  %-32s %8.2f  %8.2f  %8.1f%%\n",
+            "expf poly only (f32)",
+            ns_poly_f, ns_per(t_ours_expf, BENCH_ITERS),
+            pct(ns_poly_f, ns_per(t_ours_expf, BENCH_ITERS)));
+    lprintf("  %-32s %8.2f  %8.2f  %8.1f%%\n",
+            "exp  poly only (f64)",
+            ns_poly_d, ns_per(t_ours_exp, BENCH_ITERS),
+            pct(ns_poly_d, ns_per(t_ours_exp, BENCH_ITERS)));
 
-    std::printf("\n");
-    std::printf("──────────────────────────────────────────────────────────────────\n");
-    std::printf("  Accuracy  (%d samples, ∈ [-87,87] f32 / [-700,700] f64)\n",
-                ACC_SAMPLES);
-    std::printf("──────────────────────────────────────────────────────────────────\n");
-    std::printf("  fexp::expf  scalar — max ULP error : %u\n",   max_ulp);
-    std::printf("  fexp::expf  scalar — max rel error : %.2e\n", max_rel_f);
-    std::printf("  fexp::exp   scalar — max rel error : %.2e\n", max_rel_d);
+    lprintf("\n");
+    lprintf("──────────────────────────────────────────────────────────────────\n");
+    lprintf("  Accuracy  (%d samples, ∈ [-87,87] f32 / [-700,700] f64)\n",
+            ACC_SAMPLES);
+    lprintf("──────────────────────────────────────────────────────────────────\n");
+    lprintf("  fexp::expf  scalar — max ULP error : %u\n",   max_ulp);
+    lprintf("  fexp::expf  scalar — max rel error : %.2e\n", max_rel_f);
+    lprintf("  fexp::exp   scalar — max rel error : %.2e\n", max_rel_d);
 #ifdef __AVX2__
-    std::printf("  fexp::expf  AVX2   — max rel error : %.2e\n", max_rel_avxf);
-    std::printf("  fexp::exp   AVX2   — max rel error : %.2e\n", max_rel_avxd);
+    lprintf("  fexp::expf  AVX2   — max rel error : %.2e\n", max_rel_avxf);
+    lprintf("  fexp::exp   AVX2   — max rel error : %.2e\n", max_rel_avxd);
 #endif
-    std::printf("══════════════════════════════════════════════════════════════════\n\n");
+    lprintf("══════════════════════════════════════════════════════════════════\n\n");
+
+    if (g_log) {
+        std::fclose(g_log);
+        std::printf("results saved to bench_results.txt\n");
+    }
 
     return 0;
 }

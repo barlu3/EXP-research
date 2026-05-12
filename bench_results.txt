@@ -1,0 +1,37 @@
+
+══════════════════════════════════════════════════════════════════
+  exp benchmark   (5000000 calls per variant)
+══════════════════════════════════════════════════════════════════
+  Variant                           ns/call  ms total   speedup
+  -------------------------------- --------  --------   -------
+  ::expf (stdlib f32)                  4.53      22.7
+  fexp::expf (glibc f32)               3.62      18.1     1.25x
+                                  
+  std::exp (stdlib f64)               12.17      60.9
+  fexp::exp (glibc f64)                8.65      43.2     1.41x
+                                  
+  ::expf (AVX2 8×f32, emul)          33.04      20.7
+  fexp::expf (AVX2 8×f32, scalar)    21.49      13.4     1.54x
+                                  
+  std::exp (AVX2 4×f64, emul)        46.28      57.8
+  fexp::exp (AVX2 4×f64, scalar)     32.88      41.1     1.41x
+
+──────────────────────────────────────────────────────────────────
+  Polynomial-only  (5000000 calls, pre-reduced inputs)
+  Isolates degree-3 (f32) / degree-4 (f64) polynomial kernel.
+──────────────────────────────────────────────────────────────────
+  Variant                           ns/call   vs full  % of full
+  -------------------------------- --------   -------  ---------
+  expf poly only (f32)                 2.39      3.62      66.1%
+  exp  poly only (f64)                 2.41      8.65      27.9%
+
+──────────────────────────────────────────────────────────────────
+  Accuracy  (200000 samples, ∈ [-87,87] f32 / [-700,700] f64)
+──────────────────────────────────────────────────────────────────
+  fexp::expf  scalar — max ULP error : 0
+  fexp::expf  scalar — max rel error : 0.00e+00
+  fexp::exp   scalar — max rel error : 2.19e-16
+  fexp::expf  AVX2   — max rel error : 0.00e+00
+  fexp::exp   AVX2   — max rel error : 2.19e-16
+══════════════════════════════════════════════════════════════════
+
