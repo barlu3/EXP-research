@@ -390,6 +390,7 @@ static constexpr uint64_t EXP_TAB[256] = {
 }
 
 // Degree-3 polynomial approximating 2^(r/N_f).  Expects r from expf_reduce().
+// Coefficients (EXPF_C[0..2]) and evaluation order match glibc-2.43 e_expf.c.
 [[nodiscard]] inline float expf_poly(double r) noexcept {
     using namespace detail;
     double z2 = EXPF_C[0] * r + EXPF_C[1];
@@ -408,6 +409,8 @@ static constexpr uint64_t EXP_TAB[256] = {
 }
 
 // Degree-4 polynomial approximating exp(r)-1.  Expects r from exp_reduce().
+// Coefficients (EXP_C2..C5) and evaluation order match glibc-2.43 e_exp.c.
+// NOTE: omits the tail correction term (table lookup) to isolate the polynomial.
 [[nodiscard]] inline double exp_poly(double r) noexcept {
     using namespace detail;
     double r2 = r * r;

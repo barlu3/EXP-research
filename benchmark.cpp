@@ -2,10 +2,23 @@
  * @file  benchmark.cpp
  * @brief Benchmark + accuracy: fexp::exp/expf (homemade, glibc port) vs stdlib.
  *
- * Three input clusters, 1,000,000 iterations each:
+ * Three benchmark sections, each over three input clusters, 1,000,000 iterations:
  *   Cluster 1 — x near 1     : x ∈ [0.9,   1.1]
  *   Cluster 2 — x near 80    : x ∈ [79.5,  80.5]
  *   Cluster 3 — x near 2e-10 : x ∈ [1e-10, 3e-10]
+ *
+ * Section 1 — FLOAT64 full call: times the complete fexp::exp(x) path —
+ *   argument check, Cody-Waite 2-part range reduction, 128-entry paired table
+ *   lookup, degree-4 polynomial (C2..C5), and final scale-and-add.
+ *
+ * Section 2 — FLOAT32 full call: times the complete fexp::expf(x) path —
+ *   argument check, shift-trick range reduction, 32-entry table lookup,
+ *   degree-3 polynomial (all arithmetic in double), and float cast.
+ *
+ * Section 3 — Polynomial isolation: times only the polynomial evaluation step.
+ *   Inputs are pre-reduced via fexp::exp_reduce / fexp::expf_reduce (outside the
+ *   timed region) so argument checks, table lookups, and final scaling are
+ *   excluded.  Polynomial coefficients and evaluation order match glibc-2.43.
  *
  * Output goes to stdout and bench_results.txt.
  *
@@ -142,6 +155,9 @@ int main() {
     // ═══════════════════════════════════════════════════════════════════════════
     //  float64 (double)
     // ═══════════════════════════════════════════════════════════════════════════
+    // Timed per call: arg-check, Cody-Waite 2-part range reduction, 128-entry
+    // paired table lookup, degree-4 poly (C2..C5), and final scale-and-add.
+    // fexp::exp is header-inlined; std::exp dispatched via PLT.
 
     lprintf("\n");
     lprintf("┌────────────────────────────────────────────────────────────────┐\n");
@@ -186,6 +202,9 @@ int main() {
     // ═══════════════════════════════════════════════════════════════════════════
     //  float32 (float)
     // ═══════════════════════════════════════════════════════════════════════════
+    // Timed per call: arg-check, shift-trick range reduction, 32-entry table
+    // lookup, degree-3 poly (all arithmetic in double), and float cast.
+    // fexp::expf is header-inlined; ::expf dispatched via PLT.
 
     lprintf("\n\n");
     lprintf("┌────────────────────────────────────────────────────────────────┐\n");
@@ -232,6 +251,81 @@ int main() {
         lprintf("     %-42s %9.2f  %10.2f  %7.2fx\n",
                 "Homemade fexp::expf(x)[exp.hpp inlined]",
                 r_our.ns_per_call, r_our.total_ms, su);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    //  Polynomial isolation
+    //  Only the polynomial evaluation step is timed.  Inputs are first
+    //  range-reduced via fexp::exp_reduce / fexp::expf_reduce (outside the
+    //  timed region) so that arg checks, table lookups, and final scaling are
+    //  excluded.  Polynomial coefficients and evaluation order match glibc-2.43.
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    lprintf("\n\n");
+    lprintf("┌────────────────────────────────────────────────────────────────┐\n");
+    lprintf("│  POLYNOMIAL ISOLATION — homemade poly step only               │\n");
+    lprintf("│  float64 degree-4: r + r2*(C2+r*C3) + r2*r2*(C4+r*C5)       │\n");
+    lprintf("│  float32 degree-3: (C0*r+C1)*r2 + C2*r + 1  (in double)     │\n");
+    lprintf("│  Reduced args pre-computed; table lookup + scaling excluded.  │\n");
+    lprintf("│  Coefficients match glibc-2.43 sysdeps/ieee754/{dbl,flt}-64/ │\n");
+    lprintf("└────────────────────────────────────────────────────────────────┘\n");
+
+    // float64 polynomial — benchmark just the degree-4 poly step
+    lprintf("\n");
+    lprintf("  float64 — fexp::exp_poly(r):\n");
+
+    for (const auto& cl : CLUSTERS) {
+        std::uniform_real_distribution<double> dist_p(cl.lo, cl.hi);
+        std::vector<double> in_p(ACC_SAMPLES);
+        for (auto& v : in_p) v = dist_p(rng);
+
+        // Cody-Waite reduce outside the timed region; only the polynomial is timed.
+        std::vector<double> r_d(ACC_SAMPLES);
+        for (int i = 0; i < ACC_SAMPLES; ++i) r_d[i] = fexp::exp_reduce(in_p[i]);
+
+        auto rp = run_bench_d([](double r){ return fexp::exp_poly(r); }, r_d);
+
+        lprintf("\n");
+        lprintf("  ── Cluster: %s  x ∈ [%.3g, %.3g]  (%d iters)\n",
+                cl.label, cl.lo, cl.hi, BENCH_ITERS);
+        lprintf("\n");
+        lprintf("     %-42s %9s  %10s\n", "Variant", "ns/call", "total (ms)");
+        lprintf("     %-42s %9s  %10s\n",
+                "──────────────────────────────────────────",
+                "─────────", "──────────");
+        lprintf("     %-42s %9.2f  %10.2f\n",
+                "Homemade fexp::exp_poly(r)  [poly only]",
+                rp.ns_per_call, rp.total_ms);
+    }
+
+    // float32 polynomial — benchmark just the degree-3 poly step
+    lprintf("\n");
+    lprintf("  float32 — fexp::expf_poly(r):\n");
+
+    for (const auto& cl : CLUSTERS) {
+        std::uniform_real_distribution<float> dist_pf(
+            static_cast<float>(cl.lo), static_cast<float>(cl.hi));
+        std::vector<float> in_pf(ACC_SAMPLES);
+        for (auto& v : in_pf) v = dist_pf(rng);
+
+        // Shift-trick reduce outside the timed region; only the polynomial is timed.
+        std::vector<double> r_f(ACC_SAMPLES);
+        for (int i = 0; i < ACC_SAMPLES; ++i) r_f[i] = fexp::expf_reduce(in_pf[i]);
+
+        auto rpf = run_bench_d(
+            [](double r){ return static_cast<double>(fexp::expf_poly(r)); }, r_f);
+
+        lprintf("\n");
+        lprintf("  ── Cluster: %s  x ∈ [%.3g, %.3g]  (%d iters)\n",
+                cl.label, cl.lo, cl.hi, BENCH_ITERS);
+        lprintf("\n");
+        lprintf("     %-42s %9s  %10s\n", "Variant", "ns/call", "total (ms)");
+        lprintf("     %-42s %9s  %10s\n",
+                "──────────────────────────────────────────",
+                "─────────", "──────────");
+        lprintf("     %-42s %9.2f  %10.2f\n",
+                "Homemade fexp::expf_poly(r) [poly only]",
+                rpf.ns_per_call, rpf.total_ms);
     }
 
     // ── Wall time ─────────────────────────────────────────────────────────────
