@@ -14,28 +14,28 @@
 └────────────────────────────────────────────────────────────────┘
 
   ── Cluster: x near 1       x ∈ [0.9, 1.1]  (1000000 iters)
-     Accuracy vs stdlib — max rel error: 1.80e-16  (< 1 ULP)
+     Accuracy vs stdlib — max rel error: 0.00e+00  (bit-for-bit identical)
 
      Variant                                      ns/call  total (ms)   speedup
      ────────────────────────────────────────── ─────────  ──────────  ───────
-     Stdlib   std::exp(x)  [glibc via PLT]          14.28       14.28
-     Homemade fexp::exp(x) [exp.hpp inlined]        11.86       11.86     1.20x
+     Stdlib   std::exp(x)  [glibc via PLT]           9.73        9.73
+     Homemade fexp::exp(x) [exp.hpp inlined]         5.93        5.93     1.64x
 
   ── Cluster: x near 80      x ∈ [79.5, 80.5]  (1000000 iters)
-     Accuracy vs stdlib — max rel error: 2.21e-16  (< 1 ULP)
+     Accuracy vs stdlib — max rel error: 0.00e+00  (bit-for-bit identical)
 
      Variant                                      ns/call  total (ms)   speedup
      ────────────────────────────────────────── ─────────  ──────────  ───────
-     Stdlib   std::exp(x)  [glibc via PLT]          11.87       11.87
-     Homemade fexp::exp(x) [exp.hpp inlined]        11.71       11.71     1.01x
+     Stdlib   std::exp(x)  [glibc via PLT]           7.43        7.43
+     Homemade fexp::exp(x) [exp.hpp inlined]         4.07        4.07     1.83x
 
   ── Cluster: x near 2e-10   x ∈ [1e-10, 3e-10]  (1000000 iters)
-     Accuracy vs stdlib — max rel error: 2.22e-16  (< 1 ULP)
+     Accuracy vs stdlib — max rel error: 0.00e+00  (bit-for-bit identical)
 
      Variant                                      ns/call  total (ms)   speedup
      ────────────────────────────────────────── ─────────  ──────────  ───────
-     Stdlib   std::exp(x)  [glibc via PLT]           9.68        9.68
-     Homemade fexp::exp(x) [exp.hpp inlined]        12.79       12.79     0.76x
+     Stdlib   std::exp(x)  [glibc via PLT]           8.97        8.97
+     Homemade fexp::exp(x) [exp.hpp inlined]         6.08        6.08     1.47x
 
 
 ┌────────────────────────────────────────────────────────────────┐
@@ -45,31 +45,31 @@
 └────────────────────────────────────────────────────────────────┘
 
   ── Cluster: x near 1       x ∈ [0.9, 1.1]  (1000000 iters)
-     Accuracy vs stdlib — max ULP error: 1,  max rel error: 9.68e-08
+     Accuracy vs stdlib — max ULP error: 0 (bit-for-bit identical),  max rel error: 0.00e+00
 
      Variant                                      ns/call  total (ms)   speedup
      ────────────────────────────────────────── ─────────  ──────────  ───────
-     Stdlib   ::expf(x)    [glibc via PLT]          12.43       12.43
-     Homemade fexp::expf(x)[exp.hpp inlined]        10.53       10.53     1.18x
+     Stdlib   ::expf(x)    [glibc via PLT]           7.36        7.36
+     Homemade fexp::expf(x)[exp.hpp inlined]         7.98        7.98     0.92x
 
   ── Cluster: x near 80      x ∈ [79.5, 80.5]  (1000000 iters)
-     Accuracy vs stdlib — max ULP error: 1,  max rel error: 1.19e-07
+     Accuracy vs stdlib — max ULP error: 0 (bit-for-bit identical),  max rel error: 0.00e+00
 
      Variant                                      ns/call  total (ms)   speedup
      ────────────────────────────────────────── ─────────  ──────────  ───────
-     Stdlib   ::expf(x)    [glibc via PLT]          10.84       10.84
-     Homemade fexp::expf(x)[exp.hpp inlined]         9.28        9.28     1.17x
+     Stdlib   ::expf(x)    [glibc via PLT]           7.25        7.25
+     Homemade fexp::expf(x)[exp.hpp inlined]         6.32        6.32     1.15x
 
   ── Cluster: x near 2e-10   x ∈ [1e-10, 3e-10]  (1000000 iters)
      Accuracy vs stdlib — max ULP error: 0 (bit-for-bit identical),  max rel error: 0.00e+00
 
      Variant                                      ns/call  total (ms)   speedup
      ────────────────────────────────────────── ─────────  ──────────  ───────
-     Stdlib   ::expf(x)    [glibc via PLT]           5.57        5.57
-     Homemade fexp::expf(x)[exp.hpp inlined]        13.35       13.35     0.42x
+     Stdlib   ::expf(x)    [glibc via PLT]           7.36        7.36
+     Homemade fexp::expf(x)[exp.hpp inlined]         6.03        6.03     1.22x
 
 
 ══════════════════════════════════════════════════════════════════
-  Total benchmark wall time: 0.179 s
+  Total benchmark wall time: 0.129 s
 ══════════════════════════════════════════════════════════════════
 
