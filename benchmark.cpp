@@ -63,8 +63,8 @@ double time_ms(Fn&& fn, int iters) {
 }
 
 uint32_t ulp_dist(float a, float b) {
-    int32_t ia = static_cast<int32_t>(std::bit_cast<uint32_t>(a));
-    int32_t ib = static_cast<int32_t>(std::bit_cast<uint32_t>(b));
+    int32_t ia = static_cast<int32_t>(FEXP_BIT_CAST(uint32_t, a));
+    int32_t ib = static_cast<int32_t>(FEXP_BIT_CAST(uint32_t, b));
     return static_cast<uint32_t>(std::abs(ia - ib));
 }
 

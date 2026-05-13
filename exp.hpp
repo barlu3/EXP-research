@@ -23,12 +23,32 @@
 #include <cmath>
 #include <limits>
 
+// ─── bit_cast portability shim ────────────────────────────────────────────────
+// Apple Clang ≤ 14 ships libc++ without std::bit_cast even with -std=c++20.
+// __builtin_bit_cast is available in Clang ≥ 9 and GCC ≥ 11, covering all
+// relevant compilers.  Fall back to a memcpy template only on exotic toolchains.
+#if defined(__has_builtin) && __has_builtin(__builtin_bit_cast)
+#  define FEXP_BIT_CAST(T, x) __builtin_bit_cast(T, x)
+#elif defined(__cpp_lib_bit_cast)
+#  define FEXP_BIT_CAST(T, x) std::bit_cast<T>(x)
+#else
+#  include <cstring>
+namespace fexp_compat {
+template<typename To, typename From>
+static inline To bit_cast(From from) noexcept {
+    static_assert(sizeof(To) == sizeof(From));
+    To r; std::memcpy(&r, &from, sizeof(r)); return r;
+}
+}
+#  define FEXP_BIT_CAST(T, x) fexp_compat::bit_cast<T>(x)
+#endif
+
 namespace fexp {
 namespace detail {
 
-static inline uint32_t asuint(float f)     { return std::bit_cast<uint32_t>(f); }
-static inline uint64_t asuint64(double f)  { return std::bit_cast<uint64_t>(f); }
-static inline double   asdouble(uint64_t i){ return std::bit_cast<double>(i); }
+static inline uint32_t asuint(float f)     { return FEXP_BIT_CAST(uint32_t, f); }
+static inline uint64_t asuint64(double f)  { return FEXP_BIT_CAST(uint64_t, f); }
+static inline double   asdouble(uint64_t i){ return FEXP_BIT_CAST(double, i); }
 
 // Top 12 bits of a float  (sign + exponent + top-3 mantissa).
 static inline uint32_t top12f(float x)  { return asuint(x) >> 20; }
