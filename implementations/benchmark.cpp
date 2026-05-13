@@ -20,7 +20,7 @@
  *   timed region) so argument checks, table lookups, and final scaling are
  *   excluded.  Polynomial coefficients and evaluation order match glibc-2.43.
  *
- * Output goes to stdout and bench_results.txt.
+ * Output goes to stdout and output/bench_results.txt.
  *
  * Compile:
  *   g++ -O3 -march=native -mavx2 -mfma -std=c++20 benchmark.cpp -o bench
@@ -123,9 +123,9 @@ static BenchResult run_bench_f(Fn fn, const std::vector<float>& inputs) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 int main() {
-    g_log = std::fopen("bench_results.txt", "w");
+    g_log = std::fopen("output/bench_results.txt", "w");
     if (!g_log)
-        std::fprintf(stderr, "warning: could not open bench_results.txt\n");
+        std::fprintf(stderr, "warning: could not open output/bench_results.txt\n");
 
     auto wall_start = Clock::now();
 
@@ -340,7 +340,7 @@ int main() {
 
     if (g_log) {
         std::fclose(g_log);
-        std::printf("Results saved to bench_results.txt\n");
+        std::printf("Results saved to output/bench_results.txt\n");
     }
 
     return 0;

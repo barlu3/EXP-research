@@ -3,14 +3,14 @@
 ## Commands
 
 ```bash
-# Build
+# Build (run from implementations/)
 g++ -O3 -march=native -mavx2 -mfma -std=c++20 benchmark.cpp -o bench
 
-# Run benchmarks
+# Run benchmarks (run from implementations/)
 ./bench
 
-# Capture output
-./bench 2>&1 | tee bench_results.txt
+# Capture output (run from implementations/)
+./bench 2>&1 | tee output/bench_results.txt
 ```
 
 ## Key Decisions
