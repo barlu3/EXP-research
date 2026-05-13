@@ -1,13 +1,13 @@
 /**
  * @file  benchmark.cpp
- * @brief Benchmark + accuracy report for fexp::exp variants vs stdlib.
+ * @brief Benchmark + accuracy: fexp::exp/expf (homemade, glibc port) vs stdlib.
  *
- * Measures:
- *   - Throughput  (ns/call) for scalar float/double vs stdlib
- *   - Polynomial-only ns/call via explicit std::chrono timing
- *   - Max relative error + max ULP error vs stdlib
+ * Three input clusters, 1,000,000 iterations each:
+ *   Cluster 1 — x near 1     : x ∈ [0.9,   1.1]
+ *   Cluster 2 — x near 80    : x ∈ [79.5,  80.5]
+ *   Cluster 3 — x near 2e-10 : x ∈ [1e-10, 3e-10]
  *
- * Results are written to both stdout and bench_results.txt.
+ * Output goes to stdout and bench_results.txt.
  *
  * Compile:
  *   g++ -O3 -march=native -mavx2 -mfma -std=c++20 benchmark.cpp -o bench
@@ -21,7 +21,6 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstdint>
-#include <numeric>
 #include <random>
 #include <vector>
 #include <bit>
@@ -35,7 +34,6 @@ using Clock = std::chrono::high_resolution_clock;
 
 static FILE* g_log = nullptr;
 
-// Writes to stdout and to g_log (if open) in one call.
 __attribute__((format(printf, 1, 2)))
 static void lprintf(const char* fmt, ...) {
     va_list ap;
@@ -49,300 +47,206 @@ static void lprintf(const char* fmt, ...) {
     }
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Anti-optimisation sinks ─────────────────────────────────────────────────
 
 static volatile float  sink_f = 0.0f;
 static volatile double sink_d = 0.0;
 
-template<typename Fn>
-double time_ms(Fn&& fn, int iters) {
-    auto t0 = Clock::now();
-    fn(iters);
-    auto t1 = Clock::now();
-    return std::chrono::duration<double, std::milli>(t1 - t0).count();
-}
+// ─── Error metrics ───────────────────────────────────────────────────────────
 
-uint32_t ulp_dist(float a, float b) {
+static uint32_t ulp_dist(float a, float b) {
     int32_t ia = static_cast<int32_t>(FEXP_BIT_CAST(uint32_t, a));
     int32_t ib = static_cast<int32_t>(FEXP_BIT_CAST(uint32_t, b));
     return static_cast<uint32_t>(std::abs(ia - ib));
 }
 
-double rel_err(double fast, double ref) {
+static double rel_err(double fast, double ref) {
     if (ref == 0.0) return 0.0;
     return std::abs(fast - ref) / std::abs(ref);
 }
 
 // ─── Benchmark parameters ────────────────────────────────────────────────────
 
-static constexpr int WARMUP_ITERS = 500'000;
-static constexpr int BENCH_ITERS  = 5'000'000;
-static constexpr int ACC_SAMPLES  = 200'000;
+static constexpr int BENCH_ITERS  = 1'000'000;
+static constexpr int WARMUP_ITERS =   200'000;
+static constexpr int ACC_SAMPLES  =   100'000;
+
+// ─── Timing helpers ──────────────────────────────────────────────────────────
+
+struct BenchResult { double ns_per_call, total_ms; };
+
+template<typename Fn>
+static BenchResult run_bench_d(Fn fn, const std::vector<double>& inputs) {
+    double acc = 0.0;
+    for (int i = 0; i < WARMUP_ITERS; ++i) acc += fn(inputs[i % inputs.size()]);
+    sink_d = acc;
+
+    auto t0 = Clock::now();
+    acc = 0.0;
+    for (int i = 0; i < BENCH_ITERS; ++i) acc += fn(inputs[i % inputs.size()]);
+    auto t1 = Clock::now();
+    sink_d = acc;
+
+    double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+    return { (ms * 1e6) / BENCH_ITERS, ms };
+}
+
+template<typename Fn>
+static BenchResult run_bench_f(Fn fn, const std::vector<float>& inputs) {
+    float acc = 0.0f;
+    for (int i = 0; i < WARMUP_ITERS; ++i) acc += fn(inputs[i % inputs.size()]);
+    sink_f = acc;
+
+    auto t0 = Clock::now();
+    acc = 0.0f;
+    for (int i = 0; i < BENCH_ITERS; ++i) acc += fn(inputs[i % inputs.size()]);
+    auto t1 = Clock::now();
+    sink_f = acc;
+
+    double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+    return { (ms * 1e6) / BENCH_ITERS, ms };
+}
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 int main() {
-    // Open log file — all lprintf output goes here and to stdout.
     g_log = std::fopen("bench_results.txt", "w");
     if (!g_log)
         std::fprintf(stderr, "warning: could not open bench_results.txt\n");
 
-    // ── 1. Generate random inputs ──────────────────────────────────────────────
+    auto wall_start = Clock::now();
+
     std::mt19937 rng(42);
-    std::uniform_real_distribution<float>  dist_f(-87.0f, 87.0f);
-    std::uniform_real_distribution<double> dist_d(-700.0, 700.0);
 
-    std::vector<float>  in_f(ACC_SAMPLES);
-    std::vector<double> in_d(ACC_SAMPLES);
-    for (auto& v : in_f) v = dist_f(rng);
-    for (auto& v : in_d) v = dist_d(rng);
-
-    // ── 2. Accuracy: scalar float ──────────────────────────────────────────────
-    double max_rel_f = 0.0;
-    uint32_t max_ulp = 0;
-    for (int i = 0; i < ACC_SAMPLES; ++i) {
-        float ref  = ::expf(in_f[i]);
-        float fast = fexp::expf(in_f[i]);
-        max_rel_f  = std::max(max_rel_f, rel_err(fast, ref));
-        max_ulp    = std::max(max_ulp,   ulp_dist(fast, ref));
-    }
-
-    // ── 3. Accuracy: scalar double ────────────────────────────────────────────
-    double max_rel_d = 0.0;
-    for (int i = 0; i < ACC_SAMPLES; ++i) {
-        double ref  = std::exp(in_d[i]);
-        double fast = fexp::exp(in_d[i]);
-        max_rel_d   = std::max(max_rel_d, rel_err(fast, ref));
-    }
-
-    // ── 4. Accuracy: AVX2 ────────────────────────────────────────────────────
-#ifdef __AVX2__
-    double max_rel_avxf = 0.0;
-    for (int i = 0; i + 8 <= ACC_SAMPLES; i += 8) {
-        __m256 vx    = _mm256_loadu_ps(&in_f[i]);
-        __m256 vfast = fexp::fast_expf_avx2(vx);
-        float  buf[8]; _mm256_storeu_ps(buf, vfast);
-        for (int j = 0; j < 8; ++j) {
-            float ref = ::expf(in_f[i + j]);
-            max_rel_avxf = std::max(max_rel_avxf, rel_err(buf[j], ref));
-        }
-    }
-
-    double max_rel_avxd = 0.0;
-    for (int i = 0; i + 4 <= ACC_SAMPLES; i += 4) {
-        __m256d vx    = _mm256_loadu_pd(&in_d[i]);
-        __m256d vfast = fexp::fast_exp_avx2(vx);
-        double  buf[4]; _mm256_storeu_pd(buf, vfast);
-        for (int j = 0; j < 4; ++j) {
-            double ref = std::exp(in_d[i + j]);
-            max_rel_avxd = std::max(max_rel_avxd, rel_err(buf[j], ref));
-        }
-    }
-#endif
-
-    // ── 5. Throughput: full exp calls ─────────────────────────────────────────
-
-    auto run_scalar_f = [&](bool use_ours) {
-        return [&, use_ours](int iters) {
-            float acc = 0.0f;
-            for (int i = 0; i < iters; ++i) {
-                float x = in_f[i % ACC_SAMPLES];
-                acc += use_ours ? fexp::expf(x) : ::expf(x);
-            }
-            sink_f = acc;
-        };
-    };
-
-    auto run_scalar_d = [&](bool use_ours) {
-        return [&, use_ours](int iters) {
-            double acc = 0.0;
-            for (int i = 0; i < iters; ++i) {
-                double x = in_d[i % ACC_SAMPLES];
-                acc += use_ours ? fexp::exp(x) : std::exp(x);
-            }
-            sink_d = acc;
-        };
-    };
-
-#ifdef __AVX2__
-    auto run_avxf = [&](bool use_ours) {
-        return [&, use_ours](int iters) {
-            __m256 acc = _mm256_setzero_ps();
-            for (int i = 0; i < iters; i += 8) {
-                __m256 vx = _mm256_loadu_ps(&in_f[(i) % (ACC_SAMPLES - 8)]);
-                acc = _mm256_add_ps(acc, use_ours
-                    ? fexp::fast_expf_avx2(vx)
-                    : _mm256_set_ps(
-                        ::expf(in_f[(i+7)%ACC_SAMPLES]), ::expf(in_f[(i+6)%ACC_SAMPLES]),
-                        ::expf(in_f[(i+5)%ACC_SAMPLES]), ::expf(in_f[(i+4)%ACC_SAMPLES]),
-                        ::expf(in_f[(i+3)%ACC_SAMPLES]), ::expf(in_f[(i+2)%ACC_SAMPLES]),
-                        ::expf(in_f[(i+1)%ACC_SAMPLES]), ::expf(in_f[(i+0)%ACC_SAMPLES])));
-            }
-            float tmp[8]; _mm256_storeu_ps(tmp, acc);
-            sink_f = tmp[0];
-        };
-    };
-
-    auto run_avxd = [&](bool use_ours) {
-        return [&, use_ours](int iters) {
-            __m256d acc = _mm256_setzero_pd();
-            for (int i = 0; i < iters; i += 4) {
-                __m256d vx = _mm256_loadu_pd(&in_d[(i) % (ACC_SAMPLES - 4)]);
-                acc = _mm256_add_pd(acc, use_ours
-                    ? fexp::fast_exp_avx2(vx)
-                    : _mm256_set_pd(
-                        std::exp(in_d[(i+3)%ACC_SAMPLES]), std::exp(in_d[(i+2)%ACC_SAMPLES]),
-                        std::exp(in_d[(i+1)%ACC_SAMPLES]), std::exp(in_d[(i+0)%ACC_SAMPLES])));
-            }
-            double tmp[4]; _mm256_storeu_pd(tmp, acc);
-            sink_d = tmp[0];
-        };
-    };
-#endif
-
-    // Warmup
-    time_ms(run_scalar_f(false), WARMUP_ITERS);
-    time_ms(run_scalar_f(true),  WARMUP_ITERS);
-
-    // Timed runs
-    double t_std_expf  = time_ms(run_scalar_f(false), BENCH_ITERS);
-    double t_ours_expf = time_ms(run_scalar_f(true),  BENCH_ITERS);
-    double t_std_exp   = time_ms(run_scalar_d(false), BENCH_ITERS);
-    double t_ours_exp  = time_ms(run_scalar_d(true),  BENCH_ITERS);
-
-#ifdef __AVX2__
-    double t_avxf_std  = time_ms(run_avxf(false), BENCH_ITERS);
-    double t_avxf_ours = time_ms(run_avxf(true),  BENCH_ITERS);
-    double t_avxd_std  = time_ms(run_avxd(false), BENCH_ITERS);
-    double t_avxd_ours = time_ms(run_avxd(true),  BENCH_ITERS);
-#endif
-
-    // ── 6. Polynomial-only timing (std::chrono) ────────────────────────────────
-    std::vector<double> in_rf(ACC_SAMPLES), in_rd(ACC_SAMPLES);
-    for (int i = 0; i < ACC_SAMPLES; ++i) {
-        in_rf[i] = fexp::expf_reduce(in_f[i]);
-        in_rd[i] = fexp::exp_reduce(in_d[i]);
-    }
-
-    auto run_poly_f = [&](int iters) {
-        float acc = 0.0f;
-        for (int i = 0; i < iters; ++i)
-            acc += fexp::expf_poly(in_rf[i % ACC_SAMPLES]);
-        sink_f = acc;
-    };
-
-    auto run_poly_d = [&](int iters) {
-        double acc = 0.0;
-        for (int i = 0; i < iters; ++i)
-            acc += fexp::exp_poly(in_rd[i % ACC_SAMPLES]);
-        sink_d = acc;
-    };
-
-    run_poly_f(WARMUP_ITERS);
-    run_poly_d(WARMUP_ITERS);
-
-    auto poly_f_t0 = Clock::now();
-    run_poly_f(BENCH_ITERS);
-    auto poly_f_t1 = Clock::now();
-
-    auto poly_d_t0 = Clock::now();
-    run_poly_d(BENCH_ITERS);
-    auto poly_d_t1 = Clock::now();
-
-    double ns_poly_f = std::chrono::duration<double, std::nano>(poly_f_t1 - poly_f_t0).count()
-                       / static_cast<double>(BENCH_ITERS);
-    double ns_poly_d = std::chrono::duration<double, std::nano>(poly_d_t1 - poly_d_t0).count()
-                       / static_cast<double>(BENCH_ITERS);
-
-    // ── 7. Report ─────────────────────────────────────────────────────────────
-
-    auto ns_per  = [](double ms, int iters) { return (ms * 1e6) / static_cast<double>(iters); };
-    auto speedup = [](double base, double fast) { return base / fast; };
-    auto pct     = [](double part, double total) { return 100.0 * part / total; };
+    // ── Header ────────────────────────────────────────────────────────────────
 
     lprintf("\n");
     lprintf("══════════════════════════════════════════════════════════════════\n");
-    lprintf("  exp benchmark   (%d calls per variant)\n", BENCH_ITERS);
+    lprintf("  exp() Benchmark — homemade (exp.hpp, glibc-2.43 port) vs stdlib\n");
+    lprintf("  Compile flags : -O3 -march=native -mavx2 -mfma -std=c++20\n");
+    lprintf("  Iterations    : %'d per variant per cluster\n", BENCH_ITERS);
+    lprintf("  Warmup        : %'d iterations (not timed)\n",  WARMUP_ITERS);
+    lprintf("  Acc. samples  : %'d random draws per cluster\n", ACC_SAMPLES);
     lprintf("══════════════════════════════════════════════════════════════════\n");
-    lprintf("  %-32s %8s  %8s  %8s\n", "Variant", "ns/call", "ms total", "speedup");
-    lprintf("  %-32s %8s  %8s  %8s\n", "--------------------------------",
-            "--------", "--------", "-------");
 
-    lprintf("  %-32s %8.2f  %8.1f\n",
-            "::expf (stdlib f32)",
-            ns_per(t_std_expf, BENCH_ITERS), t_std_expf);
-    lprintf("  %-32s %8.2f  %8.1f  %7.2fx\n",
-            "fexp::expf (glibc f32)",
-            ns_per(t_ours_expf, BENCH_ITERS), t_ours_expf,
-            speedup(t_std_expf, t_ours_expf));
+    // ── Value clusters ────────────────────────────────────────────────────────
 
-    lprintf("  %-32s\n", "");
+    struct Cluster { const char* label; double lo, hi; };
 
-    lprintf("  %-32s %8.2f  %8.1f\n",
-            "std::exp (stdlib f64)",
-            ns_per(t_std_exp, BENCH_ITERS), t_std_exp);
-    lprintf("  %-32s %8.2f  %8.1f  %7.2fx\n",
-            "fexp::exp (glibc f64)",
-            ns_per(t_ours_exp, BENCH_ITERS), t_ours_exp,
-            speedup(t_std_exp, t_ours_exp));
+    static constexpr Cluster CLUSTERS[] = {
+        { "x near 1     ",  0.9,    1.1   },
+        { "x near 80    ", 79.5,   80.5   },
+        { "x near 2e-10 ", 1e-10,  3e-10  },
+    };
 
-#ifdef __AVX2__
-    lprintf("  %-32s\n", "");
-
-    lprintf("  %-32s %8.2f  %8.1f\n",
-            "::expf (AVX2 8×f32, emul)",
-            ns_per(t_avxf_std, BENCH_ITERS / 8), t_avxf_std);
-    lprintf("  %-32s %8.2f  %8.1f  %7.2fx\n",
-            "fexp::expf (AVX2 8×f32, scalar)",
-            ns_per(t_avxf_ours, BENCH_ITERS / 8), t_avxf_ours,
-            speedup(t_avxf_std, t_avxf_ours));
-
-    lprintf("  %-32s\n", "");
-
-    lprintf("  %-32s %8.2f  %8.1f\n",
-            "std::exp (AVX2 4×f64, emul)",
-            ns_per(t_avxd_std, BENCH_ITERS / 4), t_avxd_std);
-    lprintf("  %-32s %8.2f  %8.1f  %7.2fx\n",
-            "fexp::exp (AVX2 4×f64, scalar)",
-            ns_per(t_avxd_ours, BENCH_ITERS / 4), t_avxd_ours,
-            speedup(t_avxd_std, t_avxd_ours));
-#endif
+    // ═══════════════════════════════════════════════════════════════════════════
+    //  float64 (double)
+    // ═══════════════════════════════════════════════════════════════════════════
 
     lprintf("\n");
-    lprintf("──────────────────────────────────────────────────────────────────\n");
-    lprintf("  Polynomial-only  (%d calls, pre-reduced inputs)\n", BENCH_ITERS);
-    lprintf("  Isolates degree-3 (f32) / degree-4 (f64) polynomial kernel.\n");
-    lprintf("──────────────────────────────────────────────────────────────────\n");
-    lprintf("  %-32s %8s  %8s  %9s\n",
-            "Variant", "ns/call", "vs full", "% of full");
-    lprintf("  %-32s %8s  %8s  %9s\n",
-            "--------------------------------", "--------", "-------", "---------");
-    lprintf("  %-32s %8.2f  %8.2f  %8.1f%%\n",
-            "expf poly only (f32)",
-            ns_poly_f, ns_per(t_ours_expf, BENCH_ITERS),
-            pct(ns_poly_f, ns_per(t_ours_expf, BENCH_ITERS)));
-    lprintf("  %-32s %8.2f  %8.2f  %8.1f%%\n",
-            "exp  poly only (f64)",
-            ns_poly_d, ns_per(t_ours_exp, BENCH_ITERS),
-            pct(ns_poly_d, ns_per(t_ours_exp, BENCH_ITERS)));
+    lprintf("┌────────────────────────────────────────────────────────────────┐\n");
+    lprintf("│  FLOAT64 (double) — fexp::exp(x)  vs  std::exp(x)             │\n");
+    lprintf("│  Homemade : glibc-2.43 algorithm, header-inlined, no errno    │\n");
+    lprintf("│  Stdlib   : glibc libm, called via PLT (shared-library ABI)   │\n");
+    lprintf("└────────────────────────────────────────────────────────────────┘\n");
 
-    lprintf("\n");
-    lprintf("──────────────────────────────────────────────────────────────────\n");
-    lprintf("  Accuracy  (%d samples, ∈ [-87,87] f32 / [-700,700] f64)\n",
-            ACC_SAMPLES);
-    lprintf("──────────────────────────────────────────────────────────────────\n");
-    lprintf("  fexp::expf  scalar — max ULP error : %u\n",   max_ulp);
-    lprintf("  fexp::expf  scalar — max rel error : %.2e\n", max_rel_f);
-    lprintf("  fexp::exp   scalar — max rel error : %.2e\n", max_rel_d);
-#ifdef __AVX2__
-    lprintf("  fexp::expf  AVX2   — max rel error : %.2e\n", max_rel_avxf);
-    lprintf("  fexp::exp   AVX2   — max rel error : %.2e\n", max_rel_avxd);
-#endif
+    for (const auto& cl : CLUSTERS) {
+        std::uniform_real_distribution<double> dist(cl.lo, cl.hi);
+        std::vector<double> in(ACC_SAMPLES);
+        for (auto& v : in) v = dist(rng);
+
+        double max_rel = 0.0;
+        for (auto v : in)
+            max_rel = std::max(max_rel, rel_err(fexp::exp(v), std::exp(v)));
+
+        auto r_std = run_bench_d([](double x){ return std::exp(x);  }, in);
+        auto r_our = run_bench_d([](double x){ return fexp::exp(x); }, in);
+        double su  = r_std.total_ms / r_our.total_ms;
+
+        lprintf("\n");
+        lprintf("  ── Cluster: %s  x ∈ [%.3g, %.3g]  (%d iters)\n",
+                cl.label, cl.lo, cl.hi, BENCH_ITERS);
+        lprintf("     Accuracy vs stdlib — max rel error: %.2e%s\n",
+                max_rel,
+                max_rel == 0.0 ? "  (bit-for-bit identical)" : "  (< 1 ULP)");
+        lprintf("\n");
+        lprintf("     %-42s %9s  %10s  %8s\n",
+                "Variant", "ns/call", "total (ms)", "speedup");
+        lprintf("     %-42s %9s  %10s  %8s\n",
+                "──────────────────────────────────────────",
+                "─────────", "──────────", "───────");
+        lprintf("     %-42s %9.2f  %10.2f\n",
+                "Stdlib   std::exp(x)  [glibc via PLT]",
+                r_std.ns_per_call, r_std.total_ms);
+        lprintf("     %-42s %9.2f  %10.2f  %7.2fx\n",
+                "Homemade fexp::exp(x) [exp.hpp inlined]",
+                r_our.ns_per_call, r_our.total_ms, su);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    //  float32 (float)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    lprintf("\n\n");
+    lprintf("┌────────────────────────────────────────────────────────────────┐\n");
+    lprintf("│  FLOAT32 (float)  — fexp::expf(x) vs  ::expf(x)               │\n");
+    lprintf("│  Homemade : glibc-2.43 algorithm, header-inlined, no errno    │\n");
+    lprintf("│  Stdlib   : glibc libm, called via PLT (shared-library ABI)   │\n");
+    lprintf("└────────────────────────────────────────────────────────────────┘\n");
+
+    for (const auto& cl : CLUSTERS) {
+        std::uniform_real_distribution<float> dist_f(
+            static_cast<float>(cl.lo), static_cast<float>(cl.hi));
+        std::vector<float> in_f(ACC_SAMPLES);
+        for (auto& v : in_f) v = dist_f(rng);
+
+        double   max_rel_f = 0.0;
+        uint32_t max_ulp   = 0;
+        for (auto v : in_f) {
+            float ref  = ::expf(v);
+            float fast = fexp::expf(v);
+            max_rel_f  = std::max(max_rel_f, rel_err(fast, ref));
+            max_ulp    = std::max(max_ulp, ulp_dist(fast, ref));
+        }
+
+        auto r_std = run_bench_f([](float x){ return ::expf(x);      }, in_f);
+        auto r_our = run_bench_f([](float x){ return fexp::expf(x);  }, in_f);
+        double su  = r_std.total_ms / r_our.total_ms;
+
+        lprintf("\n");
+        lprintf("  ── Cluster: %s  x ∈ [%.3g, %.3g]  (%d iters)\n",
+                cl.label, cl.lo, cl.hi, BENCH_ITERS);
+        lprintf("     Accuracy vs stdlib — max ULP error: %u%s,  max rel error: %.2e\n",
+                max_ulp,
+                max_ulp == 0 ? " (bit-for-bit identical)" : "",
+                max_rel_f);
+        lprintf("\n");
+        lprintf("     %-42s %9s  %10s  %8s\n",
+                "Variant", "ns/call", "total (ms)", "speedup");
+        lprintf("     %-42s %9s  %10s  %8s\n",
+                "──────────────────────────────────────────",
+                "─────────", "──────────", "───────");
+        lprintf("     %-42s %9.2f  %10.2f\n",
+                "Stdlib   ::expf(x)    [glibc via PLT]",
+                r_std.ns_per_call, r_std.total_ms);
+        lprintf("     %-42s %9.2f  %10.2f  %7.2fx\n",
+                "Homemade fexp::expf(x)[exp.hpp inlined]",
+                r_our.ns_per_call, r_our.total_ms, su);
+    }
+
+    // ── Wall time ─────────────────────────────────────────────────────────────
+
+    auto wall_end = Clock::now();
+    double wall_s = std::chrono::duration<double>(wall_end - wall_start).count();
+
+    lprintf("\n\n");
+    lprintf("══════════════════════════════════════════════════════════════════\n");
+    lprintf("  Total benchmark wall time: %.3f s\n", wall_s);
     lprintf("══════════════════════════════════════════════════════════════════\n\n");
 
     if (g_log) {
         std::fclose(g_log);
-        std::printf("results saved to bench_results.txt\n");
+        std::printf("Results saved to bench_results.txt\n");
     }
 
     return 0;
