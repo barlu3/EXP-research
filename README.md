@@ -3,8 +3,10 @@
 ## Setup:
 - Extract folders with `tar xf glibc-2.43.tar.xz`
 - Verify `find glibc-2.43/ -name "e_exp.c"`
-- Compile with `g++ -O3 -march=native -mavx2 -mfma -std=c++20 benchmark.cpp -o bench 2>&1`
-- Run benchmarks with `./bench 2>&1`
+- `cd` into `implementations/`
+- Compile benchmarks for homemade with `g++ -O3 -march=native -mavx2 -mfma -std=c++20 benchmark-home.cpp -o output/bench 2>&1`
+- Compile benchmarks for Inria with `g++ -O3 -march=native -mavx2 -mfma -std=c++20 benchmark-inria.cpp -o output/bench_inria 2>&1`
+- Run benchmarks with `./output/bench 2>&1` and `./output/bench_inria 2>&1`
 
 ## Why the homemade version is faster (most inputs)
 
