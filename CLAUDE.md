@@ -4,13 +4,13 @@
 
 ```bash
 # Build (run from implementations/)
-g++ -O3 -march=native -mavx2 -mfma -std=c++20 benchmark.cpp -o bench
+g++ -O3 -march=native -mavx2 -mfma -std=c++20 benchmark-home.cpp -o output/bench
 
 # Run benchmarks (run from implementations/)
-./bench
+./output/bench
 
 # Capture output (run from implementations/)
-./bench 2>&1 | tee output/bench_results.txt
+./output/bench 2>&1 | tee output/bench_results.txt
 ```
 
 ## Key Decisions
