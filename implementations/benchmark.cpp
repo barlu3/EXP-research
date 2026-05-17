@@ -80,9 +80,9 @@ static double rel_err(double fast, double ref) {
 
 // ─── Benchmark parameters ────────────────────────────────────────────────────
 
-static constexpr int BENCH_ITERS  = 1'000'000;
-static constexpr int WARMUP_ITERS =   200'000;
-static constexpr int ACC_SAMPLES  =   100'000;
+static constexpr int BENCH_ITERS  = 100'000'000;
+static constexpr int WARMUP_ITERS =   1'000'000;
+static constexpr int ACC_SAMPLES  =   500'000;
 
 // ─── Timing helpers ──────────────────────────────────────────────────────────
 
