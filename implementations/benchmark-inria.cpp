@@ -18,7 +18,7 @@
  */
 
 #include "exp.hpp"
-#include "inria-exp.hpp"
+#include "inria-exp-seg.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -68,8 +68,8 @@ static constexpr int ACC_SAMPLES  =     500'000;
 
 struct BenchResult { double ns_per_call, total_ms; };
 
-template<typename Fn>
-static BenchResult run_bench(Fn fn, const std::vector<double>& inputs) {
+template<typename Fn, typename T>
+static BenchResult run_bench(Fn fn, const std::vector<T>& inputs) {
     double acc = 0.0;
     for (int i = 0; i < WARMUP_ITERS; ++i) acc += fn(inputs[i % inputs.size()]);
     sink_d = acc;
@@ -83,6 +83,11 @@ static BenchResult run_bench(Fn fn, const std::vector<double>& inputs) {
     double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
     return { (ms * 1e6) / BENCH_ITERS, ms };
 }
+
+// ─── Pre-computed input types for segment benchmarks ─────────────────────────
+
+struct PolyIn   { double th, tl, dx; };
+struct StitchIn { double x, fh, fl; i64 ie; b64u64_u ix; };
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
@@ -170,6 +175,79 @@ int main() {
         lprintf("     %-42s %9.2f  %10.2f  %7.2fx\n",
                 "Inria    cr_exp(x)    [inria-exp.hpp]",
                 r_inria.ns_per_call, r_inria.total_ms, su_inria);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    //  Segmented phase benchmarks — isolate each inria-exp-seg stage
+    //  Inputs for poly and stitch are pre-computed so only the target
+    //  stage runs inside the timed loop.
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    lprintf("\n");
+    lprintf("┌────────────────────────────────────────────────────────────────┐\n");
+    lprintf("│  FLOAT64 — Inria cr_exp segmented phases                       │\n");
+    lprintf("│  Range Reduce : exp_range_reduce()  (decompose x)              │\n");
+    lprintf("│  Poly Expand  : exp_poly_expand()   (evaluate polynomial)      │\n");
+    lprintf("│  Stitch       : exp_stitch()         (assemble IEEE result)     │\n");
+    lprintf("└────────────────────────────────────────────────────────────────┘\n");
+
+    std::mt19937 rng2(42);
+
+    for (const auto& cl : CLUSTERS) {
+        std::uniform_real_distribution<double> dist2(cl.lo, cl.hi);
+        std::vector<double> in2(ACC_SAMPLES);
+        for (auto& v : in2) v = dist2(rng2);
+
+        std::vector<PolyIn> poly_inputs(ACC_SAMPLES);
+        for (int i = 0; i < ACC_SAMPLES; ++i) {
+            double th, tl, dx; i64 ie;
+            exp_range_reduce(in2[i], &th, &tl, &dx, &ie);
+            poly_inputs[i] = {th, tl, dx};
+        }
+
+        std::vector<StitchIn> stitch_inputs(ACC_SAMPLES);
+        for (int i = 0; i < ACC_SAMPLES; ++i) {
+            double th, tl, dx; i64 ie;
+            exp_range_reduce(in2[i], &th, &tl, &dx, &ie);
+            double fh, fl;
+            exp_poly_expand(th, tl, dx, &fh, &fl);
+            b64u64_u ix = {.f = in2[i]};
+            stitch_inputs[i] = {in2[i], fh, fl, ie, ix};
+        }
+
+        auto r_rr = run_bench([](const double& x) {
+            double th, tl, dx; i64 ie;
+            exp_range_reduce(x, &th, &tl, &dx, &ie);
+            return th + tl + dx;
+        }, in2);
+
+        auto r_poly = run_bench([](const PolyIn& p) {
+            double fh, fl;
+            exp_poly_expand(p.th, p.tl, p.dx, &fh, &fl);
+            return fh + fl;
+        }, poly_inputs);
+
+        auto r_stitch = run_bench([](const StitchIn& s) {
+            return exp_stitch(s.x, s.fh, s.fl, s.ie, s.ix);
+        }, stitch_inputs);
+
+        lprintf("\n");
+        lprintf("  ── Cluster: %s  x ∈ [%.3g, %.3g]  (%d iters)\n",
+                cl.label, cl.lo, cl.hi, BENCH_ITERS);
+        lprintf("\n");
+        lprintf("     %-42s %9s  %10s\n", "Phase", "ns/call", "total (ms)");
+        lprintf("     %-42s %9s  %10s\n",
+                "──────────────────────────────────────────",
+                "─────────", "──────────");
+        lprintf("     %-42s %9.2f  %10.2f\n",
+                "Range Reduce  exp_range_reduce()",
+                r_rr.ns_per_call, r_rr.total_ms);
+        lprintf("     %-42s %9.2f  %10.2f\n",
+                "Poly Expand   exp_poly_expand()",
+                r_poly.ns_per_call, r_poly.total_ms);
+        lprintf("     %-42s %9.2f  %10.2f\n",
+                "Stitch        exp_stitch()",
+                r_stitch.ns_per_call, r_stitch.total_ms);
     }
 
     // ── Wall time ─────────────────────────────────────────────────────────────
