@@ -4,4 +4,6 @@ glibc-2.43/
 handoff.md
 bench
 CLAUDE.local.md
+.claude/
+CLAUDE.md
 implementations/output/

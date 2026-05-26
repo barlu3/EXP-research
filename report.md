@@ -373,13 +373,196 @@ accuracy study should quantify ULP degradation as mantissa bits drop from
 
 ---
 
-## 6. File Index
+## 6. Inria CORE-MATH Implementations — float16 and bfloat16
+
+The `inria-expf16.c` and `inria-expbf16.c` files are from the CORE-MATH project
+(https://core-math.gitlabpages.inria.fr/), authored by Maxence Ponsardin and
+Paul Zimmermann. They implement **correctly-rounded** `exp()` for two 16-bit
+floating-point formats used in machine learning hardware.
+
+### 6a. Target Formats
+
+**float16 (binary16)**
+
+| Field | Bits | Notes |
+|---|:---:|---|
+| Sign | 1 | 0 = positive |
+| Exponent | 5 | Bias 15; e = 31 is NaN/Inf |
+| Mantissa | 10 | — |
+
+Normal value: `(-1)^s × 2^(e−15) × (1 + m / 1024)`. Range: ~6×10⁻⁵ to ~65504.
+
+**bfloat16 (brain float 16)**
+
+| Field | Bits | Notes |
+|---|:---:|---|
+| Sign | 1 | 0 = positive |
+| Exponent | 8 | Bias 127 — identical to float32 |
+| Mantissa | 7 | — |
+
+Normal value: `(-1)^s × 2^(e−127) × (1 + m / 128)`. Same exponent range as
+float32; precision is only ~3 decimal digits. Widely used in ML hardware (TPUs,
+modern GPUs) precisely because the 8-bit exponent avoids float32 overflow at
+training magnitudes.
+
+### 6b. Algorithm — Split-Table Multiplication
+
+Both implementations use the identity:
+
+```
+exp(x) = exp(x1) × exp(x2),   where  x = x1 + x2
+```
+
+`x1` captures the "coarse" part of `x` (upper mantissa bits + sign + exponent).  
+`x2` captures the "fine" residual (lower mantissa bits + sign + exponent).
+
+Both `exp(x1)` and `exp(x2)` are pre-computed offline to **binary32 (float32)**
+precision and stored in two C arrays, `T1[]` and `T2[]`. At runtime, the
+function simply:
+1. Decodes the 16-bit input into two table indices `i1` and `i2`
+2. Reads `T1[i1]` and `T2[i2]`
+3. Multiplies them in float32
+4. Returns the result, rounded to the target 16-bit format
+
+The eight extra mantissa bits that float32 provides over float16 are enough to
+guarantee that the product rounds to exactly the nearest float16/bfloat16 value
+— i.e., the result is **correctly rounded** (≤ 0.5 ULP error, always).
+
+### 6c. How x is Split — float16
+
+A float16 bit pattern `u` (16 bits) has the layout:
+
+```
+u = s[1] | e[5] | m_hi[5] | m_lo[5]
+    ↑ sign  ↑ exponent  ↑ upper 5    ↑ lower 5 mantissa bits
+```
+
+The indices are extracted in a single shift/mask operation:
+
+```c
+i1 = u >> 5;                              // top 11 bits → 2048 T1 entries
+i2 = ((u >> 10) << 5) | (u & 0x1f);      // sign+exp + low 5 mantissa → 2048 T2 entries
+```
+
+Mathematically:
+
+```
+x1 = (-1)^s × 2^(e−15) × (1 + m_hi / 32)       [lower 5 mantissa bits zeroed]
+x2 = (-1)^s × 2^(e−25) × m_lo                   [e > 0, normal]
+x2 = (-1)^s × 2^(−24)  × m_lo                   [e = 0, subnormal]
+```
+
+Since `x1 + x2 = x` exactly, `exp(x1) × exp(x2) = exp(x)` exactly, and the
+float32 product rounds to the nearest float16.
+
+### 6d. How x is Split — bfloat16
+
+A bfloat16 bit pattern `u` (16 bits) has 7 mantissa bits, split as upper 4 +
+lower 3:
+
+```
+x1 = (-1)^s × 2^(e−127) × (1 + m_hi / 16)      [lower 3 mantissa bits zeroed]
+x2 = (-1)^s × 2^(e−134) × m_lo                  [residual from low 3 bits]
+```
+
+The index encoding in `cr_exp_bf16()` is slightly more involved because bfloat16
+has a wider exponent field and a smaller valid input range:
+
+```c
+// au = u & 0x7fff  (sign-stripped bits)
+i1 = ((u >> 15) << 8) + (au >> 3) - 0x760;
+i2 = ((u >> 15) << 7) + (((au >> 7) << 3) | (au & 0x7)) - 0x3b0;
+```
+
+The offsets `0x760 = 0x3b00 >> 3` and `0x3b0 = 118 × 8` anchor the tables to
+biased exponent 118 (unbiased −9), which is the bottom of the valid input range
+(`|x| ≥ 2^−9 ≈ 0.002`). Inputs smaller than that satisfy `exp(x) = 1` in
+bfloat16 and are handled without a table lookup.
+
+Table sizes: T1 has **512** entries (2 × 2^8: positive and negative halves),
+T2 has **256** entries (2 × 2^7).
+
+### 6e. The `.sage` Table Generators
+
+`inria-expf16.sage` and `inria-expbf16.sage` are **SageMath scripts** that
+generate the C source for the T1[] and T2[] arrays. SageMath's arbitrary-precision
+arithmetic is used so that every table entry is computed to more than sufficient
+precision before being rounded to float32.
+
+**Key helper conventions used in both scripts:**
+
+| Symbol | Meaning |
+|---|---|
+| `R24(v)` | Round `v` to 24-bit (binary32) precision, nearest-even |
+| `asfloat16(u)` | Reinterpret 16-bit integer `u` as a float16 value |
+| `asbfloat16(u)` | Reinterpret 16-bit integer `u` as a bfloat16 value |
+| `get_hex(v)` | Format `v` as a C hexadecimal float literal, e.g. `0x1.8p+3` |
+
+**`table1()` in inria-expf16.sage** — 2048 entries
+
+Iterates `i1` from 0 to 2047. For each `i1`, reconstructs the float16 bit
+pattern `u1 = i1 × 32` (the input `x1` with lower 5 mantissa bits zero),
+converts it to a real value, computes `exp(x1)` in exact arithmetic, rounds to
+float32, and writes the result. Special encodings (NaN, ±Inf) are propagated
+into float32 form; overflow is capped to `0x1.fffffep+127`; underflow is floored
+to `0x1p-149`.
+
+**`table2()` in inria-expf16.sage** — 2048 entries
+
+Iterates `i2` from 0 to 2047. Decodes `i2` into a sign+exponent header `h` and
+a 5-bit low-mantissa `l`, then computes the residual:
+```
+x2 = (-1)^sgn × 2^(e−25) × l    (normal)
+x2 = (-1)^sgn × 2^(−24)  × l    (subnormal, e = 0)
+```
+Five indices — `[159, 190, 249, 303, 493]` — are adjusted by one ULP downward
+(`y2.nextbelow()`) to avoid double-rounding failures on hard cases.
+
+**`table1()` in inria-expbf16.sage** — 512 entries
+
+Iterates `i1` from 0 to 511. The first 256 entries (sgn = 0) cover positive
+inputs; the upper 256 (sgn = 1) cover negative. The bfloat16 encoding for `x1`
+is `118 × 128 + j1 × 8`, which walks through all combinations of (exponent
+field 118–133, upper 4 mantissa bits) while holding the lower 3 mantissa bits
+at zero.
+
+**`table2()` in inria-expbf16.sage** — 256 entries
+
+Iterates `i2` from 0 to 255. Decodes `i2` into (sgn, h, l) where `h` is the
+exponent offset above 118 (0–15) and `l` is the low 3 mantissa bits (0–7).
+Computes:
+```
+x2 = (-1)^sgn × 2^(h−16) × l
+```
+One index — `i2 = 120` — is nudged one ULP upward (`y2.nextabove()`) to prevent
+a double-rounding exception at a hard input.
+
+### 6f. Why Manual ULP Adjustments Are Needed
+
+Correct rounding for the product `T1[i1] × T2[i2]` is guaranteed *in general*
+by the extra precision of float32. However, for a small number of inputs the
+true value `exp(x)` falls so close to the exact midpoint between two consecutive
+float16/bfloat16 values that the float32 product rounds to the wrong neighbour.
+These are called "Table Maker's Dilemma" instances, found by exhaustive
+verification: every float16 input (2^16 = 65536 values) or every bfloat16 input
+(2^16 = 65536 values) is checked against an oracle computed at higher precision.
+The handful of problematic table indices are then corrected by one ULP.
+
+---
+
+## 7. File Index
 
 | File | Purpose |
 |---|---|
 | `exp.hpp` | Faithful glibc-2.43 port — baseline implementation |
-| `benchmark.cpp` | Throughput + accuracy benchmark, outputs to stdout and `bench_results.txt` |
+| `benchmark-home.cpp` | Throughput + accuracy benchmark for glibc port |
+| `benchmark-inria.cpp` | Throughput benchmark for Inria CORE-MATH implementations |
+| `inria-exp.hpp` | Inria CORE-MATH implementations (include wrapper) |
+| `inria-exp-seg.hpp` | Segmented / annotated version of Inria implementations |
+| `inria-expf16.c` | Inria CORE-MATH float16 exp — `cr_expf16()` |
+| `inria-expbf16.c` | Inria CORE-MATH bfloat16 exp — `cr_exp_bf16()` |
+| `inria-expf16.sage` | SageMath script that generates T1[] and T2[] for float16 |
+| `inria-expbf16.sage` | SageMath script that generates T1[] and T2[] for bfloat16 |
 | `bench_results.txt` | Last run output |
 | `glibc-2.43/` | Reference source (not modified) |
-| `handoff.md` | Original session notes and project goals |
 | `report.md` | This file |
