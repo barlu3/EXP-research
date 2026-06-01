@@ -1,13 +1,20 @@
 /*
- * Exhaustive bfloat16 exp() verification: CORE-MATH (cr_exp_bf16) vs MPFR.
+ * Exhaustive bfloat16 verification of CORE-MATH against MPFR ground truth.
+ *
+ * The function under test is selected at compile time:
+ *   (default)      exp — includes inria-exp16bitp.c, writes MPFR-result16bitp.txt
+ *   -DVERIFY_SIN   sin — includes inria-sinbf16.c,    writes sin/MPFR-result24bitp-sin.txt
+ *   -DVERIFY_LOG   log — includes inria-logbf16.c,    writes log/MPFR-result24bitp-log.txt
  *
  * For all 65536 bfloat16 bit patterns, compare the CORE-MATH result against
- * the correctly-rounded MPFR result.  For each discrepancy, prints the input,
- * both outputs, and the T1/T2 table indices used by CORE-MATH.
- * Results are written to MPFR-result.txt.
+ * the correctly-rounded MPFR result.  Every discrepancy is logged with input,
+ * both outputs, and the lookup-table indices used by CORE-MATH (T1/T2 for exp,
+ * S1/C1/S2/C2 for sin, T1/T2 or T3 for log).
  *
- * Compile:
- *   gcc -O2 -std=c11 verify_mpfr.c -lmpfr -lgmp -lm -o verify_mpfr
+ * Compile (from cross-eval/):
+ *   gcc -O2 -std=c11              verify_mpfr.c -lmpfr -lgmp -lm -o verify_mpfr
+ *   gcc -O2 -std=c11 -DVERIFY_SIN verify_mpfr.c -lmpfr -lgmp -lm -o verify_sin
+ *   gcc -O2 -std=c11 -DVERIFY_LOG verify_mpfr.c -lmpfr -lgmp -lm -o verify_log
  */
 
 #include <stdio.h>
@@ -16,11 +23,33 @@
 #include <math.h>
 #include <mpfr.h>
 
-/* Pull in T1[], T2[], cr_exp_bf16(), exp_bf16() from CORE-MATH source. */
-// Uncomment line to find discrepancy in rounded 16-bit precision indices.
-// Make sure to uncomment the corresponding line in main() to write results to MPFR-result16bitp.txt instead of MPFR-result24bitp.txt.
-#include "inria-16bitp.c"
+/* Pull in the CORE-MATH implementation and pick its entry point + output. */
+#if defined(VERIFY_SIN)
+#include "sin/inria-sin16bitp.c"
+// Uncomment to verify the unmodified Inria tables instead of the 16-bit-rounded ones.
+// #include "../implementations/sin/inria-sinbf16.c"
+#define CR_FUNC   cr_sin_bf16
+#define FUNC_NAME "sin"
+#define OUT_FILE "sin/MPFR-result16bitp-sin.txt"
+// #define OUT_FILE  "sin/MPFR-result24bitp-sin.txt"
+#elif defined(VERIFY_LOG)
+# include "log/inria-log16bitp.c"
+// Uncomment to verify the unmodified Inria tables instead of the 16-bit-rounded ones.
+// #include "../implementations/log/inria-logbf16.c"
+#define CR_FUNC   cr_log_bf16
+#define FUNC_NAME "log"
+#define OUT_FILE "log/MPFR-result16bitp-log.txt"
+// #define OUT_FILE  "log/MPFR-result24bitp-log.txt"
+#else
+/* exp: the table source under test (16-bit rounded, or original 24-bit).
+   Uncomment the original to verify the unmodified Inria tables instead. */
+#include "inria-exp16bitp.c"
 // #include "../implementations/inria-expbf16.c"
+#define CR_FUNC   cr_exp_bf16
+#define FUNC_NAME "exp"
+#define OUT_FILE  "MPFR-result16bitp.txt"
+// #define OUT_FILE "MPFR-result24bitp.txt"
+#endif
 
 /* ── helpers ───────────────────────────────────────────────────────── */
 
@@ -32,98 +61,89 @@ static float bf16_to_float(uint16_t b)
     f32u32 v; v.u = (uint32_t)b << 16; return v.f;
 }
 
-/* ── correctly-rounded bfloat16 exp via MPFR ──────────────────────── */
+/* ── round a signed MPFR value to a bfloat16 bit pattern ──────────────── */
 /*
  * bfloat16: 1 sign + 8 exponent + 7 mantissa bits; same exponent range as
- * float32 (bias 127; normal exponent -126..127; 8 significant bits total).
+ * float32 (bias 127).  In MPFR's significand-in-[0.5,1) convention the
+ * normal exponent runs -125..128 with 8 significant bits.
  *
- * In MPFR's convention (significand in [0.5,1)):
- *   emin = -125  (smallest normal 2^-126 = 0.5 * 2^-125)
- *   emax = 128   (largest  normal < 2^128)
- *   precision = 8 bits
- *
- * We avoid mpfr_subnormalize (which has a bug in this MPFR build for
- * subnormal cases) and instead re-round from the 256-bit result to the
- * correct subnormal precision manually.
+ * We avoid mpfr_subnormalize (buggy for subnormals in this MPFR build) and
+ * re-round from the high-precision result manually.  Sign is handled here so
+ * the same routine serves exp (positive), sin and log (both signed).
  */
-static uint16_t mpfr_exp_bf16(uint16_t bits)
+static uint16_t round_mpfr_to_bf16(mpfr_t mp)
 {
-    uint16_t au = bits & 0x7fff;
+    if (mpfr_nan_p(mp)) return 0x7fc0;                  /* qNaN              */
+    uint16_t sign = mpfr_signbit(mp) ? 0x8000 : 0x0000;
+    if (mpfr_inf_p(mp))  return sign | 0x7f80;          /* +-Inf             */
+    if (mpfr_zero_p(mp)) return sign;                   /* +-0               */
 
-    /* ── IEEE special values ─────────────────────────────────────────── */
-    if (au > 0x7f80) return bits | 0x0040;        /* NaN → quiet NaN   */
-    if (au == 0x7f80)
-        return (bits == 0x7f80) ? 0x7f80 : 0x0000; /* ±Inf              */
+    /* Work on the magnitude; re-apply the sign at the end. */
+    mpfr_t a; mpfr_init2(a, 256); mpfr_abs(a, mp, MPFR_RNDN);
 
-    float x = bf16_to_float(bits);
+    mpfr_t res; mpfr_init2(res, 8);
+    mpfr_set(res, a, MPFR_RNDN);                        /* round to 8 sig bits */
+    mpfr_exp_t e = mpfr_get_exp(res);
 
-    /* ── compute exp(x) at 256-bit precision (no emin/emax clamp) ───── */
-    mpfr_t mp;
-    mpfr_init2(mp, 256);
-    mpfr_set_flt(mp, x, MPFR_RNDN);   /* exact: x is a float32 value   */
-    mpfr_exp(mp, mp, MPFR_RNDN);
-
-    /* ── round to 8 bits (still no emin/emax, so subnormals are kept) ─ */
-    mpfr_t res;
-    mpfr_init2(res, 8);
-    mpfr_set(res, mp, MPFR_RNDN);
-    mpfr_exp_t e = mpfr_zero_p(res) ? (mpfr_exp_t)-9999 : mpfr_get_exp(res);
-
-    uint16_t result;
-
+    uint16_t mag;
     if (mpfr_inf_p(res) || e > 128) {
-        /* Overflow → bfloat16 +Inf */
-        result = 0x7f80;
-
+        mag = 0x7f80;                                   /* overflow -> Inf   */
     } else if (e >= -125) {
-        /* Normal bfloat16 value.
-         * The 8-bit result is exact for this range; convert to float32
-         * (lossless since 8 ≤ 24 sig bits) and take the top 16 bits. */
+        /* Normal: the 8-bit result is exact in float32 (8 <= 24 sig bits);
+           the top 16 bits are the bfloat16 magnitude. */
         float f = mpfr_get_flt(res, MPFR_RNDN);
         f32u32 v; v.f = f;
-        result = (uint16_t)(v.u >> 16);
-
+        mag = (uint16_t)(v.u >> 16) & 0x7fff;
     } else {
-        /*
-         * Subnormal or underflow (e < -125).
-         *
-         * bfloat16 subnormals have values k * 2^(-133) for k = 1..127.
-         * Round the true value to the nearest such multiple by scaling:
-         *   k = round_nearest_even(mp * 2^133)
-         * k=0 → underflow (0x0000), k=1..127 → subnormal (0x000k).
-         *
-         * The 8-bit intermediate (res) is only used for the exponent
-         * triage above; we always re-round from the 256-bit mp to avoid
-         * any double-rounding error.
-         *
-         * Edge case e=-133: the 8-bit result sits exactly at 2^(-134)
-         * (the threshold between 0x0000 and 0x0001); the scale approach
-         * handles this correctly via ties-to-even (0 is even → 0x0000
-         * for the exact midpoint; otherwise k=1 → 0x0001).
-         */
-        mpfr_t scaled;
-        mpfr_init2(scaled, 256);
-        /* Multiply by 2^133 (exact bit-shift on a 256-bit MPFR value). */
-        mpfr_mul_2exp(scaled, mp, 133, MPFR_RNDN);
-        /* Round to nearest integer with ties-to-even. */
-        mpfr_rint(scaled, scaled, MPFR_RNDN);
+        /* Subnormal: bfloat16 subnormals are k * 2^(-133), k = 1..127.
+           Re-round from the high-precision magnitude to avoid double rounding. */
+        mpfr_t scaled; mpfr_init2(scaled, 256);
+        mpfr_mul_2exp(scaled, a, 133, MPFR_RNDN);       /* exact bit-shift   */
+        mpfr_rint(scaled, scaled, MPFR_RNDN);           /* ties-to-even      */
         long k = mpfr_get_si(scaled, MPFR_RNDN);
         mpfr_clear(scaled);
-
-        if (k <= 0)
-            result = 0x0000;          /* underflow */
-        else if (k >= 128)
-            result = 0x0080;          /* rounds to smallest normal (safety clamp) */
-        else
-            result = (uint16_t)k;     /* bfloat16 subnormal mantissa field */
+        if (k <= 0)        mag = 0x0000;                /* underflow         */
+        else if (k >= 128) mag = 0x0080;               /* smallest normal   */
+        else               mag = (uint16_t)k;
     }
 
-    mpfr_clear(res);
-    mpfr_clear(mp);
-    return result;
+    mpfr_clear(res); mpfr_clear(a);
+    return sign | mag;
 }
 
-/* ── T1/T2 index helper ────────────────────────────────────────────── */
+/* ── correctly-rounded bfloat16 reference via MPFR ───────────────────── */
+static uint16_t mpfr_ref_bf16(uint16_t bits)
+{
+    uint16_t au = bits & 0x7fff;
+    if (au > 0x7f80) return 0x7fc0;                     /* NaN in -> qNaN    */
+
+    float x = bf16_to_float(bits);
+    mpfr_t mp; mpfr_init2(mp, 256);
+    uint16_t r;
+
+#if defined(VERIFY_SIN)
+    if (au == 0x7f80) { mpfr_clear(mp); return 0x7fc0; }            /* sin(+-Inf)=NaN */
+    mpfr_set_flt(mp, x, MPFR_RNDN);
+    mpfr_sin(mp, mp, MPFR_RNDN);
+#elif defined(VERIFY_LOG)
+    if (au == 0x7f80) { mpfr_clear(mp); return (bits >> 15) ? 0x7fc0 : 0x7f80; } /* log(-Inf)=NaN, log(+Inf)=+Inf */
+    if (bits >> 15)   { mpfr_clear(mp); return (bits == 0x8000) ? 0xff80 : 0x7fc0; } /* log(-0)=-Inf, log(x<0)=NaN */
+    if (au == 0)      { mpfr_clear(mp); return 0xff80; }            /* log(+0) = -Inf */
+    mpfr_set_flt(mp, x, MPFR_RNDN);
+    mpfr_log(mp, mp, MPFR_RNDN);
+#else
+    if (au == 0x7f80) { mpfr_clear(mp); return (bits >> 15) ? 0x0000 : 0x7f80; }  /* exp(-Inf)=0, exp(+Inf)=+Inf */
+    mpfr_set_flt(mp, x, MPFR_RNDN);
+    mpfr_exp(mp, mp, MPFR_RNDN);
+#endif
+
+    r = round_mpfr_to_bf16(mp);
+    mpfr_clear(mp);
+    return r;
+}
+
+#if !defined(VERIFY_SIN) && !defined(VERIFY_LOG)
+/* ── exp T1/T2 index helper (for discrepancy annotation) ─────────────── */
 static void get_indices(uint16_t bits, int *i1_out, int *i2_out)
 {
     uint16_t au = bits & 0x7fff;
@@ -133,21 +153,19 @@ static void get_indices(uint16_t bits, int *i1_out, int *i2_out)
                     + (((au >> 7) << 3) | (au & 0x7u))
                     - 0x3b0u);
 }
+#endif
 
 /* ── main ──────────────────────────────────────────────────────────── */
 int main(void)
 {
-    // Uncomment the line below to write results for 16-bit precision
-    FILE *out = fopen("MPFR-result16bitp.txt", "w");
-    // Since the original bf16 indices were computer with 24-bit precision (32-bit)
-    // FILE *out = fopen("MPFR-result24bitp.txt", "w");
-    if (!out) { perror("fopen MPFR-result.txt"); return 1; }
+    FILE *out = fopen(OUT_FILE, "w");
+    if (!out) { perror("fopen " OUT_FILE); return 1; }
 
     fprintf(out,
-        "MPFR vs CORE-MATH bfloat16 exp() — exhaustive verification\n"
+        "MPFR vs CORE-MATH bfloat16 %s() — exhaustive verification\n"
         "MPFR version: %s\n"
         "Checking all 65536 bfloat16 bit patterns (0x0000–0xFFFF)...\n\n",
-        mpfr_get_version());
+        FUNC_NAME, mpfr_get_version());
 
     int discrepancies = 0;
     int nan_pairs     = 0;
@@ -155,16 +173,13 @@ int main(void)
     for (uint32_t u = 0; u <= 0xFFFFu; u++) {
         uint16_t bits = (uint16_t)u;
 
-        /* CORE-MATH result */
         bf16u16 in_v, out_v;
         in_v.u  = bits;
-        out_v.f = cr_exp_bf16(in_v.f);
+        out_v.f = CR_FUNC(in_v.f);
         uint16_t core_bits = out_v.u;
 
-        /* MPFR result */
-        uint16_t mpfr_bits = mpfr_exp_bf16(bits);
+        uint16_t mpfr_bits = mpfr_ref_bf16(bits);
 
-        /* Both NaN → skip payload comparison */
         int core_nan = (core_bits & 0x7fff) > 0x7f80;
         int mpfr_nan = (mpfr_bits  & 0x7fff) > 0x7f80;
         if (core_nan && mpfr_nan) { ++nan_pairs; continue; }
@@ -174,8 +189,6 @@ int main(void)
             float x_f    = bf16_to_float(bits);
             float core_f = bf16_to_float(core_bits);
             float mpfr_f = bf16_to_float(mpfr_bits);
-            int i1, i2;
-            get_indices(bits, &i1, &i2);
 
             fprintf(out, "DISCREPANCY #%d:\n", discrepancies);
             fprintf(out, "  Input     : 0x%04X  (%+.8e as float)\n",
@@ -184,6 +197,57 @@ int main(void)
                     core_bits, (double)core_f);
             fprintf(out, "  MPFR      : 0x%04X  (%+.8e as float)\n",
                     mpfr_bits, (double)mpfr_f);
+#if defined(VERIFY_SIN)
+            /* reduction path: sin = sgn * fma(S1[i1], C2[i2], C1[i1]*S2[i2]) */
+            {
+                uint16_t au = bits & 0x7fff;
+                if (au > 0x3de8 && au < 0x4580) {
+                    int i1 = (int)((au - 0x3d80) >> 3);
+                    int i2 = (int)((((au - 0x3d80) >> 7) << 3) | (au & 0x7));
+                    fprintf(out, "  S1 index  : %d   S1[%d] = %.8e\n",
+                            i1, i1, (double)S1[i1]);
+                    fprintf(out, "  C1 index  : %d   C1[%d] = %.8e\n",
+                            i1, i1, (double)C1[i1]);
+                    fprintf(out, "  S2 index  : %d   S2[%d] = %.8e\n",
+                            i2, i2, (double)S2[i2]);
+                    fprintf(out, "  C2 index  : %d   C2[%d] = %.8e\n",
+                            i2, i2, (double)C2[i2]);
+                    fprintf(out, "  fma(S1,C2,C1*S2) (float32) = %.8e\n",
+                            (double)__builtin_fmaf(S1[i1], C2[i2],
+                                                   C1[i1] * S2[i2]));
+                } else if (au >= 0x4580 && (au >> 7) != 0xff) {
+                    /* large-arg path: |x| >= 4096 reconstructs sin via the
+                       S3/C3 tables over indices k..k+7 (k=0 at |x|=4096). */
+                    int k = (int)((au >> 7) - 0x8b);
+                    fprintf(out, "  S3/C3 base : k=%d   S3[%d] = %.8e   C3[%d] = %.8e\n",
+                            k, k, (double)S3[k], k, (double)C3[k]);
+                    fprintf(out, "  (large-arg path uses S3/C3[k..k+7])\n");
+                } else {
+                    fprintf(out, "  (special-case path — sin(x) rounds to x, no table)\n");
+                }
+            }
+#elif defined(VERIFY_LOG)
+            /* normal: log = T1[i1] + T2[i2];  subnormal (i1==0): log = T3[i2] */
+            if ((bits >> 15) == 0 && (bits & 0x7fff) < 0x7f80) {
+                int i1 = (int)(bits >> 7);
+                int i2 = (int)(bits & 0x7f);
+                if (i1 == 0) {
+                    fprintf(out, "  T3 index  : %d   T3[%d] = %.8e\n",
+                            i2, i2, (double)T3[i2].f);
+                } else {
+                    fprintf(out, "  T1 index  : %d   T1[%d] = %.8e\n",
+                            i1, i1, (double)T1[i1]);
+                    fprintf(out, "  T2 index  : %d   T2[%d] = %.8e\n",
+                            i2, i2, (double)T2[i2]);
+                    fprintf(out, "  T1[i1]+T2[i2] (float32) = %.8e\n",
+                            (double)(T1[i1] + T2[i2]));
+                }
+            } else {
+                fprintf(out, "  (special-case path — no table lookup)\n");
+            }
+#else
+            int i1, i2;
+            get_indices(bits, &i1, &i2);
             if (i1 >= 0) {
                 fprintf(out, "  T1 index  : %d   T1[%d] = %.8e\n",
                         i1, i1, (double)T1[i1]);
@@ -194,6 +258,7 @@ int main(void)
             } else {
                 fprintf(out, "  (special-case path — no table lookup)\n");
             }
+#endif
             fprintf(out, "\n");
         }
     }
@@ -207,14 +272,15 @@ int main(void)
 
     if (discrepancies == 0)
         fprintf(out,
-            "RESULT: PASS — cr_exp_bf16 matches MPFR for all "
-            "non-NaN bfloat16 inputs.\n");
+            "RESULT: PASS — cr_%s_bf16 matches MPFR for all "
+            "non-NaN bfloat16 inputs.\n", FUNC_NAME);
     else
         fprintf(out,
             "RESULT: FAIL — %d inputs produced incorrectly-rounded "
             "results.\n", discrepancies);
 
     fclose(out);
-    printf("Done. Discrepancies: %d  (see MPFR-result.txt)\n", discrepancies);
+    printf("[%s] Done. Discrepancies: %d  (see %s)\n",
+           FUNC_NAME, discrepancies, OUT_FILE);
     return 0;
 }

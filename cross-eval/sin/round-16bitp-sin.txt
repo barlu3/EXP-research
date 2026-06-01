@@ -1,0 +1,1265 @@
+S/C sin(x) tables from inria-sinbf16.c rounded to 16-bit MPFR precision
+MPFR version : 4.2.1
+Rounding mode: MPFR_RNDN (nearest, ties-to-even)
+Method       : set 24-bit MPFR from float (exact), round to 16-bit MPFR
+
+=== S1 (256 entries) ===
+index      original (24-bit)         rounded (16-bit)          changed
+---------  ------------------------  ------------------------  -------
+S1[0   ]  +0x1.ffaaaep-5            +0x1.ffaap-5              YES
+S1[1   ]  +0x1.0fccd6p-4            +0x1.0fccp-4              YES
+S1[2   ]  +0x1.1fc344p-4            +0x1.1fc4p-4              YES
+S1[3   ]  +0x1.2fb892p-4            +0x1.2fb8p-4              YES
+S1[4   ]  +0x1.3facb2p-4            +0x1.3facp-4              YES
+S1[5   ]  +0x1.4f9f9p-4             +0x1.4fap-4               YES
+S1[6   ]  +0x1.5f912p-4             +0x1.5f92p-4              YES
+S1[7   ]  +0x1.6f815p-4             +0x1.6f82p-4              YES
+S1[8   ]  +0x1.7f701p-4             +0x1.7f7p-4               YES
+S1[9   ]  +0x1.8f5d52p-4            +0x1.8f5ep-4              YES
+S1[10  ]  +0x1.9f4902p-4            +0x1.9f4ap-4              YES
+S1[11  ]  +0x1.af3316p-4            +0x1.af34p-4              YES
+S1[12  ]  +0x1.bf1b78p-4            +0x1.bf1cp-4              YES
+S1[13  ]  +0x1.cf021cp-4            +0x1.cf02p-4              YES
+S1[14  ]  +0x1.dee6f2p-4            +0x1.dee6p-4              YES
+S1[15  ]  +0x1.eec9e8p-4            +0x1.eecap-4              YES
+S1[16  ]  +0x1.feaaeep-4            +0x1.feaap-4              YES
+S1[17  ]  +0x1.0f3378p-3            +0x1.0f34p-3              YES
+S1[18  ]  +0x1.1f0d3ep-3            +0x1.1f0ep-3              YES
+S1[19  ]  +0x1.2ee286p-3            +0x1.2ee2p-3              YES
+S1[20  ]  +0x1.3eb312p-3            +0x1.3eb4p-3              YES
+S1[21  ]  +0x1.4e7ea4p-3            +0x1.4e7ep-3              YES
+S1[22  ]  +0x1.5e44fcp-3            +0x1.5e44p-3              YES
+S1[23  ]  +0x1.6e05dcp-3            +0x1.6e06p-3              YES
+S1[24  ]  +0x1.7dc102p-3            +0x1.7dc2p-3              YES
+S1[25  ]  +0x1.8d7632p-3            +0x1.8d76p-3              YES
+S1[26  ]  +0x1.9d252ep-3            +0x1.9d26p-3              YES
+S1[27  ]  +0x1.accdb2p-3            +0x1.accep-3              YES
+S1[28  ]  +0x1.bc6f84p-3            +0x1.bc7p-3               YES
+S1[29  ]  +0x1.cc0a66p-3            +0x1.cc0ap-3              YES
+S1[30  ]  +0x1.db9e16p-3            +0x1.db9ep-3              YES
+S1[31  ]  +0x1.eb2a58p-3            +0x1.eb2ap-3              YES
+S1[32  ]  +0x1.faaeeep-3            +0x1.faaep-3              YES
+S1[33  ]  +0x1.0cd00cp-2            +0x1.0cdp-2               YES
+S1[34  ]  +0x1.1c37d6p-2            +0x1.1c38p-2              YES
+S1[35  ]  +0x1.2b8ddcp-2            +0x1.2b8ep-2              YES
+S1[36  ]  +0x1.3ad12ap-2            +0x1.3ad2p-2              YES
+S1[37  ]  +0x1.4a00cap-2            +0x1.4ap-2                YES
+S1[38  ]  +0x1.591bcap-2            +0x1.591cp-2              YES
+S1[39  ]  +0x1.682138p-2            +0x1.6822p-2              YES
+S1[40  ]  +0x1.771026p-2            +0x1.771p-2               YES
+S1[41  ]  +0x1.85e7a2p-2            +0x1.85e8p-2              YES
+S1[42  ]  +0x1.94a6bep-2            +0x1.94a6p-2              YES
+S1[43  ]  +0x1.a34c92p-2            +0x1.a34cp-2              YES
+S1[44  ]  +0x1.b1d83p-2             +0x1.b1d8p-2              YES
+S1[45  ]  +0x1.c048b2p-2            +0x1.c048p-2              YES
+S1[46  ]  +0x1.ce9d2ep-2            +0x1.ce9ep-2              YES
+S1[47  ]  +0x1.dcd4c2p-2            +0x1.dcd4p-2              YES
+S1[48  ]  +0x1.eaee88p-2            +0x1.eaeep-2              YES
+S1[49  ]  +0x1.036294p-1            +0x1.0362p-1              YES
+S1[50  ]  +0x1.110d0cp-1            +0x1.110ep-1              YES
+S1[51  ]  +0x1.1e7344p-1            +0x1.1e74p-1              YES
+S1[52  ]  +0x1.2b91dep-1            +0x1.2b92p-1              YES
+S1[53  ]  +0x1.386598p-1            +0x1.3866p-1              YES
+S1[54  ]  +0x1.44eb38p-1            +0x1.44ecp-1              YES
+S1[55  ]  +0x1.511fap-1             +0x1.512p-1               YES
+S1[56  ]  +0x1.5cffc2p-1            +0x1.5dp-1                YES
+S1[57  ]  +0x1.6888a4p-1            +0x1.6888p-1              YES
+S1[58  ]  +0x1.73b768p-1            +0x1.73b8p-1              YES
+S1[59  ]  +0x1.7e894p-1             +0x1.7e8ap-1              YES
+S1[60  ]  +0x1.88fb76p-1            +0x1.88fcp-1              YES
+S1[61  ]  +0x1.930b7p-1             +0x1.930cp-1              YES
+S1[62  ]  +0x1.9cb6aap-1            +0x1.9cb6p-1              YES
+S1[63  ]  +0x1.a5fab8p-1            +0x1.a5fap-1              YES
+S1[64  ]  +0x1.aed548p-1            +0x1.aed6p-1              YES
+S1[65  ]  +0x1.bf4536p-1            +0x1.bf46p-1              YES
+S1[66  ]  +0x1.cdf604p-1            +0x1.cdf6p-1              YES
+S1[67  ]  +0x1.dad902p-1            +0x1.dadap-1              YES
+S1[68  ]  +0x1.e5e15p-1             +0x1.e5e2p-1              YES
+S1[69  ]  +0x1.ef03e4p-1            +0x1.ef04p-1              YES
+S1[70  ]  +0x1.f6379ep-1            +0x1.f638p-1              YES
+S1[71  ]  +0x1.fb754ap-1            +0x1.fb76p-1              YES
+S1[72  ]  +0x1.feb7aap-1            +0x1.feb8p-1              YES
+S1[73  ]  +0x1.fffb7ep-1            +0x1.fffcp-1              YES
+S1[74  ]  +0x1.ff3f8p-1             +0x1.ff4p-1               YES
+S1[75  ]  +0x1.fc846ep-1            +0x1.fc84p-1              YES
+S1[76  ]  +0x1.f7cd02p-1            +0x1.f7cep-1              YES
+S1[77  ]  +0x1.f11df2p-1            +0x1.f11ep-1              YES
+S1[78  ]  +0x1.e87deep-1            +0x1.e87ep-1              YES
+S1[79  ]  +0x1.ddf596p-1            +0x1.ddf6p-1              YES
+S1[80  ]  +0x1.d18f6ep-1            +0x1.d19p-1               YES
+S1[81  ]  +0x1.b35d1ep-1            +0x1.b35ep-1              YES
+S1[82  ]  +0x1.8e5f9cp-1            +0x1.8e6p-1               YES
+S1[83  ]  +0x1.632abp-1             +0x1.632ap-1              YES
+S1[84  ]  +0x1.326afp-1             +0x1.326ap-1              YES
+S1[85  ]  +0x1.f9c63ep-2            +0x1.f9c6p-2              YES
+S1[86  ]  +0x1.86d224p-2            +0x1.86d2p-2              YES
+S1[87  ]  +0x1.0dc4cap-2            +0x1.0dc4p-2              YES
+S1[88  ]  +0x1.210386p-3            +0x1.2104p-3              YES
+S1[89  ]  +0x1.0fd77p-6             +0x1.0fd8p-6              YES
+S1[90  ]  -0x1.bb2ad2p-4            -0x1.bb2ap-4              YES
+S1[91  ]  -0x1.d9b092p-3            -0x1.d9bp-3               YES
+S1[92  ]  -0x1.6733b8p-2            -0x1.6734p-2              YES
+S1[93  ]  -0x1.dbf436p-2            -0x1.dbf4p-2              YES
+S1[94  ]  -0x1.24a3bp-1             -0x1.24a4p-1              YES
+S1[95  ]  -0x1.56bc3ap-1            -0x1.56bcp-1              YES
+S1[96  ]  -0x1.837b9ep-1            -0x1.837cp-1              YES
+S1[97  ]  -0x1.ca3c0cp-1            -0x1.ca3cp-1              YES
+S1[98  ]  -0x1.f47ed4p-1            -0x1.f47ep-1              YES
+S1[99  ]  -0x1.ffa34ep-1            -0x1.ffa4p-1              YES
+S1[100 ]  -0x1.eaf82p-1             -0x1.eaf8p-1              YES
+S1[101 ]  -0x1.b7c644p-1            -0x1.b7c6p-1              YES
+S1[102 ]  -0x1.693c94p-1            -0x1.693cp-1              YES
+S1[103 ]  -0x1.043d28p-1            -0x1.043ep-1              YES
+S1[104 ]  -0x1.1e1f18p-2            -0x1.1e2p-2               YES
+S1[105 ]  -0x1.0fcddcp-5            -0x1.0fcep-5              YES
+S1[106 ]  +0x1.b890d4p-3            +0x1.b89p-3               YES
+S1[107 ]  +0x1.ccd85ap-2            +0x1.ccd8p-2              YES
+S1[108 ]  +0x1.50608cp-1            +0x1.506p-1               YES
+S1[109 ]  +0x1.a56adcp-1            +0x1.a56ap-1              YES
+S1[110 ]  +0x1.e04188p-1            +0x1.e042p-1              YES
+S1[111 ]  +0x1.fd3c0ep-1            +0x1.fd3cp-1              YES
+S1[112 ]  +0x1.fa8d2ap-1            +0x1.fa8ep-1              YES
+S1[113 ]  +0x1.98d34ep-1            +0x1.98d4p-1              YES
+S1[114 ]  +0x1.a60264p-2            +0x1.a602p-2              YES
+S1[115 ]  -0x1.33d1aap-4            -0x1.33d2p-4              YES
+S1[116 ]  -0x1.1689fp-1             -0x1.168ap-1              YES
+S1[117 ]  -0x1.c2677cp-1            -0x1.c268p-1              YES
+S1[118 ]  -0x1.fffeb8p-1            -0x1.fffep-1              YES
+S1[119 ]  -0x1.c03b44p-1            -0x1.c03cp-1              YES
+S1[120 ]  -0x1.12b9bp-1             -0x1.12bap-1              YES
+S1[121 ]  -0x1.0fa78cp-4            -0x1.0fa8p-4              YES
+S1[122 ]  +0x1.ae4044p-2            +0x1.ae4p-2               YES
+S1[123 ]  +0x1.9b89a2p-1            +0x1.9b8ap-1              YES
+S1[124 ]  +0x1.fb30e4p-1            +0x1.fb3p-1               YES
+S1[125 ]  +0x1.deaa9p-1             +0x1.deaap-1              YES
+S1[126 ]  +0x1.4cf288p-1            +0x1.4cf2p-1              YES
+S1[127 ]  +0x1.a6d86cp-3            +0x1.a6d8p-3              YES
+S1[128 ]  -0x1.26d02p-2             -0x1.26dp-2               YES
+S1[129 ]  -0x1.ec3c4ap-1            -0x1.ec3cp-1              YES
+S1[130 ]  -0x1.808166p-1            -0x1.8082p-1              YES
+S1[131 ]  +0x1.32f2d2p-3            +0x1.32f2p-3              YES
+S1[132 ]  +0x1.d36d9p-1             +0x1.d36ep-1              YES
+S1[133 ]  +0x1.ac5e2p-1             +0x1.ac5ep-1              YES
+S1[134 ]  -0x1.220a2ap-7            -0x1.220ap-7              YES
+S1[135 ]  -0x1.b143cep-1            -0x1.b144p-1              YES
+S1[136 ]  -0x1.cfa7f8p-1            -0x1.cfa8p-1              YES
+S1[137 ]  -0x1.0f0e7p-3             -0x1.0f0ep-3              YES
+S1[138 ]  +0x1.866e1p-1             +0x1.866ep-1              YES
+S1[139 ]  +0x1.e9aa1cp-1            +0x1.e9aap-1              YES
+S1[140 ]  +0x1.156854p-2            +0x1.1568p-2              YES
+S1[141 ]  -0x1.53c7d2p-1            -0x1.53c8p-1              YES
+S1[142 ]  -0x1.f9df48p-1            -0x1.f9ep-1               YES
+S1[143 ]  -0x1.9dbc0cp-2            -0x1.9dbcp-2              YES
+S1[144 ]  +0x1.1a549ap-1            +0x1.1a54p-1              YES
+S1[145 ]  +0x1.0ee3eep-1            +0x1.0ee4p-1              YES
+S1[146 ]  -0x1.fbca7p-1             -0x1.fbcap-1              YES
+S1[147 ]  +0x1.2f7b3ep-2            +0x1.2f7cp-2              YES
+S1[148 ]  +0x1.7d7f78p-1            +0x1.7d8p-1               YES
+S1[149 ]  -0x1.d5425p-1             -0x1.d542p-1              YES
+S1[150 ]  +0x1.220742p-6            +0x1.2208p-6              YES
+S1[151 ]  +0x1.cdb734p-1            +0x1.cdb8p-1              YES
+S1[152 ]  -0x1.8958acp-1            -0x1.8958p-1              YES
+S1[153 ]  -0x1.0cabfep-2            -0x1.0cacp-2              YES
+S1[154 ]  +0x1.f9274p-1             +0x1.f928p-1              YES
+S1[155 ]  -0x1.1e199ap-1            -0x1.1e1ap-1              YES
+S1[156 ]  -0x1.0b08bcp-1            -0x1.0b08p-1              YES
+S1[157 ]  +0x1.fc59cep-1            +0x1.fc5ap-1              YES
+S1[158 ]  -0x1.382046p-2            -0x1.382p-2               YES
+S1[159 ]  -0x1.7a75e4p-1            -0x1.7a76p-1              YES
+S1[160 ]  +0x1.d70da8p-1            +0x1.d70ep-1              YES
+S1[161 ]  -0x1.cbbd2ep-1            -0x1.cbbep-1              YES
+S1[162 ]  +0x1.03ea46p-2            +0x1.03eap-2              YES
+S1[163 ]  +0x1.21d8dcp-1            +0x1.21d8p-1              YES
+S1[164 ]  -0x1.fcdefap-1            -0x1.fcdep-1              YES
+S1[165 ]  +0x1.7764b8p-1            +0x1.7764p-1              YES
+S1[166 ]  +0x1.21fbap-5             +0x1.21fcp-5              YES
+S1[167 ]  -0x1.8f162ep-1            -0x1.8f16p-1              YES
+S1[168 ]  +0x1.f798dp-1             +0x1.f798p-1              YES
+S1[169 ]  -0x1.03425cp-1            -0x1.0342p-1              YES
+S1[170 ]  -0x1.495762p-2            -0x1.4958p-2              YES
+S1[171 ]  +0x1.da87f4p-1            +0x1.da88p-1              YES
+S1[172 ]  -0x1.c7ad8p-1             -0x1.c7aep-1              YES
+S1[173 ]  +0x1.e4aebap-3            +0x1.e4aep-3              YES
+S1[174 ]  +0x1.2945dep-1            +0x1.2946p-1              YES
+S1[175 ]  -0x1.fdcabp-1             -0x1.fdcap-1              YES
+S1[176 ]  +0x1.712bdap-1            +0x1.712cp-1              YES
+S1[177 ]  -0x1.94b3aap-1            -0x1.94b4p-1              YES
+S1[178 ]  -0x1.f6ce5ep-2            -0x1.f6cep-2              YES
+S1[179 ]  +0x1.dddc3p-1             +0x1.dddcp-1              YES
+S1[180 ]  +0x1.c16208p-3            +0x1.c162p-3              YES
+S1[181 ]  -0x1.fe8d8p-1             -0x1.fe8ep-1              YES
+S1[182 ]  +0x1.21cd18p-4            +0x1.21cep-4              YES
+S1[183 ]  +0x1.f402dep-1            +0x1.f402p-1              YES
+S1[184 ]  -0x1.6b74f6p-2            -0x1.6b74p-2              YES
+S1[185 ]  -0x1.bf20d2p-1            -0x1.bf2p-1               YES
+S1[186 ]  +0x1.37d7cp-1             +0x1.37d8p-1              YES
+S1[187 ]  +0x1.6461c8p-1            +0x1.6462p-1              YES
+S1[188 ]  -0x1.9f8ccap-1            -0x1.9f8cp-1              YES
+S1[189 ]  -0x1.d6e9ecp-2            -0x1.d6eap-2              YES
+S1[190 ]  +0x1.e41164p-1            +0x1.e412p-1              YES
+S1[191 ]  +0x1.7a5f52p-3            +0x1.7a6p-3               YES
+S1[192 ]  -0x1.ff9832p-1            -0x1.ff98p-1              YES
+S1[193 ]  +0x1.efcc7cp-1            +0x1.efccp-1              YES
+S1[194 ]  -0x1.b604acp-1            -0x1.b604p-1              YES
+S1[195 ]  +0x1.572558p-1            +0x1.5726p-1              YES
+S1[196 ]  -0x1.b66e6p-2             -0x1.b66ep-2              YES
+S1[197 ]  +0x1.32e332p-3            +0x1.32e4p-3              YES
+S1[198 ]  +0x1.21132cp-3            +0x1.2114p-3              YES
+S1[199 ]  -0x1.ae477p-2             -0x1.ae48p-2              YES
+S1[200 ]  +0x1.53cac6p-1            +0x1.53cap-1              YES
+S1[201 ]  -0x1.b3abb4p-1            -0x1.b3acp-1              YES
+S1[202 ]  +0x1.eea802p-1            +0x1.eea8p-1              YES
+S1[203 ]  -0x1.ffc0fcp-1            -0x1.ffcp-1               YES
+S1[204 ]  +0x1.e583fcp-1            +0x1.e584p-1              YES
+S1[205 ]  -0x1.a229cep-1            -0x1.a22ap-1              YES
+S1[206 ]  +0x1.3b668ap-1            +0x1.3b66p-1              YES
+S1[207 ]  -0x1.73dbd4p-2            -0x1.73dcp-2              YES
+S1[208 ]  +0x1.45b53p-4             +0x1.45b6p-4              YES
+S1[209 ]  -0x1.eef1d2p-2            -0x1.eef2p-2              YES
+S1[210 ]  -0x1.c59b9ap-1            -0x1.c59cp-1              YES
+S1[211 ]  -0x1.fd5922p-1            -0x1.fd5ap-1              YES
+S1[212 ]  -0x1.8c3666p-1            -0x1.8c36p-1              YES
+S1[213 ]  -0x1.2f6c26p-2            -0x1.2f6cp-2              YES
+S1[214 ]  +0x1.1e2e46p-2            +0x1.1e2ep-2              YES
+S1[215 ]  +0x1.86732cp-1            +0x1.8674p-1              YES
+S1[216 ]  +0x1.fc5abep-1            +0x1.fc5ap-1              YES
+S1[217 ]  +0x1.c9b664p-1            +0x1.c9b6p-1              YES
+S1[218 ]  +0x1.fea0f6p-2            +0x1.feap-2               YES
+S1[219 ]  -0x1.fbbe8ep-5            -0x1.fbbep-5              YES
+S1[220 ]  -0x1.3442cap-1            -0x1.3442p-1              YES
+S1[221 ]  -0x1.e29538p-1            -0x1.e296p-1              YES
+S1[222 ]  -0x1.f0e724p-1            -0x1.f0e8p-1              YES
+S1[223 ]  -0x1.5a792p-1             -0x1.5a7ap-1              YES
+S1[224 ]  -0x1.44ad26p-3            -0x1.44aep-3              YES
+S1[225 ]  +0x1.b14a1ep-1            +0x1.b14ap-1              YES
+S1[226 ]  +0x1.a4be8ep-1            +0x1.a4bep-1              YES
+S1[227 ]  -0x1.9e2f3p-3             -0x1.9e3p-3               YES
+S1[228 ]  -0x1.f5e51ap-1            -0x1.f5e6p-1              YES
+S1[229 ]  -0x1.21cbd4p-1            -0x1.21ccp-1              YES
+S1[230 ]  +0x1.12c706p-1            +0x1.12c8p-1              YES
+S1[231 ]  +0x1.f924acp-1            +0x1.f924p-1              YES
+S1[232 ]  +0x1.e4714ep-3            +0x1.e472p-3              YES
+S1[233 ]  -0x1.9a3a22p-1            -0x1.9a3ap-1              YES
+S1[234 ]  -0x1.ba9c8ep-1            -0x1.ba9cp-1              YES
+S1[235 ]  +0x1.fac4a4p-4            +0x1.fac4p-4              YES
+S1[236 ]  +0x1.ec41bap-1            +0x1.ec42p-1              YES
+S1[237 ]  +0x1.427156p-1            +0x1.4272p-1              YES
+S1[238 ]  -0x1.df1b82p-2            -0x1.df1cp-2              YES
+S1[239 ]  -0x1.fe2f38p-1            -0x1.fe3p-1               YES
+S1[240 ]  -0x1.409204p-2            -0x1.4092p-2              YES
+S1[241 ]  +0x1.cdacf4p-1            +0x1.cdacp-1              YES
+S1[242 ]  -0x1.df8042p-1            -0x1.df8p-1               YES
+S1[243 ]  +0x1.95a032p-2            +0x1.95ap-2               YES
+S1[244 ]  +0x1.8ce3a4p-2            +0x1.8ce4p-2              YES
+S1[245 ]  -0x1.ddd0d6p-1            -0x1.dddp-1               YES
+S1[246 ]  +0x1.cfb56p-1             +0x1.cfb6p-1              YES
+S1[247 ]  -0x1.49933ep-2            -0x1.4994p-2              YES
+S1[248 ]  -0x1.d6b1c8p-2            -0x1.d6b2p-2              YES
+S1[249 ]  +0x1.eaee08p-1            +0x1.eaeep-1              YES
+S1[250 ]  -0x1.bcfaacp-1            -0x1.bcfap-1              YES
+S1[251 ]  +0x1.f6dfe2p-3            +0x1.f6ep-3               YES
+S1[252 ]  +0x1.0ec266p-1            +0x1.0ec2p-1              YES
+S1[253 ]  -0x1.f4ef48p-1            -0x1.f4fp-1               YES
+S1[254 ]  +0x1.a76e88p-1            +0x1.a76ep-1              YES
+S1[255 ]  -0x1.5769fap-3            -0x1.576ap-3              YES
+--- 256 of 256 entries changed
+
+=== C1 (256 entries) ===
+index      original (24-bit)         rounded (16-bit)          changed
+---------  ------------------------  ------------------------  -------
+C1[0   ]  +0x1.ff0016p-1            +0x1.ffp-1                YES
+C1[1   ]  +0x1.fedf1cp-1            +0x1.feep-1               YES
+C1[2   ]  +0x1.febc22p-1            +0x1.febcp-1              YES
+C1[3   ]  +0x1.fe972ap-1            +0x1.fe98p-1              YES
+C1[4   ]  +0x1.fe7034p-1            +0x1.fe7p-1               YES
+C1[5   ]  +0x1.fe474p-1             +0x1.fe48p-1              YES
+C1[6   ]  +0x1.fe1c4cp-1            +0x1.fe1cp-1              YES
+C1[7   ]  +0x1.fdef5cp-1            +0x1.fdfp-1               YES
+C1[8   ]  +0x1.fdc06cp-1            +0x1.fdcp-1               YES
+C1[9   ]  +0x1.fd8f8p-1             +0x1.fd9p-1               YES
+C1[10  ]  +0x1.fd5c94p-1            +0x1.fd5cp-1              YES
+C1[11  ]  +0x1.fd27acp-1            +0x1.fd28p-1              YES
+C1[12  ]  +0x1.fcf0c8p-1            +0x1.fcfp-1               YES
+C1[13  ]  +0x1.fcb7e6p-1            +0x1.fcb8p-1              YES
+C1[14  ]  +0x1.fc7d08p-1            +0x1.fc7ep-1              YES
+C1[15  ]  +0x1.fc402cp-1            +0x1.fc4p-1               YES
+C1[16  ]  +0x1.fc0156p-1            +0x1.fc02p-1              YES
+C1[17  ]  +0x1.fb7db2p-1            +0x1.fb7ep-1              YES
+C1[18  ]  +0x1.faf222p-1            +0x1.faf2p-1              YES
+C1[19  ]  +0x1.fa5ea6p-1            +0x1.fa5ep-1              YES
+C1[20  ]  +0x1.f9c34p-1             +0x1.f9c4p-1              YES
+C1[21  ]  +0x1.f91ff4p-1            +0x1.f92p-1               YES
+C1[22  ]  +0x1.f874c2p-1            +0x1.f874p-1              YES
+C1[23  ]  +0x1.f7c1bp-1             +0x1.f7c2p-1              YES
+C1[24  ]  +0x1.f706bep-1            +0x1.f706p-1              YES
+C1[25  ]  +0x1.f643fp-1             +0x1.f644p-1              YES
+C1[26  ]  +0x1.f57948p-1            +0x1.f57ap-1              YES
+C1[27  ]  +0x1.f4a6ccp-1            +0x1.f4a6p-1              YES
+C1[28  ]  +0x1.f3cc7cp-1            +0x1.f3ccp-1              YES
+C1[29  ]  +0x1.f2ea5ep-1            +0x1.f2eap-1              YES
+C1[30  ]  +0x1.f20074p-1            +0x1.f2p-1                YES
+C1[31  ]  +0x1.f10ecp-1             +0x1.f10ep-1              YES
+C1[32  ]  +0x1.f0154ap-1            +0x1.f016p-1              YES
+C1[33  ]  +0x1.ee0b2p-1             +0x1.ee0cp-1              YES
+C1[34  ]  +0x1.ebe214p-1            +0x1.ebe2p-1              YES
+C1[35  ]  +0x1.e99a4cp-1            +0x1.e99ap-1              YES
+C1[36  ]  +0x1.e733eap-1            +0x1.e734p-1              YES
+C1[37  ]  +0x1.e4af14p-1            +0x1.e4bp-1               YES
+C1[38  ]  +0x1.e20bf4p-1            +0x1.e20cp-1              YES
+C1[39  ]  +0x1.df4ab4p-1            +0x1.df4ap-1              YES
+C1[40  ]  +0x1.dc6b7ep-1            +0x1.dc6cp-1              YES
+C1[41  ]  +0x1.d96e82p-1            +0x1.d96ep-1              YES
+C1[42  ]  +0x1.d653fp-1             +0x1.d654p-1              YES
+C1[43  ]  +0x1.d31bf8p-1            +0x1.d31cp-1              YES
+C1[44  ]  +0x1.cfc6dp-1             +0x1.cfc6p-1              YES
+C1[45  ]  +0x1.cc54aap-1            +0x1.cc54p-1              YES
+C1[46  ]  +0x1.c8c5cp-1             +0x1.c8c6p-1              YES
+C1[47  ]  +0x1.c51a48p-1            +0x1.c51ap-1              YES
+C1[48  ]  +0x1.c1528p-1             +0x1.c152p-1              YES
+C1[49  ]  +0x1.b96eeep-1            +0x1.b96ep-1              YES
+C1[50  ]  +0x1.b11d04p-1            +0x1.b11ep-1              YES
+C1[51  ]  +0x1.a85ed4p-1            +0x1.a85ep-1              YES
+C1[52  ]  +0x1.9f368ep-1            +0x1.9f36p-1              YES
+C1[53  ]  +0x1.95a67ep-1            +0x1.95a6p-1              YES
+C1[54  ]  +0x1.8bb106p-1            +0x1.8bb2p-1              YES
+C1[55  ]  +0x1.8158a4p-1            +0x1.8158p-1              YES
+C1[56  ]  +0x1.769fecp-1            +0x1.76ap-1               YES
+C1[57  ]  +0x1.6b899p-1             +0x1.6b8ap-1              YES
+C1[58  ]  +0x1.601852p-1            +0x1.6018p-1              YES
+C1[59  ]  +0x1.544f1p-1             +0x1.545p-1               YES
+C1[60  ]  +0x1.4830bep-1            +0x1.483p-1               YES
+C1[61  ]  +0x1.3bc06p-1             +0x1.3bcp-1               YES
+C1[62  ]  +0x1.2f0114p-1            +0x1.2f02p-1              YES
+C1[63  ]  +0x1.21f608p-1            +0x1.21f6p-1              YES
+C1[64  ]  +0x1.14a28p-1             +0x1.14a2p-1              YES
+C1[65  ]  +0x1.f25ec6p-2            +0x1.f25ep-2              YES
+C1[66  ]  +0x1.b98656p-2            +0x1.b986p-2              YES
+C1[67  ]  +0x1.7ef484p-2            +0x1.7ef4p-2              YES
+C1[68  ]  +0x1.42e3dep-2            +0x1.42e4p-2              YES
+C1[69  ]  +0x1.05906ep-2            +0x1.059p-2               YES
+C1[70  ]  +0x1.8e6f08p-3            +0x1.8e7p-3               YES
+C1[71  ]  +0x1.102ee6p-3            +0x1.102ep-3              YES
+C1[72  ]  +0x1.21bd54p-4            +0x1.21bep-4              YES
+C1[73  ]  +0x1.0fd9d6p-7            +0x1.0fdap-7              YES
+C1[74  ]  -0x1.bbd1bp-5             -0x1.bbd2p-5              YES
+C1[75  ]  -0x1.dcef14p-4            -0x1.dcfp-4               YES
+C1[76  ]  -0x1.6d0c44p-3            -0x1.6d0cp-3              YES
+C1[77  ]  -0x1.ea3412p-3            -0x1.ea34p-3              YES
+C1[78  ]  -0x1.32b8eap-2            -0x1.32b8p-2              YES
+C1[79  ]  -0x1.6f252ap-2            -0x1.6f26p-2              YES
+C1[80  ]  -0x1.aa2266p-2            -0x1.aa22p-2              YES
+C1[81  ]  -0x1.0d72c8p-1            -0x1.0d72p-1              YES
+C1[82  ]  -0x1.419ffap-1            -0x1.41ap-1               YES
+C1[83  ]  -0x1.70c856p-1            -0x1.70c8p-1              YES
+C1[84  ]  -0x1.9a2f7ep-1            -0x1.9a3p-1               YES
+C1[85  ]  -0x1.bd300cp-1            -0x1.bd3p-1               YES
+C1[86  ]  -0x1.d93e2ap-1            -0x1.d93ep-1              YES
+C1[87  ]  -0x1.ede9c6p-1            -0x1.edeap-1              YES
+C1[88  ]  -0x1.fae04cp-1            -0x1.faep-1               YES
+C1[89  ]  -0x1.ffedf6p-1            -0x1.ffeep-1              YES
+C1[90  ]  -0x1.fcfe9p-1             -0x1.fcfep-1              YES
+C1[91  ]  -0x1.f21dd8p-1            -0x1.f21ep-1              YES
+C1[92  ]  -0x1.df774p-1             -0x1.df78p-1              YES
+C1[93  ]  -0x1.c5554ap-1            -0x1.c556p-1              YES
+C1[94  ]  -0x1.a4205cp-1            -0x1.a42p-1               YES
+C1[95  ]  -0x1.7c5d1ap-1            -0x1.7c5ep-1              YES
+C1[96  ]  -0x1.4eaa6p-1             -0x1.4eaap-1              YES
+C1[97  ]  -0x1.c8cb28p-2            -0x1.c8ccp-2              YES
+C1[98  ]  -0x1.afb5b6p-3            -0x1.afb6p-3              YES
+C1[99  ]  +0x1.34096ep-5            +0x1.340ap-5              YES
+C1[100 ]  +0x1.227858p-2            +0x1.2278p-2              YES
+C1[101 ]  +0x1.063012p-1            +0x1.063p-1               YES
+C1[102 ]  +0x1.6ad6c4p-1            +0x1.6ad6p-1              YES
+C1[103 ]  +0x1.b8ee36p-1            +0x1.b8eep-1              YES
+C1[104 ]  +0x1.eb9b7p-1             +0x1.eb9cp-1              YES
+C1[105 ]  +0x1.ffb7d6p-1            +0x1.ffb8p-1              YES
+C1[106 ]  +0x1.f4034cp-1            +0x1.f404p-1              YES
+C1[107 ]  +0x1.c9382p-1             +0x1.c938p-1              YES
+C1[108 ]  +0x1.81ff7ap-1            +0x1.82p-1                YES
+C1[109 ]  +0x1.22c6f6p-1            +0x1.22c6p-1              YES
+C1[110 ]  +0x1.62f45ep-2            +0x1.62f4p-2              YES
+C1[111 ]  +0x1.a92446p-4            +0x1.a924p-4              YES
+C1[112 ]  -0x1.29fbecp-3            -0x1.29fcp-3              YES
+C1[113 ]  -0x1.343ae8p-1            -0x1.343ap-1              YES
+C1[114 ]  -0x1.d27faap-1            -0x1.d28p-1               YES
+C1[115 ]  -0x1.fe8d5ap-1            -0x1.fe8ep-1              YES
+C1[116 ]  -0x1.ad9ac8p-1            -0x1.ad9ap-1              YES
+C1[117 ]  -0x1.e6f328p-2            -0x1.e6f4p-2              YES
+C1[118 ]  +0x1.220ae4p-8            +0x1.220ap-8              YES
+C1[119 ]  +0x1.eee772p-2            +0x1.eee8p-2              YES
+C1[120 ]  +0x1.b00dap-1             +0x1.b00ep-1              YES
+C1[121 ]  +0x1.fedf6ap-1            +0x1.feep-1               YES
+C1[122 ]  +0x1.d09cdep-1            +0x1.d09cp-1              YES
+C1[123 ]  +0x1.30997p-1             +0x1.309ap-1              YES
+C1[124 ]  +0x1.1809aep-3            +0x1.180ap-3              YES
+C1[125 ]  -0x1.6b7144p-2            -0x1.6b72p-2              YES
+C1[126 ]  -0x1.84f5dp-1             -0x1.84f6p-1              YES
+C1[127 ]  -0x1.f4f7dap-1            -0x1.f4f8p-1              YES
+C1[128 ]  -0x1.ea5258p-1            -0x1.ea52p-1              YES
+C1[129 ]  -0x1.19c46cp-2            -0x1.19c4p-2              YES
+C1[130 ]  +0x1.521508p-1            +0x1.5216p-1              YES
+C1[131 ]  +0x1.fa377ep-1            +0x1.fa38p-1              YES
+C1[132 ]  +0x1.a1e044p-2            +0x1.a1ep-2               YES
+C1[133 ]  -0x1.186ff8p-1            -0x1.187p-1               YES
+C1[134 ]  -0x1.fffadep-1            -0x1.fffap-1              YES
+C1[135 ]  -0x1.10cf7ep-1            -0x1.10dp-1               YES
+C1[136 ]  +0x1.b25bfcp-2            +0x1.b25cp-2              YES
+C1[137 ]  +0x1.fb7efp-1             +0x1.fb7ep-1              YES
+C1[138 ]  +0x1.4b3902p-1            +0x1.4b3ap-1              YES
+C1[139 ]  -0x1.2b267p-2             -0x1.2b26p-2              YES
+C1[140 ]  -0x1.ecdaaep-1            -0x1.ecdap-1              YES
+C1[141 ]  -0x1.7f0166p-1            -0x1.7f02p-1              YES
+C1[142 ]  +0x1.3be83p-3             +0x1.3be8p-3              YES
+C1[143 ]  +0x1.d4591cp-1            +0x1.d45ap-1              YES
+C1[144 ]  +0x1.ab1f54p-1            +0x1.ab2p-1               YES
+C1[145 ]  -0x1.b277cep-1            -0x1.b278p-1              YES
+C1[146 ]  -0x1.0611d4p-3            -0x1.0612p-3              YES
+C1[147 ]  +0x1.e8ff6ap-1            +0x1.e9p-1                YES
+C1[148 ]  -0x1.5578e8p-1            -0x1.5578p-1              YES
+C1[149 ]  -0x1.9995cp-2             -0x1.9996p-2              YES
+C1[150 ]  +0x1.ffeb76p-1            +0x1.ffecp-1              YES
+C1[151 ]  -0x1.ba8cdap-2            -0x1.ba8cp-2              YES
+C1[152 ]  -0x1.47c1p-1              -0x1.47cp-1               YES
+C1[153 ]  +0x1.ee1006p-1            +0x1.ee1p-1               YES
+C1[154 ]  -0x1.4dce1cp-3            -0x1.4dcep-3              YES
+C1[155 ]  -0x1.a89b4cp-1            -0x1.a89cp-1              YES
+C1[156 ]  +0x1.b4d944p-1            +0x1.b4dap-1              YES
+C1[157 ]  +0x1.e8296ep-4            +0x1.e82ap-4              YES
+C1[158 ]  -0x1.e7a2acp-1            -0x1.e7a2p-1              YES
+C1[159 ]  +0x1.58d5eep-1            +0x1.58d6p-1              YES
+C1[160 ]  +0x1.914306p-2            +0x1.9144p-2              YES
+C1[161 ]  +0x1.c2b4dap-2            +0x1.c2b4p-2              YES
+C1[162 ]  -0x1.ef3b78p-1            -0x1.ef3cp-1              YES
+C1[163 ]  +0x1.a60ec2p-1            +0x1.a60ep-1              YES
+C1[164 ]  -0x1.c4256ap-4            -0x1.c426p-4              YES
+C1[165 ]  -0x1.5c2c0ap-1            -0x1.5c2cp-1              YES
+C1[166 ]  +0x1.ffaddap-1            +0x1.ffaep-1              YES
+C1[167 ]  -0x1.40bd54p-1            -0x1.40bep-1              YES
+C1[168 ]  -0x1.718584p-3            -0x1.7186p-3              YES
+C1[169 ]  +0x1.b981dcp-1            +0x1.b982p-1              YES
+C1[170 ]  -0x1.e4cbe2p-1            -0x1.e4ccp-1              YES
+C1[171 ]  +0x1.808596p-2            +0x1.8086p-2              YES
+C1[172 ]  +0x1.d2e99p-2             +0x1.d2eap-2              YES
+C1[173 ]  -0x1.f17488p-1            -0x1.f174p-1              YES
+C1[174 ]  +0x1.a0dc54p-1            +0x1.a0dcp-1              YES
+C1[175 ]  -0x1.7c02e6p-4            -0x1.7c02p-4              YES
+C1[176 ]  -0x1.62c33ep-1            -0x1.62c4p-1              YES
+C1[177 ]  -0x1.399fecp-1            -0x1.39ap-1               YES
+C1[178 ]  +0x1.be0708p-1            +0x1.be08p-1              YES
+C1[179 ]  +0x1.6fa94ep-2            +0x1.6faap-2              YES
+C1[180 ]  -0x1.f385bp-1             -0x1.f386p-1              YES
+C1[181 ]  -0x1.33c1e6p-4            -0x1.33c2p-4              YES
+C1[182 ]  +0x1.feb786p-1            +0x1.feb8p-1              YES
+C1[183 ]  -0x1.b8988cp-3            -0x1.b898p-3              YES
+C1[184 ]  -0x1.dea9dep-1            -0x1.deaap-1              YES
+C1[185 ]  +0x1.f2e154p-2            +0x1.f2e2p-2              YES
+C1[186 ]  +0x1.961392p-1            +0x1.9614p-1              YES
+C1[187 ]  -0x1.6f9bbep-1            -0x1.6f9cp-1              YES
+C1[188 ]  -0x1.2b1a36p-1            -0x1.2b1ap-1              YES
+C1[189 ]  +0x1.c6a5aep-1            +0x1.c6a6p-1              YES
+C1[190 ]  +0x1.4d999ep-2            +0x1.4d9ap-2              YES
+C1[191 ]  -0x1.f72f9ep-1            -0x1.f73p-1               YES
+C1[192 ]  -0x1.45f746p-5            -0x1.45f8p-5              YES
+C1[193 ]  -0x1.ff1e32p-3            -0x1.ff1ep-3              YES
+C1[194 ]  +0x1.091c8p-1             +0x1.091cp-1              YES
+C1[195 ]  -0x1.7bfe48p-1            -0x1.7bfep-1              YES
+C1[196 ]  +0x1.ceb27p-1             +0x1.ceb2p-1              YES
+C1[197 ]  -0x1.fa3816p-1            -0x1.fa38p-1              YES
+C1[198 ]  +0x1.fadfbep-1            +0x1.faep-1               YES
+C1[199 ]  -0x1.d09b34p-1            -0x1.d09cp-1              YES
+C1[200 ]  +0x1.7efec6p-1            +0x1.7efep-1              YES
+C1[201 ]  -0x1.0cf3a4p-1            -0x1.0cf4p-1              YES
+C1[202 ]  +0x1.08442ap-2            +0x1.0844p-2              YES
+C1[203 ]  +0x1.fbfd12p-6            +0x1.fbfep-6              YES
+C1[204 ]  -0x1.451386p-2            -0x1.4514p-2              YES
+C1[205 ]  +0x1.27700ep-1            +0x1.277p-1               YES
+C1[206 ]  -0x1.9351cp-1             -0x1.9352p-1              YES
+C1[207 ]  +0x1.dd0c26p-1            +0x1.dd0cp-1              YES
+C1[208 ]  -0x1.fe60f2p-1            -0x1.fe6p-1               YES
+C1[209 ]  -0x1.c03868p-1            -0x1.c038p-1              YES
+C1[210 ]  -0x1.dae7f4p-2            -0x1.dae8p-2              YES
+C1[211 ]  +0x1.a05738p-4            +0x1.a058p-4              YES
+C1[212 ]  +0x1.444888p-1            +0x1.4448p-1              YES
+C1[213 ]  +0x1.e901c2p-1            +0x1.e902p-1              YES
+C1[214 ]  +0x1.eb993cp-1            +0x1.eb9ap-1              YES
+C1[215 ]  +0x1.4b32fcp-1            +0x1.4b32p-1              YES
+C1[216 ]  +0x1.e7eaaap-4            +0x1.e7eap-4              YES
+C1[217 ]  -0x1.cae1fp-2             -0x1.cae2p-2              YES
+C1[218 ]  -0x1.bbccd6p-1            -0x1.bbccp-1              YES
+C1[219 ]  -0x1.ff03fep-1            -0x1.ff04p-1              YES
+C1[220 ]  -0x1.98cd5cp-1            -0x1.98cep-1              YES
+C1[221 ]  -0x1.56191cp-2            -0x1.561ap-2              YES
+C1[222 ]  +0x1.eda9f4p-3            +0x1.edaap-3              YES
+C1[223 ]  +0x1.78f646p-1            +0x1.78f6p-1              YES
+C1[224 ]  +0x1.f9866ap-1            +0x1.f986p-1              YES
+C1[225 ]  +0x1.10c576p-1            +0x1.10c6p-1              YES
+C1[226 ]  -0x1.23c00ep-1            -0x1.23cp-1               YES
+C1[227 ]  -0x1.f56b92p-1            -0x1.f56cp-1              YES
+C1[228 ]  -0x1.94e15p-3             -0x1.94e2p-3              YES
+C1[229 ]  +0x1.a617b4p-1            +0x1.a618p-1              YES
+C1[230 ]  +0x1.b00526p-1            +0x1.b006p-1              YES
+C1[231 ]  -0x1.4e0c7cp-3            -0x1.4e0cp-3              YES
+C1[232 ]  -0x1.f17846p-1            -0x1.f178p-1              YES
+C1[233 ]  -0x1.325cb2p-1            -0x1.325cp-1              YES
+C1[234 ]  +0x1.015e92p-1            +0x1.015ep-1              YES
+C1[235 ]  +0x1.fc10f4p-1            +0x1.fc1p-1               YES
+C1[236 ]  +0x1.199e6ep-2            +0x1.199ep-2              YES
+C1[237 ]  -0x1.8db63ap-1            -0x1.8db6p-1              YES
+C1[238 ]  -0x1.c4808p-1             -0x1.c48p-1               YES
+C1[239 ]  +0x1.58a2d4p-4            +0x1.58a2p-4              YES
+C1[240 ]  +0x1.e64394p-1            +0x1.e644p-1              YES
+C1[241 ]  -0x1.bab79cp-2            -0x1.bab8p-2              YES
+C1[242 ]  -0x1.67039ep-2            -0x1.6704p-2              YES
+C1[243 ]  +0x1.d61e36p-1            +0x1.d61ep-1              YES
+C1[244 ]  -0x1.d7fa82p-1            -0x1.d7fap-1              YES
+C1[245 ]  +0x1.6fe44ep-2            +0x1.6fe4p-2              YES
+C1[246 ]  +0x1.b222bap-2            +0x1.b222p-2              YES
+C1[247 ]  -0x1.e4c1b6p-1            -0x1.e4c2p-1              YES
+C1[248 ]  +0x1.c6b436p-1            +0x1.c6b4p-1              YES
+C1[249 ]  -0x1.22bc8ap-2            -0x1.22bcp-2              YES
+C1[250 ]  -0x1.fa81fap-2            -0x1.fa82p-2              YES
+C1[251 ]  +0x1.f05348p-1            +0x1.f054p-1              YES
+C1[252 ]  -0x1.b28cb4p-1            -0x1.b28cp-1              YES
+C1[253 ]  +0x1.a77acap-3            +0x1.a77ap-3              YES
+C1[254 ]  +0x1.1fd602p-1            +0x1.1fd6p-1              YES
+C1[255 ]  -0x1.f8c028p-1            -0x1.f8cp-1               YES
+--- 256 of 256 entries changed
+
+=== S2 (128 entries) ===
+index      original (24-bit)         rounded (16-bit)          changed
+---------  ------------------------  ------------------------  -------
+S2[0   ]  +0x0p+0                   +0x0p+0                   
+S2[1   ]  +0x1.fffffep-12           +0x1p-11                  YES
+S2[2   ]  +0x1.fffffap-11           +0x1p-10                  YES
+S2[3   ]  +0x1.7ffff8p-10           +0x1.8p-10                YES
+S2[4   ]  +0x1.ffffeap-10           +0x1p-9                   YES
+S2[5   ]  +0x1.3fffecp-9            +0x1.4p-9                 YES
+S2[6   ]  +0x1.7fffdcp-9            +0x1.8p-9                 YES
+S2[7   ]  +0x1.bfffc6p-9            +0x1.cp-9                 YES
+S2[8   ]  +0x0p+0                   +0x0p+0                   
+S2[9   ]  +0x1.fffffap-11           +0x1p-10                  YES
+S2[10  ]  +0x1.ffffeap-10           +0x1p-9                   YES
+S2[11  ]  +0x1.7fffdcp-9            +0x1.8p-9                 YES
+S2[12  ]  +0x1.ffffaap-9            +0x1p-8                   YES
+S2[13  ]  +0x1.3fffacp-8            +0x1.4p-8                 YES
+S2[14  ]  +0x1.7fff7p-8             +0x1.8p-8                 YES
+S2[15  ]  +0x1.bfff1cp-8            +0x1.cp-8                 YES
+S2[16  ]  +0x0p+0                   +0x0p+0                   
+S2[17  ]  +0x1.ffffeap-10           +0x1p-9                   YES
+S2[18  ]  +0x1.ffffaap-9            +0x1p-8                   YES
+S2[19  ]  +0x1.7fff7p-8             +0x1.8p-8                 YES
+S2[20  ]  +0x1.fffeaap-8            +0x1.fffep-8              YES
+S2[21  ]  +0x1.3ffeb2p-7            +0x1.3ffep-7              YES
+S2[22  ]  +0x1.7ffdcp-7             +0x1.7ffep-7              YES
+S2[23  ]  +0x1.bffc6ep-7            +0x1.bffcp-7              YES
+S2[24  ]  +0x0p+0                   +0x0p+0                   
+S2[25  ]  +0x1.ffffaap-9            +0x1p-8                   YES
+S2[26  ]  +0x1.fffeaap-8            +0x1.fffep-8              YES
+S2[27  ]  +0x1.7ffdcp-7             +0x1.7ffep-7              YES
+S2[28  ]  +0x1.fffaaap-7            +0x1.fffap-7              YES
+S2[29  ]  +0x1.3ffacap-6            +0x1.3ffap-6              YES
+S2[30  ]  +0x1.7ff7p-6              +0x1.7ff8p-6              YES
+S2[31  ]  +0x1.bff1b6p-6            +0x1.bff2p-6              YES
+S2[32  ]  +0x0p+0                   +0x0p+0                   
+S2[33  ]  +0x1.fffeaap-8            +0x1.fffep-8              YES
+S2[34  ]  +0x1.fffaaap-7            +0x1.fffap-7              YES
+S2[35  ]  +0x1.7ff7p-6              +0x1.7ff8p-6              YES
+S2[36  ]  +0x1.ffeaaap-6            +0x1.ffeap-6              YES
+S2[37  ]  +0x1.3feb2cp-5            +0x1.3fecp-5              YES
+S2[38  ]  +0x1.7fdc02p-5            +0x1.7fdcp-5              YES
+S2[39  ]  +0x1.bfc6d8p-5            +0x1.bfc6p-5              YES
+S2[40  ]  +0x0p+0                   +0x0p+0                   
+S2[41  ]  +0x1.fffaaap-7            +0x1.fffap-7              YES
+S2[42  ]  +0x1.ffeaaap-6            +0x1.ffeap-6              YES
+S2[43  ]  +0x1.7fdc02p-5            +0x1.7fdcp-5              YES
+S2[44  ]  +0x1.ffaaaep-5            +0x1.ffaap-5              YES
+S2[45  ]  +0x1.3facb2p-4            +0x1.3facp-4              YES
+S2[46  ]  +0x1.7f701p-4             +0x1.7f7p-4               YES
+S2[47  ]  +0x1.bf1b78p-4            +0x1.bf1cp-4              YES
+S2[48  ]  +0x0p+0                   +0x0p+0                   
+S2[49  ]  +0x1.ffeaaap-6            +0x1.ffeap-6              YES
+S2[50  ]  +0x1.ffaaaep-5            +0x1.ffaap-5              YES
+S2[51  ]  +0x1.7f701p-4             +0x1.7f7p-4               YES
+S2[52  ]  +0x1.feaaeep-4            +0x1.feaap-4              YES
+S2[53  ]  +0x1.3eb312p-3            +0x1.3eb4p-3              YES
+S2[54  ]  +0x1.7dc102p-3            +0x1.7dc2p-3              YES
+S2[55  ]  +0x1.bc6f84p-3            +0x1.bc7p-3               YES
+S2[56  ]  +0x0p+0                   +0x0p+0                   
+S2[57  ]  +0x1.ffaaaep-5            +0x1.ffaap-5              YES
+S2[58  ]  +0x1.feaaeep-4            +0x1.feaap-4              YES
+S2[59  ]  +0x1.7dc102p-3            +0x1.7dc2p-3              YES
+S2[60  ]  +0x1.faaeeep-3            +0x1.faaep-3              YES
+S2[61  ]  +0x1.3ad12ap-2            +0x1.3ad2p-2              YES
+S2[62  ]  +0x1.771026p-2            +0x1.771p-2               YES
+S2[63  ]  +0x1.b1d83p-2             +0x1.b1d8p-2              YES
+S2[64  ]  +0x0p+0                   +0x0p+0                   
+S2[65  ]  +0x1.feaaeep-4            +0x1.feaap-4              YES
+S2[66  ]  +0x1.faaeeep-3            +0x1.faaep-3              YES
+S2[67  ]  +0x1.771026p-2            +0x1.771p-2               YES
+S2[68  ]  +0x1.eaee88p-2            +0x1.eaeep-2              YES
+S2[69  ]  +0x1.2b91dep-1            +0x1.2b92p-1              YES
+S2[70  ]  +0x1.5cffc2p-1            +0x1.5dp-1                YES
+S2[71  ]  +0x1.88fb76p-1            +0x1.88fcp-1              YES
+S2[72  ]  +0x0p+0                   +0x0p+0                   
+S2[73  ]  +0x1.faaeeep-3            +0x1.faaep-3              YES
+S2[74  ]  +0x1.eaee88p-2            +0x1.eaeep-2              YES
+S2[75  ]  +0x1.5cffc2p-1            +0x1.5dp-1                YES
+S2[76  ]  +0x1.aed548p-1            +0x1.aed6p-1              YES
+S2[77  ]  +0x1.e5e15p-1             +0x1.e5e2p-1              YES
+S2[78  ]  +0x1.feb7aap-1            +0x1.feb8p-1              YES
+S2[79  ]  +0x1.f7cd02p-1            +0x1.f7cep-1              YES
+S2[80  ]  +0x0p+0                   +0x0p+0                   
+S2[81  ]  +0x1.eaee88p-2            +0x1.eaeep-2              YES
+S2[82  ]  +0x1.aed548p-1            +0x1.aed6p-1              YES
+S2[83  ]  +0x1.feb7aap-1            +0x1.feb8p-1              YES
+S2[84  ]  +0x1.d18f6ep-1            +0x1.d19p-1               YES
+S2[85  ]  +0x1.326afp-1             +0x1.326ap-1              YES
+S2[86  ]  +0x1.210386p-3            +0x1.2104p-3              YES
+S2[87  ]  -0x1.6733b8p-2            -0x1.6734p-2              YES
+S2[88  ]  +0x0p+0                   +0x0p+0                   
+S2[89  ]  +0x1.aed548p-1            +0x1.aed6p-1              YES
+S2[90  ]  +0x1.d18f6ep-1            +0x1.d19p-1               YES
+S2[91  ]  +0x1.210386p-3            +0x1.2104p-3              YES
+S2[92  ]  -0x1.837b9ep-1            -0x1.837cp-1              YES
+S2[93  ]  -0x1.eaf82p-1             -0x1.eaf8p-1              YES
+S2[94  ]  -0x1.1e1f18p-2            -0x1.1e2p-2               YES
+S2[95  ]  +0x1.50608cp-1            +0x1.506p-1               YES
+S2[96  ]  +0x0p+0                   +0x0p+0                   
+S2[97  ]  +0x1.d18f6ep-1            +0x1.d19p-1               YES
+S2[98  ]  -0x1.837b9ep-1            -0x1.837cp-1              YES
+S2[99  ]  -0x1.1e1f18p-2            -0x1.1e2p-2               YES
+S2[100 ]  +0x1.fa8d2ap-1            +0x1.fa8ep-1              YES
+S2[101 ]  -0x1.1689fp-1             -0x1.168ap-1              YES
+S2[102 ]  -0x1.12b9bp-1             -0x1.12bap-1              YES
+S2[103 ]  +0x1.fb30e4p-1            +0x1.fb3p-1               YES
+S2[104 ]  +0x0p+0                   +0x0p+0                   
+S2[105 ]  -0x1.837b9ep-1            -0x1.837cp-1              YES
+S2[106 ]  +0x1.fa8d2ap-1            +0x1.fa8ep-1              YES
+S2[107 ]  -0x1.12b9bp-1             -0x1.12bap-1              YES
+S2[108 ]  -0x1.26d02p-2             -0x1.26dp-2               YES
+S2[109 ]  +0x1.d36d9p-1             +0x1.d36ep-1              YES
+S2[110 ]  -0x1.cfa7f8p-1            -0x1.cfa8p-1              YES
+S2[111 ]  +0x1.156854p-2            +0x1.1568p-2              YES
+S2[112 ]  +0x0p+0                   +0x0p+0                   
+S2[113 ]  +0x1.fa8d2ap-1            +0x1.fa8ep-1              YES
+S2[114 ]  -0x1.26d02p-2             -0x1.26dp-2               YES
+S2[115 ]  -0x1.cfa7f8p-1            -0x1.cfa8p-1              YES
+S2[116 ]  +0x1.1a549ap-1            +0x1.1a54p-1              YES
+S2[117 ]  +0x1.7d7f78p-1            +0x1.7d8p-1               YES
+S2[118 ]  -0x1.8958acp-1            -0x1.8958p-1              YES
+S2[119 ]  -0x1.0b08bcp-1            -0x1.0b08p-1              YES
+S2[120 ]  +0x0p+0                   +0x0p+0                   
+S2[121 ]  -0x1.26d02p-2             -0x1.26dp-2               YES
+S2[122 ]  +0x1.1a549ap-1            +0x1.1a54p-1              YES
+S2[123 ]  -0x1.8958acp-1            -0x1.8958p-1              YES
+S2[124 ]  +0x1.d70da8p-1            +0x1.d70ep-1              YES
+S2[125 ]  -0x1.fcdefap-1            -0x1.fcdep-1              YES
+S2[126 ]  +0x1.f798dp-1             +0x1.f798p-1              YES
+S2[127 ]  -0x1.c7ad8p-1             -0x1.c7aep-1              YES
+--- 112 of 128 entries changed
+
+=== C2 (128 entries) ===
+index      original (24-bit)         rounded (16-bit)          changed
+---------  ------------------------  ------------------------  -------
+C2[0   ]  +0x1p+0                   +0x1p+0                   
+C2[1   ]  +0x1.fffffcp-1            +0x1p+0                   YES
+C2[2   ]  +0x1.fffffp-1             +0x1p+0                   YES
+C2[3   ]  +0x1.ffffdcp-1            +0x1p+0                   YES
+C2[4   ]  +0x1.ffffcp-1             +0x1p+0                   YES
+C2[5   ]  +0x1.ffff9cp-1            +0x1p+0                   YES
+C2[6   ]  +0x1.ffff7p-1             +0x1p+0                   YES
+C2[7   ]  +0x1.ffff3cp-1            +0x1p+0                   YES
+C2[8   ]  +0x1p+0                   +0x1p+0                   
+C2[9   ]  +0x1.fffffp-1             +0x1p+0                   YES
+C2[10  ]  +0x1.ffffcp-1             +0x1p+0                   YES
+C2[11  ]  +0x1.ffff7p-1             +0x1p+0                   YES
+C2[12  ]  +0x1.ffffp-1              +0x1p+0                   YES
+C2[13  ]  +0x1.fffe7p-1             +0x1.fffep-1              YES
+C2[14  ]  +0x1.fffdcp-1             +0x1.fffep-1              YES
+C2[15  ]  +0x1.fffcfp-1             +0x1.fffcp-1              YES
+C2[16  ]  +0x1p+0                   +0x1p+0                   
+C2[17  ]  +0x1.ffffcp-1             +0x1p+0                   YES
+C2[18  ]  +0x1.ffffp-1              +0x1p+0                   YES
+C2[19  ]  +0x1.fffdcp-1             +0x1.fffep-1              YES
+C2[20  ]  +0x1.fffcp-1              +0x1.fffcp-1              
+C2[21  ]  +0x1.fff9cp-1             +0x1.fffap-1              YES
+C2[22  ]  +0x1.fff7p-1              +0x1.fff8p-1              YES
+C2[23  ]  +0x1.fff3cp-1             +0x1.fff4p-1              YES
+C2[24  ]  +0x1p+0                   +0x1p+0                   
+C2[25  ]  +0x1.ffffp-1              +0x1p+0                   YES
+C2[26  ]  +0x1.fffcp-1              +0x1.fffcp-1              
+C2[27  ]  +0x1.fff7p-1              +0x1.fff8p-1              YES
+C2[28  ]  +0x1.fffp-1               +0x1.fffp-1               
+C2[29  ]  +0x1.ffe7p-1              +0x1.ffe8p-1              YES
+C2[30  ]  +0x1.ffdcp-1              +0x1.ffdcp-1              
+C2[31  ]  +0x1.ffcfp-1              +0x1.ffdp-1               YES
+C2[32  ]  +0x1p+0                   +0x1p+0                   
+C2[33  ]  +0x1.fffcp-1              +0x1.fffcp-1              
+C2[34  ]  +0x1.fffp-1               +0x1.fffp-1               
+C2[35  ]  +0x1.ffdcp-1              +0x1.ffdcp-1              
+C2[36  ]  +0x1.ffc002p-1            +0x1.ffcp-1               YES
+C2[37  ]  +0x1.ff9c04p-1            +0x1.ff9cp-1              YES
+C2[38  ]  +0x1.ff7006p-1            +0x1.ff7p-1               YES
+C2[39  ]  +0x1.ff3c0cp-1            +0x1.ff3cp-1              YES
+C2[40  ]  +0x1p+0                   +0x1p+0                   
+C2[41  ]  +0x1.fffp-1               +0x1.fffp-1               
+C2[42  ]  +0x1.ffc002p-1            +0x1.ffcp-1               YES
+C2[43  ]  +0x1.ff7006p-1            +0x1.ff7p-1               YES
+C2[44  ]  +0x1.ff0016p-1            +0x1.ffp-1                YES
+C2[45  ]  +0x1.fe7034p-1            +0x1.fe7p-1               YES
+C2[46  ]  +0x1.fdc06cp-1            +0x1.fdcp-1               YES
+C2[47  ]  +0x1.fcf0c8p-1            +0x1.fcfp-1               YES
+C2[48  ]  +0x1p+0                   +0x1p+0                   
+C2[49  ]  +0x1.ffc002p-1            +0x1.ffcp-1               YES
+C2[50  ]  +0x1.ff0016p-1            +0x1.ffp-1                YES
+C2[51  ]  +0x1.fdc06cp-1            +0x1.fdcp-1               YES
+C2[52  ]  +0x1.fc0156p-1            +0x1.fc02p-1              YES
+C2[53  ]  +0x1.f9c34p-1             +0x1.f9c4p-1              YES
+C2[54  ]  +0x1.f706bep-1            +0x1.f706p-1              YES
+C2[55  ]  +0x1.f3cc7cp-1            +0x1.f3ccp-1              YES
+C2[56  ]  +0x1p+0                   +0x1p+0                   
+C2[57  ]  +0x1.ff0016p-1            +0x1.ffp-1                YES
+C2[58  ]  +0x1.fc0156p-1            +0x1.fc02p-1              YES
+C2[59  ]  +0x1.f706bep-1            +0x1.f706p-1              YES
+C2[60  ]  +0x1.f0154ap-1            +0x1.f016p-1              YES
+C2[61  ]  +0x1.e733eap-1            +0x1.e734p-1              YES
+C2[62  ]  +0x1.dc6b7ep-1            +0x1.dc6cp-1              YES
+C2[63  ]  +0x1.cfc6dp-1             +0x1.cfc6p-1              YES
+C2[64  ]  +0x1p+0                   +0x1p+0                   
+C2[65  ]  +0x1.fc0156p-1            +0x1.fc02p-1              YES
+C2[66  ]  +0x1.f0154ap-1            +0x1.f016p-1              YES
+C2[67  ]  +0x1.dc6b7ep-1            +0x1.dc6cp-1              YES
+C2[68  ]  +0x1.c1528p-1             +0x1.c152p-1              YES
+C2[69  ]  +0x1.9f368ep-1            +0x1.9f36p-1              YES
+C2[70  ]  +0x1.769fecp-1            +0x1.76ap-1               YES
+C2[71  ]  +0x1.4830bep-1            +0x1.483p-1               YES
+C2[72  ]  +0x1p+0                   +0x1p+0                   
+C2[73  ]  +0x1.f0154ap-1            +0x1.f016p-1              YES
+C2[74  ]  +0x1.c1528p-1             +0x1.c152p-1              YES
+C2[75  ]  +0x1.769fecp-1            +0x1.76ap-1               YES
+C2[76  ]  +0x1.14a28p-1             +0x1.14a2p-1              YES
+C2[77  ]  +0x1.42e3dep-2            +0x1.42e4p-2              YES
+C2[78  ]  +0x1.21bd54p-4            +0x1.21bep-4              YES
+C2[79  ]  -0x1.6d0c44p-3            -0x1.6d0cp-3              YES
+C2[80  ]  +0x1p+0                   +0x1p+0                   
+C2[81  ]  +0x1.c1528p-1             +0x1.c152p-1              YES
+C2[82  ]  +0x1.14a28p-1             +0x1.14a2p-1              YES
+C2[83  ]  +0x1.21bd54p-4            +0x1.21bep-4              YES
+C2[84  ]  -0x1.aa2266p-2            -0x1.aa22p-2              YES
+C2[85  ]  -0x1.9a2f7ep-1            -0x1.9a3p-1               YES
+C2[86  ]  -0x1.fae04cp-1            -0x1.faep-1               YES
+C2[87  ]  -0x1.df774p-1             -0x1.df78p-1              YES
+C2[88  ]  +0x1p+0                   +0x1p+0                   
+C2[89  ]  +0x1.14a28p-1             +0x1.14a2p-1              YES
+C2[90  ]  -0x1.aa2266p-2            -0x1.aa22p-2              YES
+C2[91  ]  -0x1.fae04cp-1            -0x1.faep-1               YES
+C2[92  ]  -0x1.4eaa6p-1             -0x1.4eaap-1              YES
+C2[93  ]  +0x1.227858p-2            +0x1.2278p-2              YES
+C2[94  ]  +0x1.eb9b7p-1             +0x1.eb9cp-1              YES
+C2[95  ]  +0x1.81ff7ap-1            +0x1.82p-1                YES
+C2[96  ]  +0x1p+0                   +0x1p+0                   
+C2[97  ]  -0x1.aa2266p-2            -0x1.aa22p-2              YES
+C2[98  ]  -0x1.4eaa6p-1             -0x1.4eaap-1              YES
+C2[99  ]  +0x1.eb9b7p-1             +0x1.eb9cp-1              YES
+C2[100 ]  -0x1.29fbecp-3            -0x1.29fcp-3              YES
+C2[101 ]  -0x1.ad9ac8p-1            -0x1.ad9ap-1              YES
+C2[102 ]  +0x1.b00dap-1             +0x1.b00ep-1              YES
+C2[103 ]  +0x1.1809aep-3            +0x1.180ap-3              YES
+C2[104 ]  +0x1p+0                   +0x1p+0                   
+C2[105 ]  -0x1.4eaa6p-1             -0x1.4eaap-1              YES
+C2[106 ]  -0x1.29fbecp-3            -0x1.29fcp-3              YES
+C2[107 ]  +0x1.b00dap-1             +0x1.b00ep-1              YES
+C2[108 ]  -0x1.ea5258p-1            -0x1.ea52p-1              YES
+C2[109 ]  +0x1.a1e044p-2            +0x1.a1ep-2               YES
+C2[110 ]  +0x1.b25bfcp-2            +0x1.b25cp-2              YES
+C2[111 ]  -0x1.ecdaaep-1            -0x1.ecdap-1              YES
+C2[112 ]  +0x1p+0                   +0x1p+0                   
+C2[113 ]  -0x1.29fbecp-3            -0x1.29fcp-3              YES
+C2[114 ]  -0x1.ea5258p-1            -0x1.ea52p-1              YES
+C2[115 ]  +0x1.b25bfcp-2            +0x1.b25cp-2              YES
+C2[116 ]  +0x1.ab1f54p-1            +0x1.ab2p-1               YES
+C2[117 ]  -0x1.5578e8p-1            -0x1.5578p-1              YES
+C2[118 ]  -0x1.47c1p-1              -0x1.47cp-1               YES
+C2[119 ]  +0x1.b4d944p-1            +0x1.b4dap-1              YES
+C2[120 ]  +0x1p+0                   +0x1p+0                   
+C2[121 ]  -0x1.ea5258p-1            -0x1.ea52p-1              YES
+C2[122 ]  +0x1.ab1f54p-1            +0x1.ab2p-1               YES
+C2[123 ]  -0x1.47c1p-1              -0x1.47cp-1               YES
+C2[124 ]  +0x1.914306p-2            +0x1.9144p-2              YES
+C2[125 ]  -0x1.c4256ap-4            -0x1.c426p-4              YES
+C2[126 ]  -0x1.718584p-3            -0x1.7186p-3              YES
+C2[127 ]  +0x1.d2e99p-2             +0x1.d2eap-2              YES
+--- 104 of 128 entries changed
+
+=== S3 (123 entries) ===
+index      original (24-bit)         rounded (16-bit)          changed
+---------  ------------------------  ------------------------  -------
+S3[0   ]  +0x1.1a549ap-1            +0x1.1a54p-1              YES
+S3[1   ]  +0x1.d70da8p-1            +0x1.d70ep-1              YES
+S3[2   ]  +0x1.712bdap-1            +0x1.712cp-1              YES
+S3[3   ]  -0x1.ff9832p-1            -0x1.ff98p-1              YES
+S3[4   ]  +0x1.45b53p-4             +0x1.45b6p-4              YES
+S3[5   ]  -0x1.44ad26p-3            -0x1.44aep-3              YES
+S3[6   ]  -0x1.409204p-2            -0x1.4092p-2              YES
+S3[7   ]  -0x1.3074e8p-1            -0x1.3074p-1              YES
+S3[8   ]  -0x1.e98f88p-1            -0x1.e99p-1               YES
+S3[9   ]  -0x1.1eb042p-1            -0x1.1ebp-1               YES
+S3[10  ]  +0x1.db0ffcp-1            +0x1.db1p-1               YES
+S3[11  ]  +0x1.625668p-1            +0x1.6256p-1              YES
+S3[12  ]  -0x1.ff8bd8p-1            -0x1.ff8cp-1              YES
+S3[13  ]  -0x1.58809cp-4            -0x1.588p-4               YES
+S3[14  ]  +0x1.57481ep-3            +0x1.5748p-3              YES
+S3[15  ]  +0x1.526cccp-2            +0x1.526cp-2              YES
+S3[16  ]  +0x1.3f6888p-1            +0x1.3f68p-1              YES
+S3[17  ]  +0x1.f34428p-1            +0x1.f344p-1              YES
+S3[18  ]  +0x1.ba9f46p-2            +0x1.baap-2               YES
+S3[19  ]  -0x1.8f22f8p-1            -0x1.8f22p-1              YES
+S3[20  ]  -0x1.f3fa14p-1            -0x1.f3fap-1              YES
+S3[21  ]  +0x1.aedbaep-2            +0x1.aedcp-2              YES
+S3[22  ]  -0x1.86dccap-1            -0x1.86dcp-1              YES
+S3[23  ]  -0x1.f8eef8p-1            -0x1.f8eep-1              YES
+S3[24  ]  +0x1.4e67cp-2             +0x1.4e68p-2              YES
+S3[25  ]  -0x1.3c1236p-1            -0x1.3c12p-1              YES
+S3[26  ]  -0x1.f14f92p-1            -0x1.f15p-1               YES
+S3[27  ]  -0x1.d91302p-2            -0x1.d914p-2              YES
+S3[28  ]  +0x1.a39038p-1            +0x1.a39p-1               YES
+S3[29  ]  +0x1.e0ef36p-1            +0x1.e0fp-1               YES
+S3[30  ]  -0x1.49f2c6p-1            -0x1.49f2p-1              YES
+S3[31  ]  +0x1.f8993cp-1            +0x1.f89ap-1              YES
+S3[32  ]  +0x1.55f456p-2            +0x1.55f4p-2              YES
+S3[33  ]  -0x1.425308p-1            -0x1.4254p-1              YES
+S3[34  ]  -0x1.f4df2p-1             -0x1.f4ep-1               YES
+S3[35  ]  -0x1.9f7122p-2            -0x1.9f72p-2              YES
+S3[36  ]  +0x1.7bb732p-1            +0x1.7bb8p-1              YES
+S3[37  ]  +0x1.fd6e84p-1            +0x1.fd6ep-1              YES
+S3[38  ]  -0x1.97b16cp-3            -0x1.97b2p-3              YES
+S3[39  ]  +0x1.8f8886p-2            +0x1.8f88p-2              YES
+S3[40  ]  +0x1.6fde18p-1            +0x1.6fdep-1              YES
+S3[41  ]  +0x1.ffbaeep-1            +0x1.ffbap-1              YES
+S3[42  ]  -0x1.09c494p-4            -0x1.09c4p-4              YES
+S3[43  ]  +0x1.093536p-3            +0x1.0936p-3              YES
+S3[44  ]  +0x1.06f98cp-2            +0x1.06fap-2              YES
+S3[45  ]  +0x1.fc4f5ep-2            +0x1.fc5p-2               YES
+S3[46  ]  +0x1.b9430ap-1            +0x1.b944p-1              YES
+S3[47  ]  +0x1.bf996ap-1            +0x1.bf9ap-1              YES
+S3[48  ]  -0x1.b2a66cp-1            -0x1.b2a6p-1              YES
+S3[49  ]  +0x1.cb6f76p-1            +0x1.cb7p-1               YES
+S3[50  ]  -0x1.958b4ep-1            -0x1.958cp-1              YES
+S3[51  ]  +0x1.ef1a9p-1             +0x1.ef1ap-1              YES
+S3[52  ]  -0x1.f8904p-2             -0x1.f89p-2               YES
+S3[53  ]  +0x1.b70f5ap-1            +0x1.b71p-1               YES
+S3[54  ]  +0x1.c3b8b8p-1            +0x1.c3b8p-1              YES
+S3[55  ]  -0x1.a94ad8p-1            -0x1.a94ap-1              YES
+S3[56  ]  +0x1.d99a3p-1             +0x1.d99ap-1              YES
+S3[57  ]  -0x1.67e574p-1            -0x1.67e6p-1              YES
+S3[58  ]  +0x1.fff6ep-1             +0x1.fff6p-1              YES
+S3[59  ]  +0x1.82a354p-6            +0x1.82a4p-6              YES
+S3[60  ]  -0x1.8287c2p-5            -0x1.8288p-5              YES
+S3[61  ]  -0x1.82198cp-4            -0x1.821ap-4              YES
+S3[62  ]  -0x1.806172p-3            -0x1.8062p-3              YES
+S3[63  ]  -0x1.798cc4p-2            -0x1.798cp-2              YES
+S3[64  ]  -0x1.5ef362p-1            -0x1.5ef4p-1              YES
+S3[65  ]  -0x1.ff115ep-1            -0x1.ff12p-1              YES
+S3[66  ]  -0x1.ed331ep-4            -0x1.ed34p-4              YES
+S3[67  ]  +0x1.e99c7ep-3            +0x1.e99cp-3              YES
+S3[68  ]  +0x1.db69f8p-2            +0x1.db6ap-2              YES
+S3[69  ]  +0x1.a5122p-1             +0x1.a512p-1              YES
+S3[70  ]  +0x1.df1908p-1            +0x1.df1ap-1              YES
+S3[71  ]  -0x1.51f3b8p-1            -0x1.51f4p-1              YES
+S3[72  ]  +0x1.fbbf0ep-1            +0x1.fbcp-1               YES
+S3[73  ]  +0x1.05417p-2             +0x1.0542p-2              YES
+S3[74  ]  -0x1.f93824p-2            -0x1.f938p-2              YES
+S3[75  ]  -0x1.b7728p-1             -0x1.b772p-1              YES
+S3[76  ]  -0x1.c30288p-1            -0x1.c302p-1              YES
+S3[77  ]  +0x1.aaf6c4p-1            +0x1.aaf6p-1              YES
+S3[78  ]  -0x1.d74732p-1            -0x1.d748p-1              YES
+S3[79  ]  +0x1.705fd8p-1            +0x1.706p-1               YES
+S3[80  ]  -0x1.ffae48p-1            -0x1.ffaep-1              YES
+S3[81  ]  +0x1.210d0ep-4            +0x1.210ep-4              YES
+S3[82  ]  -0x1.205492p-3            -0x1.2054p-3              YES
+S3[83  ]  -0x1.1d7566p-2            -0x1.1d76p-2              YES
+S3[84  ]  -0x1.12247ep-1            -0x1.1224p-1              YES
+S3[85  ]  -0x1.cf119cp-1            -0x1.cf12p-1              YES
+S3[86  ]  -0x1.8b1bb8p-1            -0x1.8b1cp-1              YES
+S3[87  ]  +0x1.f6923cp-1            +0x1.f692p-1              YES
+S3[88  ]  -0x1.8005c8p-2            -0x1.8006p-2              YES
+S3[89  ]  +0x1.63febcp-1            +0x1.63fep-1              YES
+S3[90  ]  +0x1.ffb824p-1            +0x1.ffb8p-1              YES
+S3[91  ]  +0x1.0f126p-4             +0x1.0f12p-4              YES
+S3[92  ]  -0x1.0e7a3ep-3            -0x1.0e7ap-3              YES
+S3[93  ]  -0x1.0c1bb6p-2            -0x1.0c1cp-2              YES
+S3[94  ]  -0x1.02c164p-1            -0x1.02c2p-1              YES
+S3[95  ]  -0x1.be8edap-1            -0x1.be8ep-1              YES
+S3[96  ]  -0x1.b4e4aep-1            -0x1.b4e4p-1              YES
+S3[97  ]  +0x1.c79988p-1            +0x1.c79ap-1              YES
+S3[98  ]  -0x1.9fbfecp-1            -0x1.9fcp-1               YES
+S3[99  ]  +0x1.e54c46p-1            +0x1.e54cp-1              YES
+S3[100 ]  -0x1.355a3p-1             -0x1.355ap-1              YES
+S3[101 ]  +0x1.ed0098p-1            +0x1.edp-1                YES
+S3[102 ]  +0x1.0a1946p-1            +0x1.0a1ap-1              YES
+S3[103 ]  -0x1.c6acaap-1            -0x1.c6acp-1              YES
+S3[104 ]  -0x1.a21844p-1            -0x1.a218p-1              YES
+S3[105 ]  +0x1.e2a982p-1            +0x1.e2aap-1              YES
+S3[106 ]  -0x1.4212dep-1            -0x1.4212p-1              YES
+S3[107 ]  +0x1.f4bcc8p-1            +0x1.f4bcp-1              YES
+S3[108 ]  +0x1.a1cc8p-2             +0x1.a1ccp-2              YES
+S3[109 ]  -0x1.7d7108p-1            -0x1.7d72p-1              YES
+S3[110 ]  -0x1.fce3cp-1             -0x1.fce4p-1              YES
+S3[111 ]  +0x1.c01004p-3            +0x1.c01p-3               YES
+S3[112 ]  -0x1.b53538p-2            -0x1.b536p-2              YES
+S3[113 ]  -0x1.8b5aa2p-1            -0x1.8b5ap-1              YES
+S3[114 ]  -0x1.f66c46p-1            -0x1.f66cp-1              YES
+S3[115 ]  +0x1.82e346p-2            +0x1.82e4p-2              YES
+S3[116 ]  -0x1.663618p-1            -0x1.6636p-1              YES
+S3[117 ]  -0x1.ffe302p-1            -0x1.ffe4p-1              YES
+S3[118 ]  -0x1.5881f6p-5            -0x1.5882p-5              YES
+S3[119 ]  +0x1.5833f2p-4            +0x1.5834p-4              YES
+S3[120 ]  +0x1.56fc44p-3            +0x1.56fcp-3              YES
+S3[121 ]  +0x1.52242cp-2            +0x1.5224p-2              YES
+S3[122 ]  +0x1.3f2c62p-1            +0x1.3f2cp-1              YES
+--- 123 of 123 entries changed
+
+=== C3 (123 entries) ===
+index      original (24-bit)         rounded (16-bit)          changed
+---------  ------------------------  ------------------------  -------
+C3[0   ]  +0x1.ab1f54p-1            +0x1.ab2p-1               YES
+C3[1   ]  +0x1.914306p-2            +0x1.9144p-2              YES
+C3[2   ]  -0x1.62c33ep-1            -0x1.62c4p-1              YES
+C3[3   ]  -0x1.45f746p-5            -0x1.45f8p-5              YES
+C3[4   ]  -0x1.fe60f2p-1            -0x1.fe6p-1               YES
+C3[5   ]  +0x1.f9866ap-1            +0x1.f986p-1              YES
+C3[6   ]  +0x1.e64394p-1            +0x1.e644p-1              YES
+C3[7   ]  +0x1.9ba4a8p-1            +0x1.9ba4p-1              YES
+C3[8   ]  +0x1.2bd43ep-2            +0x1.2bd4p-2              YES
+C3[9   ]  -0x1.a835a2p-1            -0x1.a836p-1              YES
+C3[10  ]  +0x1.7de36ap-2            +0x1.7de4p-2              YES
+C3[11  ]  -0x1.719454p-1            -0x1.7194p-1              YES
+C3[12  ]  +0x1.58ced6p-5            +0x1.58cep-5              YES
+C3[13  ]  -0x1.fe2f94p-1            -0x1.fe3p-1               YES
+C3[14  ]  +0x1.f8c198p-1            +0x1.f8c2p-1              YES
+C3[15  ]  +0x1.e33adap-1            +0x1.e33ap-1              YES
+C3[16  ]  +0x1.902722p-1            +0x1.9028p-1              YES
+C3[17  ]  +0x1.c5e944p-3            +0x1.c5eap-3              YES
+C3[18  ]  -0x1.cdb2cap-1            -0x1.cdb2p-1              YES
+C3[19  ]  +0x1.40ad68p-1            +0x1.40aep-1              YES
+C3[20  ]  -0x1.b9381ap-3            -0x1.b938p-3              YES
+C3[21  ]  -0x1.d078dap-1            -0x1.d078p-1              YES
+C3[22  ]  +0x1.4ab652p-1            +0x1.4ab6p-1              YES
+C3[23  ]  -0x1.5315d4p-3            -0x1.5316p-3              YES
+C3[24  ]  -0x1.e3edd2p-1            -0x1.e3eep-1              YES
+C3[25  ]  +0x1.92cb46p-1            +0x1.92ccp-1              YES
+C3[26  ]  +0x1.e70c2ep-3            +0x1.e70cp-3              YES
+C3[27  ]  -0x1.c61608p-1            -0x1.c616p-1              YES
+C3[28  ]  +0x1.25723p-1             +0x1.2572p-1              YES
+C3[29  ]  -0x1.5f42d8p-2            -0x1.5f42p-2              YES
+C3[30  ]  -0x1.8781eap-1            -0x1.8782p-1              YES
+C3[31  ]  +0x1.5af86p-3             +0x1.5af8p-3              YES
+C3[32  ]  -0x1.e29bbap-1            -0x1.e29cp-1              YES
+C3[33  ]  +0x1.8dcecap-1            +0x1.8dcep-1              YES
+C3[34  ]  +0x1.a8ac1ap-3            +0x1.a8acp-3              YES
+C3[35  ]  -0x1.d3f858p-1            -0x1.d3f8p-1              YES
+C3[36  ]  +0x1.5774p-1              +0x1.5774p-1              
+C3[37  ]  -0x1.99bf9ap-4            -0x1.99cp-4               YES
+C3[38  ]  -0x1.f5c0a8p-1            -0x1.f5cp-1               YES
+C3[39  ]  +0x1.d76ba6p-1            +0x1.d76cp-1              YES
+C3[40  ]  +0x1.641d4ap-1            +0x1.641ep-1              YES
+C3[41  ]  -0x1.09e872p-5            -0x1.09e8p-5              YES
+C3[42  ]  -0x1.feebccp-1            -0x1.feecp-1              YES
+C3[43  ]  +0x1.fbb05ep-1            +0x1.fbbp-1               YES
+C3[44  ]  +0x1.eed40cp-1            +0x1.eed4p-1              YES
+C3[45  ]  +0x1.bc7712p-1            +0x1.bc78p-1              YES
+C3[46  ]  +0x1.03ad3ap-1            +0x1.03aep-1              YES
+C3[47  ]  -0x1.f1300ep-2            -0x1.f13p-2               YES
+C3[48  ]  -0x1.0e9918p-1            -0x1.0e9ap-1              YES
+C3[49  ]  -0x1.c3f168p-2            -0x1.c3f2p-2              YES
+C3[50  ]  -0x1.3888e2p-1            -0x1.3888p-1              YES
+C3[51  ]  -0x1.04e422p-2            -0x1.04e4p-2              YES
+C3[52  ]  -0x1.bd87f4p-1            -0x1.bd88p-1              YES
+C3[53  ]  +0x1.0761eep-1            +0x1.0762p-1              YES
+C3[54  ]  -0x1.e20b48p-2            -0x1.e20cp-2              YES
+C3[55  ]  -0x1.1d146p-1             -0x1.1d14p-1              YES
+C3[56  ]  -0x1.85134p-2             -0x1.8514p-2              YES
+C3[57  ]  -0x1.6c2b2p-1             -0x1.6c2cp-1              YES
+C3[58  ]  +0x1.82aa38p-7            +0x1.82aap-7              YES
+C3[59  ]  -0x1.ffdb8p-1             -0x1.ffdcp-1              YES
+C3[60  ]  +0x1.ff6e04p-1            +0x1.ff6ep-1              YES
+C3[61  ]  +0x1.fdb862p-1            +0x1.fdb8p-1              YES
+C3[62  ]  +0x1.f6e6bcp-1            +0x1.f6e6p-1              YES
+C3[63  ]  +0x1.dbedb8p-1            +0x1.dbeep-1              YES
+C3[64  ]  +0x1.74cc06p-1            +0x1.74ccp-1              YES
+C3[65  ]  +0x1.ee1968p-5            +0x1.ee1ap-5              YES
+C3[66  ]  -0x1.fc465ap-1            -0x1.fc46p-1              YES
+C3[67  ]  +0x1.f12748p-1            +0x1.f128p-1              YES
+C3[68  ]  +0x1.c5798cp-1            +0x1.c57ap-1              YES
+C3[69  ]  +0x1.234766p-1            +0x1.2348p-1              YES
+C3[70  ]  -0x1.692938p-2            -0x1.692ap-2              YES
+C3[71  ]  -0x1.809ebp-1             -0x1.809ep-1              YES
+C3[72  ]  +0x1.0771bep-3            +0x1.0772p-3              YES
+C3[73  ]  -0x1.ef0e52p-1            -0x1.ef0ep-1              YES
+C3[74  ]  +0x1.bd586p-1             +0x1.bd58p-1              YES
+C3[75  ]  +0x1.06bc5ep-1            +0x1.06bcp-1              YES
+C3[76  ]  -0x1.e4b3cap-2            -0x1.e4b4p-2              YES
+C3[77  ]  -0x1.1a91ecp-1            -0x1.1a92p-1              YES
+C3[78  ]  -0x1.903464p-2            -0x1.9034p-2              YES
+C3[79  ]  -0x1.63970ep-1            -0x1.6398p-1              YES
+C3[80  ]  -0x1.213b38p-5            -0x1.213cp-5              YES
+C3[81  ]  -0x1.feb93ap-1            -0x1.febap-1              YES
+C3[82  ]  +0x1.fae686p-1            +0x1.fae6p-1              YES
+C3[83  ]  +0x1.ebb41ap-1            +0x1.ebb4p-1              YES
+C3[84  ]  +0x1.b06c5ap-1            +0x1.b06cp-1              YES
+C3[85  ]  +0x1.b4dbb8p-2            +0x1.b4dcp-2              YES
+C3[86  ]  -0x1.45a0b6p-1            -0x1.45ap-1               YES
+C3[87  ]  -0x1.873a2ep-3            -0x1.873ap-3              YES
+C3[88  ]  -0x1.daa1d2p-1            -0x1.daa2p-1              YES
+C3[89  ]  +0x1.6ffbaap-1            +0x1.6ffcp-1              YES
+C3[90  ]  +0x1.0f387p-5             +0x1.0f38p-5              YES
+C3[91  ]  -0x1.fee0a8p-1            -0x1.feep-1               YES
+C3[92  ]  +0x1.fb83ep-1             +0x1.fb84p-1              YES
+C3[93  ]  +0x1.ee239ep-1            +0x1.ee24p-1              YES
+C3[94  ]  +0x1.b9cd7ep-1            +0x1.b9cep-1              YES
+C3[95  ]  +0x1.f4eb4p-2             +0x1.f4ecp-2              YES
+C3[96  ]  -0x1.0af60ep-1            -0x1.0af6p-1              YES
+C3[97  ]  -0x1.d3377ep-2            -0x1.d338p-2              YES
+C3[98  ]  -0x1.2ad31ep-1            -0x1.2ad4p-1              YES
+C3[99  ]  -0x1.465f9cp-2            -0x1.466p-2               YES
+C3[100 ]  -0x1.97fa16p-1            -0x1.97fap-1              YES
+C3[101 ]  +0x1.145a4ep-2            +0x1.145ap-2              YES
+C3[102 ]  -0x1.b56b4ap-1            -0x1.b56cp-1              YES
+C3[103 ]  +0x1.d6cefp-2             +0x1.d6cep-2              YES
+C3[104 ]  -0x1.2788ep-1             -0x1.2788p-1              YES
+C3[105 ]  -0x1.55a682p-2            -0x1.55a6p-2              YES
+C3[106 ]  -0x1.8e02cp-1             -0x1.8e02p-1              YES
+C3[107 ]  +0x1.ab3228p-3            +0x1.ab32p-3              YES
+C3[108 ]  -0x1.d371fap-1            -0x1.d372p-1              YES
+C3[109 ]  +0x1.55890ap-1            +0x1.558ap-1              YES
+C3[110 ]  -0x1.c2cd1ap-4            -0x1.c2cep-4              YES
+C3[111 ]  -0x1.f398a8p-1            -0x1.f398p-1              YES
+C3[112 ]  +0x1.cefc7ep-1            +0x1.cefcp-1              YES
+C3[113 ]  +0x1.455452p-1            +0x1.4554p-1              YES
+C3[114 ]  -0x1.8a4336p-3            -0x1.8a44p-3              YES
+C3[115 ]  -0x1.da0cdp-1             -0x1.da0cp-1              YES
+C3[116 ]  +0x1.6dd376p-1            +0x1.6dd4p-1              YES
+C3[117 ]  +0x1.58957ap-6            +0x1.5896p-6              YES
+C3[118 ]  -0x1.ff8c0cp-1            -0x1.ff8cp-1              YES
+C3[119 ]  +0x1.fe3062p-1            +0x1.fe3p-1               YES
+C3[120 ]  +0x1.f8c4d2p-1            +0x1.f8c4p-1              YES
+C3[121 ]  +0x1.e3479p-1             +0x1.e348p-1              YES
+C3[122 ]  +0x1.90571ep-1            +0x1.9058p-1              YES
+--- 122 of 123 entries changed
+
+
+================================================================
+ PASTE-READY TABLES (16-bit-rounded values, source format)
+================================================================
+
+/* sin(x1) table S1, rounded to 16-bit precision. */
+static const float S1[] = {
+ 0x1.ffaap-5, 0x1.0fccp-4, 0x1.1fc4p-4, 0x1.2fb8p-4, 0x1.3facp-4, 0x1.4fap-4,
+ 0x1.5f92p-4, 0x1.6f82p-4, 0x1.7f7p-4, 0x1.8f5ep-4, 0x1.9f4ap-4, 0x1.af34p-4,
+ 0x1.bf1cp-4, 0x1.cf02p-4, 0x1.dee6p-4, 0x1.eecap-4, 0x1.feaap-4, 0x1.0f34p-3,
+ 0x1.1f0ep-3, 0x1.2ee2p-3, 0x1.3eb4p-3, 0x1.4e7ep-3, 0x1.5e44p-3, 0x1.6e06p-3,
+ 0x1.7dc2p-3, 0x1.8d76p-3, 0x1.9d26p-3, 0x1.accep-3, 0x1.bc7p-3, 0x1.cc0ap-3,
+ 0x1.db9ep-3, 0x1.eb2ap-3, 0x1.faaep-3, 0x1.0cdp-2, 0x1.1c38p-2, 0x1.2b8ep-2,
+ 0x1.3ad2p-2, 0x1.4ap-2, 0x1.591cp-2, 0x1.6822p-2, 0x1.771p-2, 0x1.85e8p-2,
+ 0x1.94a6p-2, 0x1.a34cp-2, 0x1.b1d8p-2, 0x1.c048p-2, 0x1.ce9ep-2, 0x1.dcd4p-2,
+ 0x1.eaeep-2, 0x1.0362p-1, 0x1.110ep-1, 0x1.1e74p-1, 0x1.2b92p-1, 0x1.3866p-1,
+ 0x1.44ecp-1, 0x1.512p-1, 0x1.5dp-1, 0x1.6888p-1, 0x1.73b8p-1, 0x1.7e8ap-1,
+ 0x1.88fcp-1, 0x1.930cp-1, 0x1.9cb6p-1, 0x1.a5fap-1, 0x1.aed6p-1, 0x1.bf46p-1,
+ 0x1.cdf6p-1, 0x1.dadap-1, 0x1.e5e2p-1, 0x1.ef04p-1, 0x1.f638p-1, 0x1.fb76p-1,
+ 0x1.feb8p-1, 0x1.fffcp-1, 0x1.ff4p-1, 0x1.fc84p-1, 0x1.f7cep-1, 0x1.f11ep-1,
+ 0x1.e87ep-1, 0x1.ddf6p-1, 0x1.d19p-1, 0x1.b35ep-1, 0x1.8e6p-1, 0x1.632ap-1,
+ 0x1.326ap-1, 0x1.f9c6p-2, 0x1.86d2p-2, 0x1.0dc4p-2, 0x1.2104p-3, 0x1.0fd8p-6,
+ -0x1.bb2ap-4, -0x1.d9bp-3, -0x1.6734p-2, -0x1.dbf4p-2, -0x1.24a4p-1,
+ -0x1.56bcp-1, -0x1.837cp-1, -0x1.ca3cp-1, -0x1.f47ep-1, -0x1.ffa4p-1,
+ -0x1.eaf8p-1, -0x1.b7c6p-1, -0x1.693cp-1, -0x1.043ep-1, -0x1.1e2p-2,
+ -0x1.0fcep-5, 0x1.b89p-3, 0x1.ccd8p-2, 0x1.506p-1, 0x1.a56ap-1, 0x1.e042p-1,
+ 0x1.fd3cp-1, 0x1.fa8ep-1, 0x1.98d4p-1, 0x1.a602p-2, -0x1.33d2p-4,
+ -0x1.168ap-1, -0x1.c268p-1, -0x1.fffep-1, -0x1.c03cp-1, -0x1.12bap-1,
+ -0x1.0fa8p-4, 0x1.ae4p-2, 0x1.9b8ap-1, 0x1.fb3p-1, 0x1.deaap-1, 0x1.4cf2p-1,
+ 0x1.a6d8p-3, -0x1.26dp-2, -0x1.ec3cp-1, -0x1.8082p-1, 0x1.32f2p-3,
+ 0x1.d36ep-1, 0x1.ac5ep-1, -0x1.220ap-7, -0x1.b144p-1, -0x1.cfa8p-1,
+ -0x1.0f0ep-3, 0x1.866ep-1, 0x1.e9aap-1, 0x1.1568p-2, -0x1.53c8p-1,
+ -0x1.f9ep-1, -0x1.9dbcp-2, 0x1.1a54p-1, 0x1.0ee4p-1, -0x1.fbcap-1,
+ 0x1.2f7cp-2, 0x1.7d8p-1, -0x1.d542p-1, 0x1.2208p-6, 0x1.cdb8p-1,
+ -0x1.8958p-1, -0x1.0cacp-2, 0x1.f928p-1, -0x1.1e1ap-1, -0x1.0b08p-1,
+ 0x1.fc5ap-1, -0x1.382p-2, -0x1.7a76p-1, 0x1.d70ep-1, -0x1.cbbep-1,
+ 0x1.03eap-2, 0x1.21d8p-1, -0x1.fcdep-1, 0x1.7764p-1, 0x1.21fcp-5,
+ -0x1.8f16p-1, 0x1.f798p-1, -0x1.0342p-1, -0x1.4958p-2, 0x1.da88p-1,
+ -0x1.c7aep-1, 0x1.e4aep-3, 0x1.2946p-1, -0x1.fdcap-1, 0x1.712cp-1,
+ -0x1.94b4p-1, -0x1.f6cep-2, 0x1.dddcp-1, 0x1.c162p-3, -0x1.fe8ep-1,
+ 0x1.21cep-4, 0x1.f402p-1, -0x1.6b74p-2, -0x1.bf2p-1, 0x1.37d8p-1,
+ 0x1.6462p-1, -0x1.9f8cp-1, -0x1.d6eap-2, 0x1.e412p-1, 0x1.7a6p-3,
+ -0x1.ff98p-1, 0x1.efccp-1, -0x1.b604p-1, 0x1.5726p-1, -0x1.b66ep-2,
+ 0x1.32e4p-3, 0x1.2114p-3, -0x1.ae48p-2, 0x1.53cap-1, -0x1.b3acp-1,
+ 0x1.eea8p-1, -0x1.ffcp-1, 0x1.e584p-1, -0x1.a22ap-1, 0x1.3b66p-1,
+ -0x1.73dcp-2, 0x1.45b6p-4, -0x1.eef2p-2, -0x1.c59cp-1, -0x1.fd5ap-1,
+ -0x1.8c36p-1, -0x1.2f6cp-2, 0x1.1e2ep-2, 0x1.8674p-1, 0x1.fc5ap-1,
+ 0x1.c9b6p-1, 0x1.feap-2, -0x1.fbbep-5, -0x1.3442p-1, -0x1.e296p-1,
+ -0x1.f0e8p-1, -0x1.5a7ap-1, -0x1.44aep-3, 0x1.b14ap-1, 0x1.a4bep-1,
+ -0x1.9e3p-3, -0x1.f5e6p-1, -0x1.21ccp-1, 0x1.12c8p-1, 0x1.f924p-1,
+ 0x1.e472p-3, -0x1.9a3ap-1, -0x1.ba9cp-1, 0x1.fac4p-4, 0x1.ec42p-1,
+ 0x1.4272p-1, -0x1.df1cp-2, -0x1.fe3p-1, -0x1.4092p-2, 0x1.cdacp-1,
+ -0x1.df8p-1, 0x1.95ap-2, 0x1.8ce4p-2, -0x1.dddp-1, 0x1.cfb6p-1, -0x1.4994p-2,
+ -0x1.d6b2p-2, 0x1.eaeep-1, -0x1.bcfap-1, 0x1.f6ep-3, 0x1.0ec2p-1,
+ -0x1.f4fp-1, 0x1.a76ep-1, -0x1.576ap-3,
+};
+
+/* cos(x1) table C1, rounded to 16-bit precision. */
+static const float C1[] = {
+ 0x1.ffp-1, 0x1.feep-1, 0x1.febcp-1, 0x1.fe98p-1, 0x1.fe7p-1, 0x1.fe48p-1,
+ 0x1.fe1cp-1, 0x1.fdfp-1, 0x1.fdcp-1, 0x1.fd9p-1, 0x1.fd5cp-1, 0x1.fd28p-1,
+ 0x1.fcfp-1, 0x1.fcb8p-1, 0x1.fc7ep-1, 0x1.fc4p-1, 0x1.fc02p-1, 0x1.fb7ep-1,
+ 0x1.faf2p-1, 0x1.fa5ep-1, 0x1.f9c4p-1, 0x1.f92p-1, 0x1.f874p-1, 0x1.f7c2p-1,
+ 0x1.f706p-1, 0x1.f644p-1, 0x1.f57ap-1, 0x1.f4a6p-1, 0x1.f3ccp-1, 0x1.f2eap-1,
+ 0x1.f2p-1, 0x1.f10ep-1, 0x1.f016p-1, 0x1.ee0cp-1, 0x1.ebe2p-1, 0x1.e99ap-1,
+ 0x1.e734p-1, 0x1.e4bp-1, 0x1.e20cp-1, 0x1.df4ap-1, 0x1.dc6cp-1, 0x1.d96ep-1,
+ 0x1.d654p-1, 0x1.d31cp-1, 0x1.cfc6p-1, 0x1.cc54p-1, 0x1.c8c6p-1, 0x1.c51ap-1,
+ 0x1.c152p-1, 0x1.b96ep-1, 0x1.b11ep-1, 0x1.a85ep-1, 0x1.9f36p-1, 0x1.95a6p-1,
+ 0x1.8bb2p-1, 0x1.8158p-1, 0x1.76ap-1, 0x1.6b8ap-1, 0x1.6018p-1, 0x1.545p-1,
+ 0x1.483p-1, 0x1.3bcp-1, 0x1.2f02p-1, 0x1.21f6p-1, 0x1.14a2p-1, 0x1.f25ep-2,
+ 0x1.b986p-2, 0x1.7ef4p-2, 0x1.42e4p-2, 0x1.059p-2, 0x1.8e7p-3, 0x1.102ep-3,
+ 0x1.21bep-4, 0x1.0fdap-7, -0x1.bbd2p-5, -0x1.dcfp-4, -0x1.6d0cp-3,
+ -0x1.ea34p-3, -0x1.32b8p-2, -0x1.6f26p-2, -0x1.aa22p-2, -0x1.0d72p-1,
+ -0x1.41ap-1, -0x1.70c8p-1, -0x1.9a3p-1, -0x1.bd3p-1, -0x1.d93ep-1,
+ -0x1.edeap-1, -0x1.faep-1, -0x1.ffeep-1, -0x1.fcfep-1, -0x1.f21ep-1,
+ -0x1.df78p-1, -0x1.c556p-1, -0x1.a42p-1, -0x1.7c5ep-1, -0x1.4eaap-1,
+ -0x1.c8ccp-2, -0x1.afb6p-3, 0x1.340ap-5, 0x1.2278p-2, 0x1.063p-1,
+ 0x1.6ad6p-1, 0x1.b8eep-1, 0x1.eb9cp-1, 0x1.ffb8p-1, 0x1.f404p-1, 0x1.c938p-1,
+ 0x1.82p-1, 0x1.22c6p-1, 0x1.62f4p-2, 0x1.a924p-4, -0x1.29fcp-3, -0x1.343ap-1,
+ -0x1.d28p-1, -0x1.fe8ep-1, -0x1.ad9ap-1, -0x1.e6f4p-2, 0x1.220ap-8,
+ 0x1.eee8p-2, 0x1.b00ep-1, 0x1.feep-1, 0x1.d09cp-1, 0x1.309ap-1, 0x1.180ap-3,
+ -0x1.6b72p-2, -0x1.84f6p-1, -0x1.f4f8p-1, -0x1.ea52p-1, -0x1.19c4p-2,
+ 0x1.5216p-1, 0x1.fa38p-1, 0x1.a1ep-2, -0x1.187p-1, -0x1.fffap-1, -0x1.10dp-1,
+ 0x1.b25cp-2, 0x1.fb7ep-1, 0x1.4b3ap-1, -0x1.2b26p-2, -0x1.ecdap-1,
+ -0x1.7f02p-1, 0x1.3be8p-3, 0x1.d45ap-1, 0x1.ab2p-1, -0x1.b278p-1,
+ -0x1.0612p-3, 0x1.e9p-1, -0x1.5578p-1, -0x1.9996p-2, 0x1.ffecp-1,
+ -0x1.ba8cp-2, -0x1.47cp-1, 0x1.ee1p-1, -0x1.4dcep-3, -0x1.a89cp-1,
+ 0x1.b4dap-1, 0x1.e82ap-4, -0x1.e7a2p-1, 0x1.58d6p-1, 0x1.9144p-2,
+ 0x1.c2b4p-2, -0x1.ef3cp-1, 0x1.a60ep-1, -0x1.c426p-4, -0x1.5c2cp-1,
+ 0x1.ffaep-1, -0x1.40bep-1, -0x1.7186p-3, 0x1.b982p-1, -0x1.e4ccp-1,
+ 0x1.8086p-2, 0x1.d2eap-2, -0x1.f174p-1, 0x1.a0dcp-1, -0x1.7c02p-4,
+ -0x1.62c4p-1, -0x1.39ap-1, 0x1.be08p-1, 0x1.6faap-2, -0x1.f386p-1,
+ -0x1.33c2p-4, 0x1.feb8p-1, -0x1.b898p-3, -0x1.deaap-1, 0x1.f2e2p-2,
+ 0x1.9614p-1, -0x1.6f9cp-1, -0x1.2b1ap-1, 0x1.c6a6p-1, 0x1.4d9ap-2,
+ -0x1.f73p-1, -0x1.45f8p-5, -0x1.ff1ep-3, 0x1.091cp-1, -0x1.7bfep-1,
+ 0x1.ceb2p-1, -0x1.fa38p-1, 0x1.faep-1, -0x1.d09cp-1, 0x1.7efep-1,
+ -0x1.0cf4p-1, 0x1.0844p-2, 0x1.fbfep-6, -0x1.4514p-2, 0x1.277p-1,
+ -0x1.9352p-1, 0x1.dd0cp-1, -0x1.fe6p-1, -0x1.c038p-1, -0x1.dae8p-2,
+ 0x1.a058p-4, 0x1.4448p-1, 0x1.e902p-1, 0x1.eb9ap-1, 0x1.4b32p-1, 0x1.e7eap-4,
+ -0x1.cae2p-2, -0x1.bbccp-1, -0x1.ff04p-1, -0x1.98cep-1, -0x1.561ap-2,
+ 0x1.edaap-3, 0x1.78f6p-1, 0x1.f986p-1, 0x1.10c6p-1, -0x1.23cp-1,
+ -0x1.f56cp-1, -0x1.94e2p-3, 0x1.a618p-1, 0x1.b006p-1, -0x1.4e0cp-3,
+ -0x1.f178p-1, -0x1.325cp-1, 0x1.015ep-1, 0x1.fc1p-1, 0x1.199ep-2,
+ -0x1.8db6p-1, -0x1.c48p-1, 0x1.58a2p-4, 0x1.e644p-1, -0x1.bab8p-2,
+ -0x1.6704p-2, 0x1.d61ep-1, -0x1.d7fap-1, 0x1.6fe4p-2, 0x1.b222p-2,
+ -0x1.e4c2p-1, 0x1.c6b4p-1, -0x1.22bcp-2, -0x1.fa82p-2, 0x1.f054p-1,
+ -0x1.b28cp-1, 0x1.a77ap-3, 0x1.1fd6p-1, -0x1.f8cp-1,
+};
+
+/* sin(x2) table S2, rounded to 16-bit precision. */
+static const float S2[] = {
+ 0x0p+0, 0x1p-11, 0x1p-10, 0x1.8p-10, 0x1p-9, 0x1.4p-9, 0x1.8p-9, 0x1.cp-9,
+ 0x0p+0, 0x1p-10, 0x1p-9, 0x1.8p-9, 0x1p-8, 0x1.4p-8, 0x1.8p-8, 0x1.cp-8,
+ 0x0p+0, 0x1p-9, 0x1p-8, 0x1.8p-8, 0x1.fffep-8, 0x1.3ffep-7, 0x1.7ffep-7,
+ 0x1.bffcp-7, 0x0p+0, 0x1p-8, 0x1.fffep-8, 0x1.7ffep-7, 0x1.fffap-7,
+ 0x1.3ffap-6, 0x1.7ff8p-6, 0x1.bff2p-6, 0x0p+0, 0x1.fffep-8, 0x1.fffap-7,
+ 0x1.7ff8p-6, 0x1.ffeap-6, 0x1.3fecp-5, 0x1.7fdcp-5, 0x1.bfc6p-5, 0x0p+0,
+ 0x1.fffap-7, 0x1.ffeap-6, 0x1.7fdcp-5, 0x1.ffaap-5, 0x1.3facp-4, 0x1.7f7p-4,
+ 0x1.bf1cp-4, 0x0p+0, 0x1.ffeap-6, 0x1.ffaap-5, 0x1.7f7p-4, 0x1.feaap-4,
+ 0x1.3eb4p-3, 0x1.7dc2p-3, 0x1.bc7p-3, 0x0p+0, 0x1.ffaap-5, 0x1.feaap-4,
+ 0x1.7dc2p-3, 0x1.faaep-3, 0x1.3ad2p-2, 0x1.771p-2, 0x1.b1d8p-2, 0x0p+0,
+ 0x1.feaap-4, 0x1.faaep-3, 0x1.771p-2, 0x1.eaeep-2, 0x1.2b92p-1, 0x1.5dp-1,
+ 0x1.88fcp-1, 0x0p+0, 0x1.faaep-3, 0x1.eaeep-2, 0x1.5dp-1, 0x1.aed6p-1,
+ 0x1.e5e2p-1, 0x1.feb8p-1, 0x1.f7cep-1, 0x0p+0, 0x1.eaeep-2, 0x1.aed6p-1,
+ 0x1.feb8p-1, 0x1.d19p-1, 0x1.326ap-1, 0x1.2104p-3, -0x1.6734p-2, 0x0p+0,
+ 0x1.aed6p-1, 0x1.d19p-1, 0x1.2104p-3, -0x1.837cp-1, -0x1.eaf8p-1,
+ -0x1.1e2p-2, 0x1.506p-1, 0x0p+0, 0x1.d19p-1, -0x1.837cp-1, -0x1.1e2p-2,
+ 0x1.fa8ep-1, -0x1.168ap-1, -0x1.12bap-1, 0x1.fb3p-1, 0x0p+0, -0x1.837cp-1,
+ 0x1.fa8ep-1, -0x1.12bap-1, -0x1.26dp-2, 0x1.d36ep-1, -0x1.cfa8p-1,
+ 0x1.1568p-2, 0x0p+0, 0x1.fa8ep-1, -0x1.26dp-2, -0x1.cfa8p-1, 0x1.1a54p-1,
+ 0x1.7d8p-1, -0x1.8958p-1, -0x1.0b08p-1, 0x0p+0, -0x1.26dp-2, 0x1.1a54p-1,
+ -0x1.8958p-1, 0x1.d70ep-1, -0x1.fcdep-1, 0x1.f798p-1, -0x1.c7aep-1,
+};
+
+/* cos(x2) table C2, rounded to 16-bit precision. */
+static const float C2[] = {
+ 0x1p+0, 0x1p+0, 0x1p+0, 0x1p+0, 0x1p+0, 0x1p+0, 0x1p+0, 0x1p+0, 0x1p+0,
+ 0x1p+0, 0x1p+0, 0x1p+0, 0x1p+0, 0x1.fffep-1, 0x1.fffep-1, 0x1.fffcp-1,
+ 0x1p+0, 0x1p+0, 0x1p+0, 0x1.fffep-1, 0x1.fffcp-1, 0x1.fffap-1, 0x1.fff8p-1,
+ 0x1.fff4p-1, 0x1p+0, 0x1p+0, 0x1.fffcp-1, 0x1.fff8p-1, 0x1.fffp-1,
+ 0x1.ffe8p-1, 0x1.ffdcp-1, 0x1.ffdp-1, 0x1p+0, 0x1.fffcp-1, 0x1.fffp-1,
+ 0x1.ffdcp-1, 0x1.ffcp-1, 0x1.ff9cp-1, 0x1.ff7p-1, 0x1.ff3cp-1, 0x1p+0,
+ 0x1.fffp-1, 0x1.ffcp-1, 0x1.ff7p-1, 0x1.ffp-1, 0x1.fe7p-1, 0x1.fdcp-1,
+ 0x1.fcfp-1, 0x1p+0, 0x1.ffcp-1, 0x1.ffp-1, 0x1.fdcp-1, 0x1.fc02p-1,
+ 0x1.f9c4p-1, 0x1.f706p-1, 0x1.f3ccp-1, 0x1p+0, 0x1.ffp-1, 0x1.fc02p-1,
+ 0x1.f706p-1, 0x1.f016p-1, 0x1.e734p-1, 0x1.dc6cp-1, 0x1.cfc6p-1, 0x1p+0,
+ 0x1.fc02p-1, 0x1.f016p-1, 0x1.dc6cp-1, 0x1.c152p-1, 0x1.9f36p-1, 0x1.76ap-1,
+ 0x1.483p-1, 0x1p+0, 0x1.f016p-1, 0x1.c152p-1, 0x1.76ap-1, 0x1.14a2p-1,
+ 0x1.42e4p-2, 0x1.21bep-4, -0x1.6d0cp-3, 0x1p+0, 0x1.c152p-1, 0x1.14a2p-1,
+ 0x1.21bep-4, -0x1.aa22p-2, -0x1.9a3p-1, -0x1.faep-1, -0x1.df78p-1, 0x1p+0,
+ 0x1.14a2p-1, -0x1.aa22p-2, -0x1.faep-1, -0x1.4eaap-1, 0x1.2278p-2,
+ 0x1.eb9cp-1, 0x1.82p-1, 0x1p+0, -0x1.aa22p-2, -0x1.4eaap-1, 0x1.eb9cp-1,
+ -0x1.29fcp-3, -0x1.ad9ap-1, 0x1.b00ep-1, 0x1.180ap-3, 0x1p+0, -0x1.4eaap-1,
+ -0x1.29fcp-3, 0x1.b00ep-1, -0x1.ea52p-1, 0x1.a1ep-2, 0x1.b25cp-2,
+ -0x1.ecdap-1, 0x1p+0, -0x1.29fcp-3, -0x1.ea52p-1, 0x1.b25cp-2, 0x1.ab2p-1,
+ -0x1.5578p-1, -0x1.47cp-1, 0x1.b4dap-1, 0x1p+0, -0x1.ea52p-1, 0x1.ab2p-1,
+ -0x1.47cp-1, 0x1.9144p-2, -0x1.c426p-4, -0x1.7186p-3, 0x1.d2eap-2,
+};
+
+/* sin(2^(5+i)) table S3, rounded to 16-bit precision. */
+static const float S3[] = {
+ 0x1.1a54p-1, 0x1.d70ep-1, 0x1.712cp-1, -0x1.ff98p-1, 0x1.45b6p-4,
+ -0x1.44aep-3, -0x1.4092p-2, -0x1.3074p-1, -0x1.e99p-1, -0x1.1ebp-1,
+ 0x1.db1p-1, 0x1.6256p-1, -0x1.ff8cp-1, -0x1.588p-4, 0x1.5748p-3, 0x1.526cp-2,
+ 0x1.3f68p-1, 0x1.f344p-1, 0x1.baap-2, -0x1.8f22p-1, -0x1.f3fap-1,
+ 0x1.aedcp-2, -0x1.86dcp-1, -0x1.f8eep-1, 0x1.4e68p-2, -0x1.3c12p-1,
+ -0x1.f15p-1, -0x1.d914p-2, 0x1.a39p-1, 0x1.e0fp-1, -0x1.49f2p-1, 0x1.f89ap-1,
+ 0x1.55f4p-2, -0x1.4254p-1, -0x1.f4ep-1, -0x1.9f72p-2, 0x1.7bb8p-1,
+ 0x1.fd6ep-1, -0x1.97b2p-3, 0x1.8f88p-2, 0x1.6fdep-1, 0x1.ffbap-1,
+ -0x1.09c4p-4, 0x1.0936p-3, 0x1.06fap-2, 0x1.fc5p-2, 0x1.b944p-1, 0x1.bf9ap-1,
+ -0x1.b2a6p-1, 0x1.cb7p-1, -0x1.958cp-1, 0x1.ef1ap-1, -0x1.f89p-2, 0x1.b71p-1,
+ 0x1.c3b8p-1, -0x1.a94ap-1, 0x1.d99ap-1, -0x1.67e6p-1, 0x1.fff6p-1,
+ 0x1.82a4p-6, -0x1.8288p-5, -0x1.821ap-4, -0x1.8062p-3, -0x1.798cp-2,
+ -0x1.5ef4p-1, -0x1.ff12p-1, -0x1.ed34p-4, 0x1.e99cp-3, 0x1.db6ap-2,
+ 0x1.a512p-1, 0x1.df1ap-1, -0x1.51f4p-1, 0x1.fbcp-1, 0x1.0542p-2,
+ -0x1.f938p-2, -0x1.b772p-1, -0x1.c302p-1, 0x1.aaf6p-1, -0x1.d748p-1,
+ 0x1.706p-1, -0x1.ffaep-1, 0x1.210ep-4, -0x1.2054p-3, -0x1.1d76p-2,
+ -0x1.1224p-1, -0x1.cf12p-1, -0x1.8b1cp-1, 0x1.f692p-1, -0x1.8006p-2,
+ 0x1.63fep-1, 0x1.ffb8p-1, 0x1.0f12p-4, -0x1.0e7ap-3, -0x1.0c1cp-2,
+ -0x1.02c2p-1, -0x1.be8ep-1, -0x1.b4e4p-1, 0x1.c79ap-1, -0x1.9fcp-1,
+ 0x1.e54cp-1, -0x1.355ap-1, 0x1.edp-1, 0x1.0a1ap-1, -0x1.c6acp-1,
+ -0x1.a218p-1, 0x1.e2aap-1, -0x1.4212p-1, 0x1.f4bcp-1, 0x1.a1ccp-2,
+ -0x1.7d72p-1, -0x1.fce4p-1, 0x1.c01p-3, -0x1.b536p-2, -0x1.8b5ap-1,
+ -0x1.f66cp-1, 0x1.82e4p-2, -0x1.6636p-1, -0x1.ffe4p-1, -0x1.5882p-5,
+ 0x1.5834p-4, 0x1.56fcp-3, 0x1.5224p-2, 0x1.3f2cp-1,
+};
+
+/* cos(2^(5+i)) table C3, rounded to 16-bit precision. */
+static const float C3[] = {
+ 0x1.ab2p-1, 0x1.9144p-2, -0x1.62c4p-1, -0x1.45f8p-5, -0x1.fe6p-1,
+ 0x1.f986p-1, 0x1.e644p-1, 0x1.9ba4p-1, 0x1.2bd4p-2, -0x1.a836p-1,
+ 0x1.7de4p-2, -0x1.7194p-1, 0x1.58cep-5, -0x1.fe3p-1, 0x1.f8c2p-1,
+ 0x1.e33ap-1, 0x1.9028p-1, 0x1.c5eap-3, -0x1.cdb2p-1, 0x1.40aep-1,
+ -0x1.b938p-3, -0x1.d078p-1, 0x1.4ab6p-1, -0x1.5316p-3, -0x1.e3eep-1,
+ 0x1.92ccp-1, 0x1.e70cp-3, -0x1.c616p-1, 0x1.2572p-1, -0x1.5f42p-2,
+ -0x1.8782p-1, 0x1.5af8p-3, -0x1.e29cp-1, 0x1.8dcep-1, 0x1.a8acp-3,
+ -0x1.d3f8p-1, 0x1.5774p-1, -0x1.99cp-4, -0x1.f5cp-1, 0x1.d76cp-1,
+ 0x1.641ep-1, -0x1.09e8p-5, -0x1.feecp-1, 0x1.fbbp-1, 0x1.eed4p-1,
+ 0x1.bc78p-1, 0x1.03aep-1, -0x1.f13p-2, -0x1.0e9ap-1, -0x1.c3f2p-2,
+ -0x1.3888p-1, -0x1.04e4p-2, -0x1.bd88p-1, 0x1.0762p-1, -0x1.e20cp-2,
+ -0x1.1d14p-1, -0x1.8514p-2, -0x1.6c2cp-1, 0x1.82aap-7, -0x1.ffdcp-1,
+ 0x1.ff6ep-1, 0x1.fdb8p-1, 0x1.f6e6p-1, 0x1.dbeep-1, 0x1.74ccp-1, 0x1.ee1ap-5,
+ -0x1.fc46p-1, 0x1.f128p-1, 0x1.c57ap-1, 0x1.2348p-1, -0x1.692ap-2,
+ -0x1.809ep-1, 0x1.0772p-3, -0x1.ef0ep-1, 0x1.bd58p-1, 0x1.06bcp-1,
+ -0x1.e4b4p-2, -0x1.1a92p-1, -0x1.9034p-2, -0x1.6398p-1, -0x1.213cp-5,
+ -0x1.febap-1, 0x1.fae6p-1, 0x1.ebb4p-1, 0x1.b06cp-1, 0x1.b4dcp-2,
+ -0x1.45ap-1, -0x1.873ap-3, -0x1.daa2p-1, 0x1.6ffcp-1, 0x1.0f38p-5,
+ -0x1.feep-1, 0x1.fb84p-1, 0x1.ee24p-1, 0x1.b9cep-1, 0x1.f4ecp-2,
+ -0x1.0af6p-1, -0x1.d338p-2, -0x1.2ad4p-1, -0x1.466p-2, -0x1.97fap-1,
+ 0x1.145ap-2, -0x1.b56cp-1, 0x1.d6cep-2, -0x1.2788p-1, -0x1.55a6p-2,
+ -0x1.8e02p-1, 0x1.ab32p-3, -0x1.d372p-1, 0x1.558ap-1, -0x1.c2cep-4,
+ -0x1.f398p-1, 0x1.cefcp-1, 0x1.4554p-1, -0x1.8a44p-3, -0x1.da0cp-1,
+ 0x1.6dd4p-1, 0x1.5896p-6, -0x1.ff8cp-1, 0x1.fe3p-1, 0x1.f8c4p-1, 0x1.e348p-1,
+ 0x1.9058p-1,
+};
+

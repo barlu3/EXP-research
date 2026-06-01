@@ -1,0 +1,1151 @@
+MPFR vs CORE-MATH bfloat16 sin() — exhaustive verification
+MPFR version: 4.2.1
+Checking all 65536 bfloat16 bit patterns (0x0000–0xFFFF)...
+
+DISCREPANCY #1:
+  Input     : 0x4117  (+9.43750000e+00 as float)
+  CORE-MATH : 0xBC51  (-1.27563477e-02 as float)
+  MPFR      : 0xBC50  (-1.26953125e-02 as float)
+  S1 index  : 114   S1[114] = 4.12117004e-01
+  C1 index  : 114   C1[114] = -9.11132812e-01
+  S2 index  : 63   S2[63] = 4.23675537e-01
+  C2 index  : 63   C2[63] = 9.05807495e-01
+  fma(S1,C2,C1*S2) (float32) = -1.27260126e-02
+
+DISCREPANCY #2:
+  Input     : 0x414D  (+1.28125000e+01 as float)
+  CORE-MATH : 0x3E7A  (+2.44140625e-01 as float)
+  MPFR      : 0x3E79  (+2.43164062e-01 as float)
+  S1 index  : 121   S1[121] = -6.63223267e-02
+  C1 index  : 121   C1[121] = 9.97802734e-01
+  S2 index  : 61   S2[61] = 3.07441711e-01
+  C2 index  : 61   C2[61] = 9.51568604e-01
+  fma(S1,C2,C1*S2) (float32) = 2.43655935e-01
+
+DISCREPANCY #3:
+  Input     : 0x4284  (+6.60000000e+01 as float)
+  CORE-MATH : 0xBCD9  (-2.64892578e-02 as float)
+  MPFR      : 0xBCDA  (-2.66113281e-02 as float)
+  S1 index  : 160   S1[160] = 9.20028687e-01
+  C1 index  : 160   C1[160] = 3.91860962e-01
+  S2 index  : 84   S2[84] = 9.09301758e-01
+  C2 index  : 84   C2[84] = -4.16145325e-01
+  fma(S1,C2,C1*S2) (float32) = -2.65457612e-02
+
+DISCREPANCY #4:
+  Input     : 0x4349  (+2.01000000e+02 as float)
+  CORE-MATH : 0xBD7D  (-6.17675781e-02 as float)
+  MPFR      : 0xBD7E  (-6.20117188e-02 as float)
+  S1 index  : 185   S1[185] = -8.73291016e-01
+  C1 index  : 185   C1[185] = 4.87190247e-01
+  S2 index  : 89   S2[89] = 8.41476440e-01
+  C2 index  : 89   C2[89] = 5.40298462e-01
+  fma(S1,C2,C1*S2) (float32) = -6.18786849e-02
+
+DISCREPANCY #5:
+  Input     : 0x43BE  (+3.80000000e+02 as float)
+  CORE-MATH : 0x3E08  (+1.32812500e-01 as float)
+  MPFR      : 0x3E07  (+1.31835938e-01 as float)
+  S1 index  : 199   S1[199] = -4.20196533e-01
+  C1 index  : 199   C1[199] = -9.07440186e-01
+  S2 index  : 102   S2[102] = -5.36575317e-01
+  C2 index  : 102   C2[102] = 8.43856812e-01
+  fma(S1,C2,C1*S2) (float32) = 1.32324308e-01
+
+DISCREPANCY #6:
+  Input     : 0x43FA  (+5.00000000e+02 as float)
+  CORE-MATH : 0xBEF0  (-4.68750000e-01 as float)
+  MPFR      : 0xBEEF  (-4.66796875e-01 as float)
+  S1 index  : 207   S1[207] = -3.63143921e-01
+  C1 index  : 207   C1[207] = 9.31732178e-01
+  S2 index  : 98   S2[98] = -7.56805420e-01
+  C2 index  : 98   C2[98] = -6.53640747e-01
+  fma(S1,C2,C1*S2) (float32) = -4.67774272e-01
+
+DISCREPANCY #7:
+  Input     : 0x4894  (+3.03104000e+05 as float)
+  CORE-MATH : 0x3A56  (+8.16345215e-04 as float)
+  MPFR      : 0x3A55  (+8.12530518e-04 as float)
+  S3/C3 base : k=6   S3[6] = -3.13056946e-01   C3[6] = 9.49737549e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #8:
+  Input     : 0x495E  (+9.09312000e+05 as float)
+  CORE-MATH : 0x3B20  (+2.44140625e-03 as float)
+  MPFR      : 0x3B1F  (+2.42614746e-03 as float)
+  S3/C3 base : k=7   S3[7] = -5.94635010e-01   C3[7] = 8.03985596e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #9:
+  Input     : 0x49DE  (+1.81862400e+06 as float)
+  CORE-MATH : 0xBBA0  (-4.88281250e-03 as float)
+  MPFR      : 0xBB9F  (-4.85229492e-03 as float)
+  S3/C3 base : k=8   S3[8] = -9.56176758e-01   C3[8] = 2.92800903e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #10:
+  Input     : 0x4A04  (+2.16268800e+06 as float)
+  CORE-MATH : 0x3DBA  (+9.08203125e-02 as float)
+  MPFR      : 0x3DB9  (+9.03320312e-02 as float)
+  S3/C3 base : k=9   S3[9] = -5.59936523e-01   C3[9] = -8.28536987e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #11:
+  Input     : 0x4A44  (+3.21126400e+06 as float)
+  CORE-MATH : 0xBE79  (-2.43164062e-01 as float)
+  MPFR      : 0xBE7A  (-2.44140625e-01 as float)
+  S3/C3 base : k=9   S3[9] = -5.59936523e-01   C3[9] = -8.28536987e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #12:
+  Input     : 0x4A5E  (+3.63724800e+06 as float)
+  CORE-MATH : 0xBC20  (-9.76562500e-03 as float)
+  MPFR      : 0xBC1F  (-9.70458984e-03 as float)
+  S3/C3 base : k=9   S3[9] = -5.59936523e-01   C3[9] = -8.28536987e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #13:
+  Input     : 0x4A8F  (+4.68582400e+06 as float)
+  CORE-MATH : 0x3EA4  (+3.20312500e-01 as float)
+  MPFR      : 0x3EA5  (+3.22265625e-01 as float)
+  S3/C3 base : k=10   S3[10] = 9.27856445e-01   C3[10] = 3.72940063e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #14:
+  Input     : 0x4ADE  (+7.27449600e+06 as float)
+  CORE-MATH : 0xBCA0  (-1.95312500e-02 as float)
+  MPFR      : 0xBC9F  (-1.94091797e-02 as float)
+  S3/C3 base : k=10   S3[10] = 9.27856445e-01   C3[10] = 3.72940063e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #15:
+  Input     : 0x4AE6  (+7.53664000e+06 as float)
+  CORE-MATH : 0xBD84  (-6.44531250e-02 as float)
+  MPFR      : 0xBD85  (-6.49414062e-02 as float)
+  S3/C3 base : k=10   S3[10] = 9.27856445e-01   C3[10] = 3.72940063e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #16:
+  Input     : 0x4CFB  (+1.31596288e+08 as float)
+  CORE-MATH : 0xBF7D  (-9.88281250e-01 as float)
+  MPFR      : 0xBF7E  (-9.92187500e-01 as float)
+  S3/C3 base : k=14   S3[14] = 1.67617798e-01   C3[14] = 9.85855103e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #17:
+  Input     : 0x4DA3  (+3.41835776e+08 as float)
+  CORE-MATH : 0x3E1A  (+1.50390625e-01 as float)
+  MPFR      : 0x3E19  (+1.49414062e-01 as float)
+  S3/C3 base : k=16   S3[16] = 6.23840332e-01   C3[16] = 7.81555176e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #18:
+  Input     : 0x4DDC  (+4.61373440e+08 as float)
+  CORE-MATH : 0xBF05  (-5.19531250e-01 as float)
+  MPFR      : 0xBF06  (-5.23437500e-01 as float)
+  S3/C3 base : k=16   S3[16] = 6.23840332e-01   C3[16] = 7.81555176e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #19:
+  Input     : 0x4EF6  (+2.06359757e+09 as float)
+  CORE-MATH : 0x3B1E  (+2.41088867e-03 as float)
+  MPFR      : 0x3B1F  (+2.42614746e-03 as float)
+  S3/C3 base : k=18   S3[18] = 4.32250977e-01   C3[18] = -9.01748657e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #20:
+  Input     : 0x50AA  (+2.28170138e+10 as float)
+  CORE-MATH : 0x3AAA  (+1.29699707e-03 as float)
+  MPFR      : 0x3AAB  (+1.30462646e-03 as float)
+  S3/C3 base : k=22   S3[22] = -7.63397217e-01   C3[22] = 6.45919800e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #21:
+  Input     : 0x51AA  (+9.12680550e+10 as float)
+  CORE-MATH : 0xBBAA  (-5.18798828e-03 as float)
+  MPFR      : 0xBBAB  (-5.21850586e-03 as float)
+  S3/C3 base : k=24   S3[24] = 3.26568604e-01   C3[24] = -9.45175171e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #22:
+  Input     : 0x51BF  (+1.02542344e+11 as float)
+  CORE-MATH : 0x3F27  (+6.52343750e-01 as float)
+  MPFR      : 0x3F26  (+6.48437500e-01 as float)
+  S3/C3 base : k=24   S3[24] = 3.26568604e-01   C3[24] = -9.45175171e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #23:
+  Input     : 0x51EC  (+1.26701535e+11 as float)
+  CORE-MATH : 0xBCF3  (-2.96630859e-02 as float)
+  MPFR      : 0xBCF4  (-2.97851562e-02 as float)
+  S3/C3 base : k=24   S3[24] = 3.26568604e-01   C3[24] = -9.45175171e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #24:
+  Input     : 0x531D  (+6.74309865e+11 as float)
+  CORE-MATH : 0x3AC7  (+1.51824951e-03 as float)
+  MPFR      : 0x3AC6  (+1.51062012e-03 as float)
+  S3/C3 base : k=27   S3[27] = -4.61990356e-01   C3[27] = -8.86886597e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #25:
+  Input     : 0x53B4  (+1.54618823e+12 as float)
+  CORE-MATH : 0xBDC5  (-9.61914062e-02 as float)
+  MPFR      : 0xBDC6  (-9.66796875e-02 as float)
+  S3/C3 base : k=28   S3[28] = 8.19458008e-01   C3[28] = 5.73135376e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #26:
+  Input     : 0x53C1  (+1.65785738e+12 as float)
+  CORE-MATH : 0xBC86  (-1.63574219e-02 as float)
+  MPFR      : 0xBC85  (-1.62353516e-02 as float)
+  S3/C3 base : k=28   S3[28] = 8.19458008e-01   C3[28] = 5.73135376e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #27:
+  Input     : 0x5453  (+3.62495240e+12 as float)
+  CORE-MATH : 0xBD54  (-5.17578125e-02 as float)
+  MPFR      : 0xBD55  (-5.20019531e-02 as float)
+  S3/C3 base : k=29   S3[29] = 9.39331055e-01   C3[29] = -3.43025208e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #28:
+  Input     : 0x560F  (+3.93075407e+13 as float)
+  CORE-MATH : 0xBC44  (-1.19628906e-02 as float)
+  MPFR      : 0xBC45  (-1.20239258e-02 as float)
+  S3/C3 base : k=33   S3[33] = -6.29547119e-01   C3[33] = 7.76962280e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #29:
+  Input     : 0x56A6  (+9.12594651e+13 as float)
+  CORE-MATH : 0x3DED  (+1.15722656e-01 as float)
+  MPFR      : 0x3DEC  (+1.15234375e-01 as float)
+  S3/C3 base : k=34   S3[34] = -9.78271484e-01   C3[34] = 2.07359314e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #30:
+  Input     : 0x56FA  (+1.37438953e+14 as float)
+  CORE-MATH : 0xBF6D  (-9.25781250e-01 as float)
+  MPFR      : 0xBF6E  (-9.29687500e-01 as float)
+  S3/C3 base : k=34   S3[34] = -9.78271484e-01   C3[34] = 2.07359314e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #31:
+  Input     : 0x5883  (+1.15228819e+15 as float)
+  CORE-MATH : 0xBF67  (-9.02343750e-01 as float)
+  MPFR      : 0xBF66  (-8.98437500e-01 as float)
+  S3/C3 base : k=38   S3[38] = -1.99069977e-01   C3[38] = -9.79980469e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #32:
+  Input     : 0x5973  (+4.27490121e+15 as float)
+  CORE-MATH : 0xBC0F  (-8.72802734e-03 as float)
+  MPFR      : 0xBC10  (-8.78906250e-03 as float)
+  S3/C3 base : k=39   S3[39] = 3.90167236e-01   C3[39] = 9.20745850e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #33:
+  Input     : 0x5AF2  (+3.40584722e+16 as float)
+  CORE-MATH : 0xBBA9  (-5.15747070e-03 as float)
+  MPFR      : 0xBBAA  (-5.18798828e-03 as float)
+  S3/C3 base : k=42   S3[42] = -6.48841858e-02   C3[42] = -9.97894287e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #34:
+  Input     : 0x5B2B  (+4.81322210e+16 as float)
+  CORE-MATH : 0xBE5B  (-2.13867188e-01 as float)
+  MPFR      : 0xBE5A  (-2.12890625e-01 as float)
+  S3/C3 base : k=43   S3[43] = 1.29497528e-01   C3[43] = 9.91577148e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #35:
+  Input     : 0x5B43  (+5.48876205e+16 as float)
+  CORE-MATH : 0x3E42  (+1.89453125e-01 as float)
+  MPFR      : 0x3E41  (+1.88476562e-01 as float)
+  S3/C3 base : k=43   S3[43] = 1.29497528e-01   C3[43] = 9.91577148e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #36:
+  Input     : 0x5C04  (+1.48618788e+17 as float)
+  CORE-MATH : 0xBF06  (-5.23437500e-01 as float)
+  MPFR      : 0xBF05  (-5.19531250e-01 as float)
+  S3/C3 base : k=45   S3[45] = 4.96398926e-01   C3[45] = 8.68103027e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #37:
+  Input     : 0x5D3D  (+8.51180330e+17 as float)
+  CORE-MATH : 0x39A3  (+3.10897827e-04 as float)
+  MPFR      : 0x39A9  (+3.22341919e-04 as float)
+  S3/C3 base : k=47   S3[47] = 8.74221802e-01   C3[47] = -4.85534668e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #38:
+  Input     : 0x5D40  (+8.64691128e+17 as float)
+  CORE-MATH : 0x3D4D  (+5.00488281e-02 as float)
+  MPFR      : 0x3D4E  (+5.02929688e-02 as float)
+  S3/C3 base : k=47   S3[47] = 8.74221802e-01   C3[47] = -4.85534668e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #39:
+  Input     : 0x5DBD  (+1.70236066e+18 as float)
+  CORE-MATH : 0xBA28  (-6.40869141e-04 as float)
+  MPFR      : 0xBA29  (-6.44683838e-04 as float)
+  S3/C3 base : k=48   S3[48] = -8.48922729e-01   C3[48] = -5.28518677e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #40:
+  Input     : 0x5E1E  (+2.84627496e+18 as float)
+  CORE-MATH : 0xBD0C  (-3.41796875e-02 as float)
+  MPFR      : 0xBD0D  (-3.44238281e-02 as float)
+  S3/C3 base : k=49   S3[49] = 8.97338867e-01   C3[49] = -4.41352844e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #41:
+  Input     : 0x5E3D  (+3.40472132e+18 as float)
+  CORE-MATH : 0xBAA7  (-1.27410889e-03 as float)
+  MPFR      : 0xBAA9  (-1.28936768e-03 as float)
+  S3/C3 base : k=49   S3[49] = 8.97338867e-01   C3[49] = -4.41352844e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #42:
+  Input     : 0x5E43  (+3.51280771e+18 as float)
+  CORE-MATH : 0xBEC7  (-3.88671875e-01 as float)
+  MPFR      : 0xBEC8  (-3.90625000e-01 as float)
+  S3/C3 base : k=49   S3[49] = 8.97338867e-01   C3[49] = -4.41352844e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #43:
+  Input     : 0x5EBD  (+6.80944264e+18 as float)
+  CORE-MATH : 0xBB28  (-2.56347656e-03 as float)
+  MPFR      : 0xBB29  (-2.57873535e-03 as float)
+  S3/C3 base : k=50   S3[50] = -7.92083740e-01   C3[50] = -6.10412598e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #44:
+  Input     : 0x6185  (+3.06677120e+20 as float)
+  CORE-MATH : 0xB9B4  (-3.43322754e-04 as float)
+  MPFR      : 0xB9B1  (-3.37600708e-04 as float)
+  S3/C3 base : k=56   S3[56] = 9.25003052e-01   C3[56] = -3.79959106e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #45:
+  Input     : 0x6205  (+6.13354240e+20 as float)
+  CORE-MATH : 0x3A30  (+6.71386719e-04 as float)
+  MPFR      : 0x3A31  (+6.75201416e-04 as float)
+  S3/C3 base : k=57   S3[57] = -7.02926636e-01   C3[57] = -7.11273193e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #46:
+  Input     : 0x6414  (+1.09204725e+22 as float)
+  CORE-MATH : 0xBF7D  (-9.88281250e-01 as float)
+  MPFR      : 0xBF7C  (-9.84375000e-01 as float)
+  S3/C3 base : k=61   S3[61] = -9.42630768e-02   C3[61] = 9.95544434e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #47:
+  Input     : 0x64B7  (+2.70060333e+22 as float)
+  CORE-MATH : 0xBBC7  (-6.07299805e-03 as float)
+  MPFR      : 0xBBC8  (-6.10351562e-03 as float)
+  S3/C3 base : k=62   S3[62] = -1.87686920e-01   C3[62] = 9.82223511e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #48:
+  Input     : 0x653A  (+5.48975104e+22 as float)
+  CORE-MATH : 0xBF67  (-9.02343750e-01 as float)
+  MPFR      : 0xBF66  (-8.98437500e-01 as float)
+  S3/C3 base : k=63   S3[63] = -3.68698120e-01   C3[63] = 9.29550171e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #49:
+  Input     : 0x6550  (+6.13907643e+22 as float)
+  CORE-MATH : 0x3B5A  (+3.32641602e-03 as float)
+  MPFR      : 0x3B59  (+3.31115723e-03 as float)
+  S3/C3 base : k=63   S3[63] = -3.68698120e-01   C3[63] = 9.29550171e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #50:
+  Input     : 0x669B  (+3.65983402e+23 as float)
+  CORE-MATH : 0x3E10  (+1.40625000e-01 as float)
+  MPFR      : 0x3E0F  (+1.39648438e-01 as float)
+  S3/C3 base : k=66   S3[66] = -1.20410919e-01   C3[66] = -9.92721558e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #51:
+  Input     : 0x68A4  (+6.19574483e+24 as float)
+  CORE-MATH : 0x3F0B  (+5.42968750e-01 as float)
+  MPFR      : 0x3F0C  (+5.46875000e-01 as float)
+  S3/C3 base : k=70   S3[70] = 9.35745239e-01   C3[70] = -3.52699280e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #52:
+  Input     : 0x68FA  (+9.44473297e+24 as float)
+  CORE-MATH : 0xBF56  (-8.35937500e-01 as float)
+  MPFR      : 0xBF57  (-8.39843750e-01 as float)
+  S3/C3 base : k=70   S3[70] = 9.35745239e-01   C3[70] = -3.52699280e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #53:
+  Input     : 0x6914  (+1.11825638e+25 as float)
+  CORE-MATH : 0xBDF6  (-1.20117188e-01 as float)
+  MPFR      : 0xBDF7  (-1.20605469e-01 as float)
+  S3/C3 base : k=71   S3[71] = -6.60064697e-01   C3[71] = -7.51205444e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #54:
+  Input     : 0x6973  (+1.83605609e+25 as float)
+  CORE-MATH : 0x3F2E  (+6.79687500e-01 as float)
+  MPFR      : 0x3F2F  (+6.83593750e-01 as float)
+  S3/C3 base : k=71   S3[71] = -6.60064697e-01   C3[71] = -7.51205444e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #55:
+  Input     : 0x69CF  (+3.12809556e+25 as float)
+  CORE-MATH : 0xBB0C  (-2.13623047e-03 as float)
+  MPFR      : 0xBB0B  (-2.12097168e-03 as float)
+  S3/C3 base : k=72   S3[72] = 9.91699219e-01   C3[72] = 1.28635406e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #56:
+  Input     : 0x69E1  (+3.40010387e+25 as float)
+  CORE-MATH : 0xBF3C  (-7.34375000e-01 as float)
+  MPFR      : 0xBF3B  (-7.30468750e-01 as float)
+  S3/C3 base : k=72   S3[72] = 9.91699219e-01   C3[72] = 1.28635406e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #57:
+  Input     : 0x6A4D  (+6.19574483e+25 as float)
+  CORE-MATH : 0x3EFE  (+4.96093750e-01 as float)
+  MPFR      : 0x3EFF  (+4.98046875e-01 as float)
+  S3/C3 base : k=73   S3[73] = 2.55134583e-01   C3[73] = -9.66903687e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #58:
+  Input     : 0x6A73  (+7.34422435e+25 as float)
+  CORE-MATH : 0xBE11  (-1.41601562e-01 as float)
+  MPFR      : 0xBE10  (-1.40625000e-01 as float)
+  S3/C3 base : k=73   S3[73] = 2.55134583e-01   C3[73] = -9.66903687e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #59:
+  Input     : 0x6D01  (+2.49522289e+27 as float)
+  CORE-MATH : 0x3DA1  (+7.86132812e-02 as float)
+  MPFR      : 0x3DA0  (+7.81250000e-02 as float)
+  S3/C3 base : k=79   S3[79] = 7.19482422e-01   C3[79] = -6.94519043e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #60:
+  Input     : 0x6E33  (+1.38494542e+28 as float)
+  CORE-MATH : 0x3D9B  (+7.56835938e-02 as float)
+  MPFR      : 0x3D9C  (+7.61718750e-02 as float)
+  S3/C3 base : k=81   S3[81] = 7.05699921e-02   C3[81] = -9.97512817e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #61:
+  Input     : 0x6EAF  (+2.70799384e+28 as float)
+  CORE-MATH : 0x3ECD  (+4.00390625e-01 as float)
+  MPFR      : 0x3ECE  (+4.02343750e-01 as float)
+  S3/C3 base : k=82   S3[82] = -1.40785217e-01   C3[82] = 9.90036011e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #62:
+  Input     : 0x6F8B  (+8.60368327e+28 as float)
+  CORE-MATH : 0xBAE1  (-1.71661377e-03 as float)
+  MPFR      : 0xBAE0  (-1.70898438e-03 as float)
+  S3/C3 base : k=84   S3[84] = -5.35430908e-01   C3[84] = 8.44573975e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #63:
+  Input     : 0x700B  (+1.72073665e+29 as float)
+  CORE-MATH : 0x3B61  (+3.43322754e-03 as float)
+  MPFR      : 0x3B60  (+3.41796875e-03 as float)
+  S3/C3 base : k=85   S3[85] = -9.04434204e-01   C3[85] = 4.26620483e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #64:
+  Input     : 0x710F  (+7.08101702e+29 as float)
+  CORE-MATH : 0x3F34  (+7.03125000e-01 as float)
+  MPFR      : 0x3F35  (+7.07031250e-01 as float)
+  S3/C3 base : k=87   S3[87] = 9.81582642e-01   C3[87] = -1.91028595e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #65:
+  Input     : 0x716D  (+1.17356716e+30 as float)
+  CORE-MATH : 0xBA41  (-7.36236572e-04 as float)
+  MPFR      : 0xBA43  (-7.43865967e-04 as float)
+  S3/C3 base : k=87   S3[87] = 9.81582642e-01   C3[87] = -1.91028595e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #66:
+  Input     : 0x71ED  (+2.34713431e+30 as float)
+  CORE-MATH : 0x3AC4  (+1.49536133e-03 as float)
+  MPFR      : 0x3AC3  (+1.48773193e-03 as float)
+  S3/C3 base : k=88   S3[88] = -3.75022888e-01   C3[88] = -9.27017212e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #67:
+  Input     : 0x723C  (+3.72372364e+30 as float)
+  CORE-MATH : 0x3CEC  (+2.88085938e-02 as float)
+  MPFR      : 0x3CED  (+2.89306641e-02 as float)
+  S3/C3 base : k=89   S3[89] = 6.95297241e-01   C3[89] = 7.18719482e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #68:
+  Input     : 0x73BD  (+2.99482454e+31 as float)
+  CORE-MATH : 0x3DCA  (+9.86328125e-02 as float)
+  MPFR      : 0x3DC9  (+9.81445312e-02 as float)
+  S3/C3 base : k=92   S3[92] = -1.32068634e-01   C3[92] = 9.91241455e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #69:
+  Input     : 0x7404  (+4.18324698e+31 as float)
+  CORE-MATH : 0x3ECC  (+3.98437500e-01 as float)
+  MPFR      : 0x3ECD  (+4.00390625e-01 as float)
+  S3/C3 base : k=93   S3[93] = -2.61825562e-01   C3[93] = 9.65118408e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #70:
+  Input     : 0x7426  (+5.26074999e+31 as float)
+  CORE-MATH : 0x3BE1  (+6.86645508e-03 as float)
+  MPFR      : 0x3BE2  (+6.89697266e-03 as float)
+  S3/C3 base : k=93   S3[93] = -2.61825562e-01   C3[93] = 9.65118408e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #71:
+  Input     : 0x7480  (+8.11296384e+31 as float)
+  CORE-MATH : 0x3F76  (+9.60937500e-01 as float)
+  MPFR      : 0x3F77  (+9.64843750e-01 as float)
+  S3/C3 base : k=94   S3[94] = -5.05386353e-01   C3[94] = 8.62899780e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #72:
+  Input     : 0x7494  (+9.38061444e+31 as float)
+  CORE-MATH : 0xBE00  (-1.25000000e-01 as float)
+  MPFR      : 0xBE01  (-1.25976562e-01 as float)
+  S3/C3 base : k=94   S3[94] = -5.05386353e-01   C3[94] = 8.62899780e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #73:
+  Input     : 0x74C6  (+1.25497409e+32 as float)
+  CORE-MATH : 0x3F71  (+9.41406250e-01 as float)
+  MPFR      : 0x3F72  (+9.45312500e-01 as float)
+  S3/C3 base : k=94   S3[94] = -5.05386353e-01   C3[94] = 8.62899780e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #74:
+  Input     : 0x7526  (+2.10430000e+32 as float)
+  CORE-MATH : 0x3CE1  (+2.74658203e-02 as float)
+  MPFR      : 0x3CE2  (+2.75878906e-02 as float)
+  S3/C3 base : k=95   S3[95] = -8.72177124e-01   C3[95] = 4.89181519e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #75:
+  Input     : 0x752A  (+2.15500602e+32 as float)
+  CORE-MATH : 0x3F61  (+8.78906250e-01 as float)
+  MPFR      : 0x3F60  (+8.75000000e-01 as float)
+  S3/C3 base : k=95   S3[95] = -8.72177124e-01   C3[95] = 4.89181519e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #76:
+  Input     : 0x77DB  (+8.88369541e+33 as float)
+  CORE-MATH : 0x3F26  (+6.48437500e-01 as float)
+  MPFR      : 0x3F27  (+6.52343750e-01 as float)
+  S3/C3 base : k=100   S3[100] = -6.04202271e-01   C3[100] = -7.96829224e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #77:
+  Input     : 0x7C64  (+4.73537473e+36 as float)
+  CORE-MATH : 0x3BBF  (+5.82885742e-03 as float)
+  MPFR      : 0x3BBE  (+5.79833984e-03 as float)
+  S3/C3 base : k=109   S3[109] = -7.45010376e-01   C3[109] = 6.67068481e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #78:
+  Input     : 0x7CE4  (+9.47074947e+36 as float)
+  CORE-MATH : 0xBC3F  (-1.16577148e-02 as float)
+  MPFR      : 0xBC3E  (-1.15966797e-02 as float)
+  S3/C3 base : k=110   S3[110] = -9.93927002e-01   C3[110] = -1.10059738e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #79:
+  Input     : 0x7F63  (+3.01734755e+38 as float)
+  CORE-MATH : 0xBC7E  (-1.55029297e-02 as float)
+  MPFR      : 0xBC7F  (-1.55639648e-02 as float)
+  S3/C3 base : k=115   S3[115] = 3.77822876e-01   C3[115] = -9.25872803e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #80:
+  Input     : 0xC117  (-9.43750000e+00 as float)
+  CORE-MATH : 0x3C51  (+1.27563477e-02 as float)
+  MPFR      : 0x3C50  (+1.26953125e-02 as float)
+  S1 index  : 114   S1[114] = 4.12117004e-01
+  C1 index  : 114   C1[114] = -9.11132812e-01
+  S2 index  : 63   S2[63] = 4.23675537e-01
+  C2 index  : 63   C2[63] = 9.05807495e-01
+  fma(S1,C2,C1*S2) (float32) = -1.27260126e-02
+
+DISCREPANCY #81:
+  Input     : 0xC14D  (-1.28125000e+01 as float)
+  CORE-MATH : 0xBE7A  (-2.44140625e-01 as float)
+  MPFR      : 0xBE79  (-2.43164062e-01 as float)
+  S1 index  : 121   S1[121] = -6.63223267e-02
+  C1 index  : 121   C1[121] = 9.97802734e-01
+  S2 index  : 61   S2[61] = 3.07441711e-01
+  C2 index  : 61   C2[61] = 9.51568604e-01
+  fma(S1,C2,C1*S2) (float32) = 2.43655935e-01
+
+DISCREPANCY #82:
+  Input     : 0xC284  (-6.60000000e+01 as float)
+  CORE-MATH : 0x3CD9  (+2.64892578e-02 as float)
+  MPFR      : 0x3CDA  (+2.66113281e-02 as float)
+  S1 index  : 160   S1[160] = 9.20028687e-01
+  C1 index  : 160   C1[160] = 3.91860962e-01
+  S2 index  : 84   S2[84] = 9.09301758e-01
+  C2 index  : 84   C2[84] = -4.16145325e-01
+  fma(S1,C2,C1*S2) (float32) = -2.65457612e-02
+
+DISCREPANCY #83:
+  Input     : 0xC349  (-2.01000000e+02 as float)
+  CORE-MATH : 0x3D7D  (+6.17675781e-02 as float)
+  MPFR      : 0x3D7E  (+6.20117188e-02 as float)
+  S1 index  : 185   S1[185] = -8.73291016e-01
+  C1 index  : 185   C1[185] = 4.87190247e-01
+  S2 index  : 89   S2[89] = 8.41476440e-01
+  C2 index  : 89   C2[89] = 5.40298462e-01
+  fma(S1,C2,C1*S2) (float32) = -6.18786849e-02
+
+DISCREPANCY #84:
+  Input     : 0xC3BE  (-3.80000000e+02 as float)
+  CORE-MATH : 0xBE08  (-1.32812500e-01 as float)
+  MPFR      : 0xBE07  (-1.31835938e-01 as float)
+  S1 index  : 199   S1[199] = -4.20196533e-01
+  C1 index  : 199   C1[199] = -9.07440186e-01
+  S2 index  : 102   S2[102] = -5.36575317e-01
+  C2 index  : 102   C2[102] = 8.43856812e-01
+  fma(S1,C2,C1*S2) (float32) = 1.32324308e-01
+
+DISCREPANCY #85:
+  Input     : 0xC3FA  (-5.00000000e+02 as float)
+  CORE-MATH : 0x3EF0  (+4.68750000e-01 as float)
+  MPFR      : 0x3EEF  (+4.66796875e-01 as float)
+  S1 index  : 207   S1[207] = -3.63143921e-01
+  C1 index  : 207   C1[207] = 9.31732178e-01
+  S2 index  : 98   S2[98] = -7.56805420e-01
+  C2 index  : 98   C2[98] = -6.53640747e-01
+  fma(S1,C2,C1*S2) (float32) = -4.67774272e-01
+
+DISCREPANCY #86:
+  Input     : 0xC894  (-3.03104000e+05 as float)
+  CORE-MATH : 0xBA56  (-8.16345215e-04 as float)
+  MPFR      : 0xBA55  (-8.12530518e-04 as float)
+  S3/C3 base : k=6   S3[6] = -3.13056946e-01   C3[6] = 9.49737549e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #87:
+  Input     : 0xC95E  (-9.09312000e+05 as float)
+  CORE-MATH : 0xBB20  (-2.44140625e-03 as float)
+  MPFR      : 0xBB1F  (-2.42614746e-03 as float)
+  S3/C3 base : k=7   S3[7] = -5.94635010e-01   C3[7] = 8.03985596e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #88:
+  Input     : 0xC9DE  (-1.81862400e+06 as float)
+  CORE-MATH : 0x3BA0  (+4.88281250e-03 as float)
+  MPFR      : 0x3B9F  (+4.85229492e-03 as float)
+  S3/C3 base : k=8   S3[8] = -9.56176758e-01   C3[8] = 2.92800903e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #89:
+  Input     : 0xCA04  (-2.16268800e+06 as float)
+  CORE-MATH : 0xBDBA  (-9.08203125e-02 as float)
+  MPFR      : 0xBDB9  (-9.03320312e-02 as float)
+  S3/C3 base : k=9   S3[9] = -5.59936523e-01   C3[9] = -8.28536987e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #90:
+  Input     : 0xCA44  (-3.21126400e+06 as float)
+  CORE-MATH : 0x3E79  (+2.43164062e-01 as float)
+  MPFR      : 0x3E7A  (+2.44140625e-01 as float)
+  S3/C3 base : k=9   S3[9] = -5.59936523e-01   C3[9] = -8.28536987e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #91:
+  Input     : 0xCA5E  (-3.63724800e+06 as float)
+  CORE-MATH : 0x3C20  (+9.76562500e-03 as float)
+  MPFR      : 0x3C1F  (+9.70458984e-03 as float)
+  S3/C3 base : k=9   S3[9] = -5.59936523e-01   C3[9] = -8.28536987e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #92:
+  Input     : 0xCA8F  (-4.68582400e+06 as float)
+  CORE-MATH : 0xBEA4  (-3.20312500e-01 as float)
+  MPFR      : 0xBEA5  (-3.22265625e-01 as float)
+  S3/C3 base : k=10   S3[10] = 9.27856445e-01   C3[10] = 3.72940063e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #93:
+  Input     : 0xCADE  (-7.27449600e+06 as float)
+  CORE-MATH : 0x3CA0  (+1.95312500e-02 as float)
+  MPFR      : 0x3C9F  (+1.94091797e-02 as float)
+  S3/C3 base : k=10   S3[10] = 9.27856445e-01   C3[10] = 3.72940063e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #94:
+  Input     : 0xCAE6  (-7.53664000e+06 as float)
+  CORE-MATH : 0x3D84  (+6.44531250e-02 as float)
+  MPFR      : 0x3D85  (+6.49414062e-02 as float)
+  S3/C3 base : k=10   S3[10] = 9.27856445e-01   C3[10] = 3.72940063e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #95:
+  Input     : 0xCCFB  (-1.31596288e+08 as float)
+  CORE-MATH : 0x3F7D  (+9.88281250e-01 as float)
+  MPFR      : 0x3F7E  (+9.92187500e-01 as float)
+  S3/C3 base : k=14   S3[14] = 1.67617798e-01   C3[14] = 9.85855103e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #96:
+  Input     : 0xCDA3  (-3.41835776e+08 as float)
+  CORE-MATH : 0xBE1A  (-1.50390625e-01 as float)
+  MPFR      : 0xBE19  (-1.49414062e-01 as float)
+  S3/C3 base : k=16   S3[16] = 6.23840332e-01   C3[16] = 7.81555176e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #97:
+  Input     : 0xCDDC  (-4.61373440e+08 as float)
+  CORE-MATH : 0x3F05  (+5.19531250e-01 as float)
+  MPFR      : 0x3F06  (+5.23437500e-01 as float)
+  S3/C3 base : k=16   S3[16] = 6.23840332e-01   C3[16] = 7.81555176e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #98:
+  Input     : 0xCEF6  (-2.06359757e+09 as float)
+  CORE-MATH : 0xBB1E  (-2.41088867e-03 as float)
+  MPFR      : 0xBB1F  (-2.42614746e-03 as float)
+  S3/C3 base : k=18   S3[18] = 4.32250977e-01   C3[18] = -9.01748657e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #99:
+  Input     : 0xD0AA  (-2.28170138e+10 as float)
+  CORE-MATH : 0xBAAA  (-1.29699707e-03 as float)
+  MPFR      : 0xBAAB  (-1.30462646e-03 as float)
+  S3/C3 base : k=22   S3[22] = -7.63397217e-01   C3[22] = 6.45919800e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #100:
+  Input     : 0xD1AA  (-9.12680550e+10 as float)
+  CORE-MATH : 0x3BAA  (+5.18798828e-03 as float)
+  MPFR      : 0x3BAB  (+5.21850586e-03 as float)
+  S3/C3 base : k=24   S3[24] = 3.26568604e-01   C3[24] = -9.45175171e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #101:
+  Input     : 0xD1BF  (-1.02542344e+11 as float)
+  CORE-MATH : 0xBF27  (-6.52343750e-01 as float)
+  MPFR      : 0xBF26  (-6.48437500e-01 as float)
+  S3/C3 base : k=24   S3[24] = 3.26568604e-01   C3[24] = -9.45175171e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #102:
+  Input     : 0xD1EC  (-1.26701535e+11 as float)
+  CORE-MATH : 0x3CF3  (+2.96630859e-02 as float)
+  MPFR      : 0x3CF4  (+2.97851562e-02 as float)
+  S3/C3 base : k=24   S3[24] = 3.26568604e-01   C3[24] = -9.45175171e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #103:
+  Input     : 0xD31D  (-6.74309865e+11 as float)
+  CORE-MATH : 0xBAC7  (-1.51824951e-03 as float)
+  MPFR      : 0xBAC6  (-1.51062012e-03 as float)
+  S3/C3 base : k=27   S3[27] = -4.61990356e-01   C3[27] = -8.86886597e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #104:
+  Input     : 0xD3B4  (-1.54618823e+12 as float)
+  CORE-MATH : 0x3DC5  (+9.61914062e-02 as float)
+  MPFR      : 0x3DC6  (+9.66796875e-02 as float)
+  S3/C3 base : k=28   S3[28] = 8.19458008e-01   C3[28] = 5.73135376e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #105:
+  Input     : 0xD3C1  (-1.65785738e+12 as float)
+  CORE-MATH : 0x3C86  (+1.63574219e-02 as float)
+  MPFR      : 0x3C85  (+1.62353516e-02 as float)
+  S3/C3 base : k=28   S3[28] = 8.19458008e-01   C3[28] = 5.73135376e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #106:
+  Input     : 0xD453  (-3.62495240e+12 as float)
+  CORE-MATH : 0x3D54  (+5.17578125e-02 as float)
+  MPFR      : 0x3D55  (+5.20019531e-02 as float)
+  S3/C3 base : k=29   S3[29] = 9.39331055e-01   C3[29] = -3.43025208e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #107:
+  Input     : 0xD60F  (-3.93075407e+13 as float)
+  CORE-MATH : 0x3C44  (+1.19628906e-02 as float)
+  MPFR      : 0x3C45  (+1.20239258e-02 as float)
+  S3/C3 base : k=33   S3[33] = -6.29547119e-01   C3[33] = 7.76962280e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #108:
+  Input     : 0xD6A6  (-9.12594651e+13 as float)
+  CORE-MATH : 0xBDED  (-1.15722656e-01 as float)
+  MPFR      : 0xBDEC  (-1.15234375e-01 as float)
+  S3/C3 base : k=34   S3[34] = -9.78271484e-01   C3[34] = 2.07359314e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #109:
+  Input     : 0xD6FA  (-1.37438953e+14 as float)
+  CORE-MATH : 0x3F6D  (+9.25781250e-01 as float)
+  MPFR      : 0x3F6E  (+9.29687500e-01 as float)
+  S3/C3 base : k=34   S3[34] = -9.78271484e-01   C3[34] = 2.07359314e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #110:
+  Input     : 0xD883  (-1.15228819e+15 as float)
+  CORE-MATH : 0x3F67  (+9.02343750e-01 as float)
+  MPFR      : 0x3F66  (+8.98437500e-01 as float)
+  S3/C3 base : k=38   S3[38] = -1.99069977e-01   C3[38] = -9.79980469e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #111:
+  Input     : 0xD973  (-4.27490121e+15 as float)
+  CORE-MATH : 0x3C0F  (+8.72802734e-03 as float)
+  MPFR      : 0x3C10  (+8.78906250e-03 as float)
+  S3/C3 base : k=39   S3[39] = 3.90167236e-01   C3[39] = 9.20745850e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #112:
+  Input     : 0xDAF2  (-3.40584722e+16 as float)
+  CORE-MATH : 0x3BA9  (+5.15747070e-03 as float)
+  MPFR      : 0x3BAA  (+5.18798828e-03 as float)
+  S3/C3 base : k=42   S3[42] = -6.48841858e-02   C3[42] = -9.97894287e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #113:
+  Input     : 0xDB2B  (-4.81322210e+16 as float)
+  CORE-MATH : 0x3E5B  (+2.13867188e-01 as float)
+  MPFR      : 0x3E5A  (+2.12890625e-01 as float)
+  S3/C3 base : k=43   S3[43] = 1.29497528e-01   C3[43] = 9.91577148e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #114:
+  Input     : 0xDB43  (-5.48876205e+16 as float)
+  CORE-MATH : 0xBE42  (-1.89453125e-01 as float)
+  MPFR      : 0xBE41  (-1.88476562e-01 as float)
+  S3/C3 base : k=43   S3[43] = 1.29497528e-01   C3[43] = 9.91577148e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #115:
+  Input     : 0xDC04  (-1.48618788e+17 as float)
+  CORE-MATH : 0x3F06  (+5.23437500e-01 as float)
+  MPFR      : 0x3F05  (+5.19531250e-01 as float)
+  S3/C3 base : k=45   S3[45] = 4.96398926e-01   C3[45] = 8.68103027e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #116:
+  Input     : 0xDD3D  (-8.51180330e+17 as float)
+  CORE-MATH : 0xB9A3  (-3.10897827e-04 as float)
+  MPFR      : 0xB9A9  (-3.22341919e-04 as float)
+  S3/C3 base : k=47   S3[47] = 8.74221802e-01   C3[47] = -4.85534668e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #117:
+  Input     : 0xDD40  (-8.64691128e+17 as float)
+  CORE-MATH : 0xBD4D  (-5.00488281e-02 as float)
+  MPFR      : 0xBD4E  (-5.02929688e-02 as float)
+  S3/C3 base : k=47   S3[47] = 8.74221802e-01   C3[47] = -4.85534668e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #118:
+  Input     : 0xDDBD  (-1.70236066e+18 as float)
+  CORE-MATH : 0x3A28  (+6.40869141e-04 as float)
+  MPFR      : 0x3A29  (+6.44683838e-04 as float)
+  S3/C3 base : k=48   S3[48] = -8.48922729e-01   C3[48] = -5.28518677e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #119:
+  Input     : 0xDE1E  (-2.84627496e+18 as float)
+  CORE-MATH : 0x3D0C  (+3.41796875e-02 as float)
+  MPFR      : 0x3D0D  (+3.44238281e-02 as float)
+  S3/C3 base : k=49   S3[49] = 8.97338867e-01   C3[49] = -4.41352844e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #120:
+  Input     : 0xDE3D  (-3.40472132e+18 as float)
+  CORE-MATH : 0x3AA7  (+1.27410889e-03 as float)
+  MPFR      : 0x3AA9  (+1.28936768e-03 as float)
+  S3/C3 base : k=49   S3[49] = 8.97338867e-01   C3[49] = -4.41352844e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #121:
+  Input     : 0xDE43  (-3.51280771e+18 as float)
+  CORE-MATH : 0x3EC7  (+3.88671875e-01 as float)
+  MPFR      : 0x3EC8  (+3.90625000e-01 as float)
+  S3/C3 base : k=49   S3[49] = 8.97338867e-01   C3[49] = -4.41352844e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #122:
+  Input     : 0xDEBD  (-6.80944264e+18 as float)
+  CORE-MATH : 0x3B28  (+2.56347656e-03 as float)
+  MPFR      : 0x3B29  (+2.57873535e-03 as float)
+  S3/C3 base : k=50   S3[50] = -7.92083740e-01   C3[50] = -6.10412598e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #123:
+  Input     : 0xE185  (-3.06677120e+20 as float)
+  CORE-MATH : 0x39B4  (+3.43322754e-04 as float)
+  MPFR      : 0x39B1  (+3.37600708e-04 as float)
+  S3/C3 base : k=56   S3[56] = 9.25003052e-01   C3[56] = -3.79959106e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #124:
+  Input     : 0xE205  (-6.13354240e+20 as float)
+  CORE-MATH : 0xBA30  (-6.71386719e-04 as float)
+  MPFR      : 0xBA31  (-6.75201416e-04 as float)
+  S3/C3 base : k=57   S3[57] = -7.02926636e-01   C3[57] = -7.11273193e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #125:
+  Input     : 0xE414  (-1.09204725e+22 as float)
+  CORE-MATH : 0x3F7D  (+9.88281250e-01 as float)
+  MPFR      : 0x3F7C  (+9.84375000e-01 as float)
+  S3/C3 base : k=61   S3[61] = -9.42630768e-02   C3[61] = 9.95544434e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #126:
+  Input     : 0xE4B7  (-2.70060333e+22 as float)
+  CORE-MATH : 0x3BC7  (+6.07299805e-03 as float)
+  MPFR      : 0x3BC8  (+6.10351562e-03 as float)
+  S3/C3 base : k=62   S3[62] = -1.87686920e-01   C3[62] = 9.82223511e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #127:
+  Input     : 0xE53A  (-5.48975104e+22 as float)
+  CORE-MATH : 0x3F67  (+9.02343750e-01 as float)
+  MPFR      : 0x3F66  (+8.98437500e-01 as float)
+  S3/C3 base : k=63   S3[63] = -3.68698120e-01   C3[63] = 9.29550171e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #128:
+  Input     : 0xE550  (-6.13907643e+22 as float)
+  CORE-MATH : 0xBB5A  (-3.32641602e-03 as float)
+  MPFR      : 0xBB59  (-3.31115723e-03 as float)
+  S3/C3 base : k=63   S3[63] = -3.68698120e-01   C3[63] = 9.29550171e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #129:
+  Input     : 0xE69B  (-3.65983402e+23 as float)
+  CORE-MATH : 0xBE10  (-1.40625000e-01 as float)
+  MPFR      : 0xBE0F  (-1.39648438e-01 as float)
+  S3/C3 base : k=66   S3[66] = -1.20410919e-01   C3[66] = -9.92721558e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #130:
+  Input     : 0xE8A4  (-6.19574483e+24 as float)
+  CORE-MATH : 0xBF0B  (-5.42968750e-01 as float)
+  MPFR      : 0xBF0C  (-5.46875000e-01 as float)
+  S3/C3 base : k=70   S3[70] = 9.35745239e-01   C3[70] = -3.52699280e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #131:
+  Input     : 0xE8FA  (-9.44473297e+24 as float)
+  CORE-MATH : 0x3F56  (+8.35937500e-01 as float)
+  MPFR      : 0x3F57  (+8.39843750e-01 as float)
+  S3/C3 base : k=70   S3[70] = 9.35745239e-01   C3[70] = -3.52699280e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #132:
+  Input     : 0xE914  (-1.11825638e+25 as float)
+  CORE-MATH : 0x3DF6  (+1.20117188e-01 as float)
+  MPFR      : 0x3DF7  (+1.20605469e-01 as float)
+  S3/C3 base : k=71   S3[71] = -6.60064697e-01   C3[71] = -7.51205444e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #133:
+  Input     : 0xE973  (-1.83605609e+25 as float)
+  CORE-MATH : 0xBF2E  (-6.79687500e-01 as float)
+  MPFR      : 0xBF2F  (-6.83593750e-01 as float)
+  S3/C3 base : k=71   S3[71] = -6.60064697e-01   C3[71] = -7.51205444e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #134:
+  Input     : 0xE9CF  (-3.12809556e+25 as float)
+  CORE-MATH : 0x3B0C  (+2.13623047e-03 as float)
+  MPFR      : 0x3B0B  (+2.12097168e-03 as float)
+  S3/C3 base : k=72   S3[72] = 9.91699219e-01   C3[72] = 1.28635406e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #135:
+  Input     : 0xE9E1  (-3.40010387e+25 as float)
+  CORE-MATH : 0x3F3C  (+7.34375000e-01 as float)
+  MPFR      : 0x3F3B  (+7.30468750e-01 as float)
+  S3/C3 base : k=72   S3[72] = 9.91699219e-01   C3[72] = 1.28635406e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #136:
+  Input     : 0xEA4D  (-6.19574483e+25 as float)
+  CORE-MATH : 0xBEFE  (-4.96093750e-01 as float)
+  MPFR      : 0xBEFF  (-4.98046875e-01 as float)
+  S3/C3 base : k=73   S3[73] = 2.55134583e-01   C3[73] = -9.66903687e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #137:
+  Input     : 0xEA73  (-7.34422435e+25 as float)
+  CORE-MATH : 0x3E11  (+1.41601562e-01 as float)
+  MPFR      : 0x3E10  (+1.40625000e-01 as float)
+  S3/C3 base : k=73   S3[73] = 2.55134583e-01   C3[73] = -9.66903687e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #138:
+  Input     : 0xED01  (-2.49522289e+27 as float)
+  CORE-MATH : 0xBDA1  (-7.86132812e-02 as float)
+  MPFR      : 0xBDA0  (-7.81250000e-02 as float)
+  S3/C3 base : k=79   S3[79] = 7.19482422e-01   C3[79] = -6.94519043e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #139:
+  Input     : 0xEE33  (-1.38494542e+28 as float)
+  CORE-MATH : 0xBD9B  (-7.56835938e-02 as float)
+  MPFR      : 0xBD9C  (-7.61718750e-02 as float)
+  S3/C3 base : k=81   S3[81] = 7.05699921e-02   C3[81] = -9.97512817e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #140:
+  Input     : 0xEEAF  (-2.70799384e+28 as float)
+  CORE-MATH : 0xBECD  (-4.00390625e-01 as float)
+  MPFR      : 0xBECE  (-4.02343750e-01 as float)
+  S3/C3 base : k=82   S3[82] = -1.40785217e-01   C3[82] = 9.90036011e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #141:
+  Input     : 0xEF8B  (-8.60368327e+28 as float)
+  CORE-MATH : 0x3AE1  (+1.71661377e-03 as float)
+  MPFR      : 0x3AE0  (+1.70898438e-03 as float)
+  S3/C3 base : k=84   S3[84] = -5.35430908e-01   C3[84] = 8.44573975e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #142:
+  Input     : 0xF00B  (-1.72073665e+29 as float)
+  CORE-MATH : 0xBB61  (-3.43322754e-03 as float)
+  MPFR      : 0xBB60  (-3.41796875e-03 as float)
+  S3/C3 base : k=85   S3[85] = -9.04434204e-01   C3[85] = 4.26620483e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #143:
+  Input     : 0xF10F  (-7.08101702e+29 as float)
+  CORE-MATH : 0xBF34  (-7.03125000e-01 as float)
+  MPFR      : 0xBF35  (-7.07031250e-01 as float)
+  S3/C3 base : k=87   S3[87] = 9.81582642e-01   C3[87] = -1.91028595e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #144:
+  Input     : 0xF16D  (-1.17356716e+30 as float)
+  CORE-MATH : 0x3A41  (+7.36236572e-04 as float)
+  MPFR      : 0x3A43  (+7.43865967e-04 as float)
+  S3/C3 base : k=87   S3[87] = 9.81582642e-01   C3[87] = -1.91028595e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #145:
+  Input     : 0xF1ED  (-2.34713431e+30 as float)
+  CORE-MATH : 0xBAC4  (-1.49536133e-03 as float)
+  MPFR      : 0xBAC3  (-1.48773193e-03 as float)
+  S3/C3 base : k=88   S3[88] = -3.75022888e-01   C3[88] = -9.27017212e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #146:
+  Input     : 0xF23C  (-3.72372364e+30 as float)
+  CORE-MATH : 0xBCEC  (-2.88085938e-02 as float)
+  MPFR      : 0xBCED  (-2.89306641e-02 as float)
+  S3/C3 base : k=89   S3[89] = 6.95297241e-01   C3[89] = 7.18719482e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #147:
+  Input     : 0xF3BD  (-2.99482454e+31 as float)
+  CORE-MATH : 0xBDCA  (-9.86328125e-02 as float)
+  MPFR      : 0xBDC9  (-9.81445312e-02 as float)
+  S3/C3 base : k=92   S3[92] = -1.32068634e-01   C3[92] = 9.91241455e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #148:
+  Input     : 0xF404  (-4.18324698e+31 as float)
+  CORE-MATH : 0xBECC  (-3.98437500e-01 as float)
+  MPFR      : 0xBECD  (-4.00390625e-01 as float)
+  S3/C3 base : k=93   S3[93] = -2.61825562e-01   C3[93] = 9.65118408e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #149:
+  Input     : 0xF426  (-5.26074999e+31 as float)
+  CORE-MATH : 0xBBE1  (-6.86645508e-03 as float)
+  MPFR      : 0xBBE2  (-6.89697266e-03 as float)
+  S3/C3 base : k=93   S3[93] = -2.61825562e-01   C3[93] = 9.65118408e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #150:
+  Input     : 0xF480  (-8.11296384e+31 as float)
+  CORE-MATH : 0xBF76  (-9.60937500e-01 as float)
+  MPFR      : 0xBF77  (-9.64843750e-01 as float)
+  S3/C3 base : k=94   S3[94] = -5.05386353e-01   C3[94] = 8.62899780e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #151:
+  Input     : 0xF494  (-9.38061444e+31 as float)
+  CORE-MATH : 0x3E00  (+1.25000000e-01 as float)
+  MPFR      : 0x3E01  (+1.25976562e-01 as float)
+  S3/C3 base : k=94   S3[94] = -5.05386353e-01   C3[94] = 8.62899780e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #152:
+  Input     : 0xF4C6  (-1.25497409e+32 as float)
+  CORE-MATH : 0xBF71  (-9.41406250e-01 as float)
+  MPFR      : 0xBF72  (-9.45312500e-01 as float)
+  S3/C3 base : k=94   S3[94] = -5.05386353e-01   C3[94] = 8.62899780e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #153:
+  Input     : 0xF526  (-2.10430000e+32 as float)
+  CORE-MATH : 0xBCE1  (-2.74658203e-02 as float)
+  MPFR      : 0xBCE2  (-2.75878906e-02 as float)
+  S3/C3 base : k=95   S3[95] = -8.72177124e-01   C3[95] = 4.89181519e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #154:
+  Input     : 0xF52A  (-2.15500602e+32 as float)
+  CORE-MATH : 0xBF61  (-8.78906250e-01 as float)
+  MPFR      : 0xBF60  (-8.75000000e-01 as float)
+  S3/C3 base : k=95   S3[95] = -8.72177124e-01   C3[95] = 4.89181519e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #155:
+  Input     : 0xF7DB  (-8.88369541e+33 as float)
+  CORE-MATH : 0xBF26  (-6.48437500e-01 as float)
+  MPFR      : 0xBF27  (-6.52343750e-01 as float)
+  S3/C3 base : k=100   S3[100] = -6.04202271e-01   C3[100] = -7.96829224e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #156:
+  Input     : 0xFC64  (-4.73537473e+36 as float)
+  CORE-MATH : 0xBBBF  (-5.82885742e-03 as float)
+  MPFR      : 0xBBBE  (-5.79833984e-03 as float)
+  S3/C3 base : k=109   S3[109] = -7.45010376e-01   C3[109] = 6.67068481e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #157:
+  Input     : 0xFCE4  (-9.47074947e+36 as float)
+  CORE-MATH : 0x3C3F  (+1.16577148e-02 as float)
+  MPFR      : 0x3C3E  (+1.15966797e-02 as float)
+  S3/C3 base : k=110   S3[110] = -9.93927002e-01   C3[110] = -1.10059738e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+DISCREPANCY #158:
+  Input     : 0xFF63  (-3.01734755e+38 as float)
+  CORE-MATH : 0x3C7E  (+1.55029297e-02 as float)
+  MPFR      : 0x3C7F  (+1.55639648e-02 as float)
+  S3/C3 base : k=115   S3[115] = 3.77822876e-01   C3[115] = -9.25872803e-01
+  (large-arg path uses S3/C3[k..k+7])
+
+=== SUMMARY ===
+Total bfloat16 inputs   : 65536
+NaN-in/NaN-out pairs    : 256  (payload not compared)
+Discrepancies           : 158
+RESULT: FAIL — 158 inputs produced incorrectly-rounded results.

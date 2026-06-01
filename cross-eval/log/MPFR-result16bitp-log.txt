@@ -1,0 +1,273 @@
+MPFR vs CORE-MATH bfloat16 log() — exhaustive verification
+MPFR version: 4.2.1
+Checking all 65536 bfloat16 bit patterns (0x0000–0xFFFF)...
+
+DISCREPANCY #1:
+  Input     : 0x00E6  (+2.11221641e-38 as float)
+  CORE-MATH : 0xC2AD  (-8.65000000e+01 as float)
+  MPFR      : 0xC2AE  (-8.70000000e+01 as float)
+  T1 index  : 1   T1[1] = -8.73359375e+01
+  T2 index  : 102   T2[102] = 5.86044312e-01
+  T1[i1]+T2[i2] (float32) = -8.67498932e+01
+
+DISCREPANCY #2:
+  Input     : 0x0201  (+9.47742320e-38 as float)
+  CORE-MATH : 0xC2AB  (-8.55000000e+01 as float)
+  MPFR      : 0xC2AA  (-8.50000000e+01 as float)
+  T1 index  : 4   T1[4] = -8.52578125e+01
+  T2 index  : 1   T2[1] = 7.78210163e-03
+  T1[i1]+T2[i2] (float32) = -8.52500305e+01
+
+DISCREPANCY #3:
+  Input     : 0x0AA0  (+1.54074396e-32 as float)
+  CORE-MATH : 0xC292  (-7.30000000e+01 as float)
+  MPFR      : 0xC293  (-7.35000000e+01 as float)
+  T1 index  : 21   T1[21] = -7.34726562e+01
+  T2 index  : 32   T2[32] = 2.23144531e-01
+  T1[i1]+T2[i2] (float32) = -7.32495117e+01
+
+DISCREPANCY #4:
+  Input     : 0x0B04  (+2.54222753e-32 as float)
+  CORE-MATH : 0xC292  (-7.30000000e+01 as float)
+  MPFR      : 0xC291  (-7.25000000e+01 as float)
+  T1 index  : 22   T1[22] = -7.27812500e+01
+  T2 index  : 4   T2[4] = 3.07717323e-02
+  T1[i1]+T2[i2] (float32) = -7.27504807e+01
+
+DISCREPANCY #5:
+  Input     : 0x0E99  (+3.77174120e-30 as float)
+  CORE-MATH : 0xC287  (-6.75000000e+01 as float)
+  MPFR      : 0xC288  (-6.80000000e+01 as float)
+  T1 index  : 29   T1[29] = -6.79277344e+01
+  T2 index  : 25   T2[25] = 1.78405762e-01
+  T1[i1]+T2[i2] (float32) = -6.77493286e+01
+
+DISCREPANCY #6:
+  Input     : 0x1069  (+4.59511477e-29 as float)
+  CORE-MATH : 0xC283  (-6.55000000e+01 as float)
+  MPFR      : 0xC282  (-6.50000000e+01 as float)
+  T1 index  : 32   T1[32] = -6.58496094e+01
+  T2 index  : 105   T2[105] = 5.99014282e-01
+  T1[i1]+T2[i2] (float32) = -6.52505951e+01
+
+DISCREPANCY #7:
+  Input     : 0x1249  (+6.34244168e-28 as float)
+  CORE-MATH : 0xC27A  (-6.25000000e+01 as float)
+  MPFR      : 0xC27B  (-6.27500000e+01 as float)
+  T1 index  : 36   T1[36] = -6.30761719e+01
+  T2 index  : 73   T2[73] = 4.51271057e-01
+  T1[i1]+T2[i2] (float32) = -6.26249008e+01
+
+DISCREPANCY #8:
+  Input     : 0x14A2  (+1.63578197e-26 as float)
+  CORE-MATH : 0xC26D  (-5.92500000e+01 as float)
+  MPFR      : 0xC26E  (-5.95000000e+01 as float)
+  T1 index  : 41   T1[41] = -5.96103516e+01
+  T2 index  : 34   T2[34] = 2.35565186e-01
+  T1[i1]+T2[i2] (float32) = -5.93747864e+01
+
+DISCREPANCY #9:
+  Input     : 0x14D0  (+2.10026327e-26 as float)
+  CORE-MATH : 0xC26C  (-5.90000000e+01 as float)
+  MPFR      : 0xC26D  (-5.92500000e+01 as float)
+  T1 index  : 41   T1[41] = -5.96103516e+01
+  T2 index  : 80   T2[80] = 4.85504150e-01
+  T1[i1]+T2[i2] (float32) = -5.91248474e+01
+
+DISCREPANCY #10:
+  Input     : 0x22E4  (+6.17995238e-18 as float)
+  CORE-MATH : 0xC21E  (-3.95000000e+01 as float)
+  MPFR      : 0xC21F  (-3.97500000e+01 as float)
+  T1 index  : 69   T1[69] = -4.02021484e+01
+  T2 index  : 100   T2[100] = 5.77316284e-01
+  T1[i1]+T2[i2] (float32) = -3.96248322e+01
+
+DISCREPANCY #11:
+  Input     : 0x233C  (+1.01915004e-17 as float)
+  CORE-MATH : 0xC21D  (-3.92500000e+01 as float)
+  MPFR      : 0xC21C  (-3.90000000e+01 as float)
+  T1 index  : 70   T1[70] = -3.95097656e+01
+  T2 index  : 60   T2[60] = 3.84414673e-01
+  T1[i1]+T2[i2] (float32) = -3.91253510e+01
+
+DISCREPANCY #12:
+  Input     : 0x239B  (+1.68051337e-17 as float)
+  CORE-MATH : 0xC21B  (-3.87500000e+01 as float)
+  MPFR      : 0xC21A  (-3.85000000e+01 as float)
+  T1 index  : 71   T1[71] = -3.88164062e+01
+  T2 index  : 27   T2[27] = 1.91394806e-01
+  T1[i1]+T2[i2] (float32) = -3.86250114e+01
+
+DISCREPANCY #13:
+  Input     : 0x23C7  (+2.15756232e-17 as float)
+  CORE-MATH : 0xC21A  (-3.85000000e+01 as float)
+  MPFR      : 0xC219  (-3.82500000e+01 as float)
+  T1 index  : 71   T1[71] = -3.88164062e+01
+  T2 index  : 71   T2[71] = 4.41276550e-01
+  T1[i1]+T2[i2] (float32) = -3.83751297e+01
+
+DISCREPANCY #14:
+  Input     : 0x2925  (+3.66373598e-14 as float)
+  CORE-MATH : 0xC1F7  (-3.08750000e+01 as float)
+  MPFR      : 0xC1F8  (-3.10000000e+01 as float)
+  T1 index  : 82   T1[82] = -3.11914062e+01
+  T2 index  : 37   T2[37] = 2.53913879e-01
+  T1[i1]+T2[i2] (float32) = -3.09374924e+01
+
+DISCREPANCY #15:
+  Input     : 0x293B  (+4.15223411e-14 as float)
+  CORE-MATH : 0xC1F6  (-3.07500000e+01 as float)
+  MPFR      : 0xC1F7  (-3.08750000e+01 as float)
+  T1 index  : 82   T1[82] = -3.11914062e+01
+  T2 index  : 59   T2[59] = 3.79081726e-01
+  T1[i1]+T2[i2] (float32) = -3.08123245e+01
+
+DISCREPANCY #16:
+  Input     : 0x2A10  (+1.27897692e-13 as float)
+  CORE-MATH : 0xC1ED  (-2.96250000e+01 as float)
+  MPFR      : 0xC1EE  (-2.97500000e+01 as float)
+  T1 index  : 84   T1[84] = -2.98051758e+01
+  T2 index  : 16   T2[16] = 1.17782593e-01
+  T1[i1]+T2[i2] (float32) = -2.96873932e+01
+
+DISCREPANCY #17:
+  Input     : 0x2C95  (+4.23483471e-12 as float)
+  CORE-MATH : 0xC1D1  (-2.61250000e+01 as float)
+  MPFR      : 0xC1D2  (-2.62500000e+01 as float)
+  T1 index  : 89   T1[89] = -2.63393555e+01
+  T2 index  : 21   T2[21] = 1.51916504e-01
+  T1[i1]+T2[i2] (float32) = -2.61874390e+01
+
+DISCREPANCY #18:
+  Input     : 0x3B25  (+2.51770020e-03 as float)
+  CORE-MATH : 0xC0BF  (-5.96875000e+00 as float)
+  MPFR      : 0xC0C0  (-6.00000000e+00 as float)
+  T1 index  : 118   T1[118] = -6.23828125e+00
+  T2 index  : 37   T2[37] = 2.53913879e-01
+  T1[i1]+T2[i2] (float32) = -5.98436737e+00
+
+DISCREPANCY #19:
+  Input     : 0x3E1A  (+1.50390625e-01 as float)
+  CORE-MATH : 0xBFF3  (-1.89843750e+00 as float)
+  MPFR      : 0xBFF2  (-1.89062500e+00 as float)
+  T1 index  : 124   T1[124] = -2.07946777e+00
+  T2 index  : 26   T2[26] = 1.84921265e-01
+  T1[i1]+T2[i2] (float32) = -1.89454651e+00
+
+DISCREPANCY #20:
+  Input     : 0x3F4D  (+8.00781250e-01 as float)
+  CORE-MATH : 0xBE64  (-2.22656250e-01 as float)
+  MPFR      : 0xBE63  (-2.21679688e-01 as float)
+  T1 index  : 126   T1[126] = -6.93145752e-01
+  T2 index  : 77   T2[77] = 4.70977783e-01
+  T1[i1]+T2[i2] (float32) = -2.22167969e-01
+
+DISCREPANCY #21:
+  Input     : 0x3F7E  (+9.92187500e-01 as float)
+  CORE-MATH : 0xBC00  (-7.81250000e-03 as float)
+  MPFR      : 0xBC01  (-7.87353516e-03 as float)
+  T1 index  : 126   T1[126] = -6.93145752e-01
+  T2 index  : 126   T2[126] = 6.85302734e-01
+  T1[i1]+T2[i2] (float32) = -7.84301758e-03
+
+DISCREPANCY #22:
+  Input     : 0x52A0  (+3.43597384e+11 as float)
+  CORE-MATH : 0x41D4  (+2.65000000e+01 as float)
+  MPFR      : 0x41D5  (+2.66250000e+01 as float)
+  T1 index  : 165   T1[165] = 2.63393555e+01
+  T2 index  : 32   T2[32] = 2.23144531e-01
+  T1[i1]+T2[i2] (float32) = 2.65625000e+01
+
+DISCREPANCY #23:
+  Input     : 0x548A  (+4.74164389e+12 as float)
+  CORE-MATH : 0x41EA  (+2.92500000e+01 as float)
+  MPFR      : 0x41E9  (+2.91250000e+01 as float)
+  T1 index  : 169   T1[169] = 2.91123047e+01
+  T2 index  : 10   T2[10] = 7.52239227e-02
+  T1[i1]+T2[i2] (float32) = 2.91875286e+01
+
+DISCREPANCY #24:
+  Input     : 0x578E  (+3.12261302e+14 as float)
+  CORE-MATH : 0x4206  (+3.35000000e+01 as float)
+  MPFR      : 0x4205  (+3.32500000e+01 as float)
+  T1 index  : 175   T1[175] = 3.32714844e+01
+  T2 index  : 14   T2[14] = 1.03796005e-01
+  T1[i1]+T2[i2] (float32) = 3.33752823e+01
+
+DISCREPANCY #25:
+  Input     : 0x5A13  (+1.03442054e+16 as float)
+  CORE-MATH : 0x4213  (+3.67500000e+01 as float)
+  MPFR      : 0x4214  (+3.70000000e+01 as float)
+  T1 index  : 180   T1[180] = 3.67363281e+01
+  T2 index  : 19   T2[19] = 1.38401031e-01
+  T1[i1]+T2[i2] (float32) = 3.68747292e+01
+
+DISCREPANCY #26:
+  Input     : 0x5D21  (+7.25079540e+17 as float)
+  CORE-MATH : 0x4224  (+4.10000000e+01 as float)
+  MPFR      : 0x4225  (+4.12500000e+01 as float)
+  T1 index  : 186   T1[186] = 4.08955078e+01
+  T2 index  : 33   T2[33] = 2.29373932e-01
+  T1[i1]+T2[i2] (float32) = 4.11248817e+01
+
+DISCREPANCY #27:
+  Input     : 0x6378  (+4.57479253e+21 as float)
+  CORE-MATH : 0x4248  (+5.00000000e+01 as float)
+  MPFR      : 0x4247  (+4.97500000e+01 as float)
+  T1 index  : 198   T1[198] = 4.92138672e+01
+  T2 index  : 120   T2[120] = 6.61392212e-01
+  T1[i1]+T2[i2] (float32) = 4.98752594e+01
+
+DISCREPANCY #28:
+  Input     : 0x65C8  (+1.18059162e+23 as float)
+  CORE-MATH : 0x4254  (+5.30000000e+01 as float)
+  MPFR      : 0x4255  (+5.32500000e+01 as float)
+  T1 index  : 203   T1[203] = 5.26787109e+01
+  T2 index  : 72   T2[72] = 4.46289062e-01
+  T1[i1]+T2[i2] (float32) = 5.31250000e+01
+
+DISCREPANCY #29:
+  Input     : 0x68DB  (+8.27358608e+24 as float)
+  CORE-MATH : 0x4265  (+5.72500000e+01 as float)
+  MPFR      : 0x4266  (+5.75000000e+01 as float)
+  T1 index  : 209   T1[209] = 5.68378906e+01
+  T2 index  : 91   T2[91] = 5.37048340e-01
+  T1[i1]+T2[i2] (float32) = 5.73749390e+01
+
+DISCREPANCY #30:
+  Input     : 0x7002  (+1.60932205e+29 as float)
+  CORE-MATH : 0x4286  (+6.70000000e+01 as float)
+  MPFR      : 0x4287  (+6.75000000e+01 as float)
+  T1 index  : 224   T1[224] = 6.72343750e+01
+  T2 index  : 2   T2[2] = 1.55041218e-02
+  T1[i1]+T2[i2] (float32) = 6.72498779e+01
+
+DISCREPANCY #31:
+  Input     : 0x7170  (+1.18842244e+30 as float)
+  CORE-MATH : 0x428A  (+6.90000000e+01 as float)
+  MPFR      : 0x428B  (+6.95000000e+01 as float)
+  T1 index  : 226   T1[226] = 6.86210938e+01
+  T2 index  : 112   T2[112] = 6.28601074e-01
+  T1[i1]+T2[i2] (float32) = 6.92496948e+01
+
+DISCREPANCY #32:
+  Input     : 0x7A15  (+1.93413058e+35 as float)
+  CORE-MATH : 0x42A2  (+8.10000000e+01 as float)
+  MPFR      : 0x42A3  (+8.15000000e+01 as float)
+  T1 index  : 244   T1[244] = 8.10976562e+01
+  T2 index  : 21   T2[21] = 1.51916504e-01
+  T1[i1]+T2[i2] (float32) = 8.12495728e+01
+
+DISCREPANCY #33:
+  Input     : 0x7C3B  (+3.88383805e+36 as float)
+  CORE-MATH : 0x42A9  (+8.45000000e+01 as float)
+  MPFR      : 0x42A8  (+8.40000000e+01 as float)
+  T1 index  : 248   T1[248] = 8.38710938e+01
+  T2 index  : 59   T2[59] = 3.79081726e-01
+  T1[i1]+T2[i2] (float32) = 8.42501755e+01
+
+=== SUMMARY ===
+Total bfloat16 inputs   : 65536
+NaN-in/NaN-out pairs    : 32894  (payload not compared)
+Discrepancies           : 33
+RESULT: FAIL — 33 inputs produced incorrectly-rounded results.

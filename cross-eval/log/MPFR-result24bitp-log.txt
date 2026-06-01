@@ -1,0 +1,9 @@
+MPFR vs CORE-MATH bfloat16 log() — exhaustive verification
+MPFR version: 4.2.1
+Checking all 65536 bfloat16 bit patterns (0x0000–0xFFFF)...
+
+=== SUMMARY ===
+Total bfloat16 inputs   : 65536
+NaN-in/NaN-out pairs    : 32894  (payload not compared)
+Discrepancies           : 0
+RESULT: PASS — cr_log_bf16 matches MPFR for all non-NaN bfloat16 inputs.
