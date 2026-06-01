@@ -13,3 +13,6 @@ version
 
 # discrepancy checker for MPFR library
 verify_mpfr
+
+# rounding binary compilation
+cross-eval/round-16bitp

@@ -1,0 +1,65 @@
+MPFR vs CORE-MATH bfloat16 exp() — exhaustive verification
+MPFR version: 4.2.1
+Checking all 65536 bfloat16 bit patterns (0x0000–0xFFFF)...
+
+DISCREPANCY #1:
+  Input     : 0x3B7F  (+3.89099121e-03 as float)
+  CORE-MATH : 0x3F81  (+1.00781250e+00 as float)
+  MPFR      : 0x3F80  (+1.00000000e+00 as float)
+  T1 index  : 15   T1[15] = 1.00378418e+00
+  T2 index  : 7   T2[7] = 1.00012207e+00
+  T1[i1]*T2[i2] (float32) = 1.00390673e+00
+
+DISCREPANCY #2:
+  Input     : 0x3B80  (+3.90625000e-03 as float)
+  CORE-MATH : 0x3F80  (+1.00000000e+00 as float)
+  MPFR      : 0x3F81  (+1.00781250e+00 as float)
+  T1 index  : 16   T1[16] = 1.00390625e+00
+  T2 index  : 8   T2[8] = 1.00000000e+00
+  T1[i1]*T2[i2] (float32) = 1.00390625e+00
+
+DISCREPANCY #3:
+  Input     : 0x3CDD  (+2.69775391e-02 as float)
+  CORE-MATH : 0x3F83  (+1.02343750e+00 as float)
+  MPFR      : 0x3F84  (+1.03125000e+00 as float)
+  T1 index  : 59   T1[59] = 1.02670288e+00
+  T2 index  : 29   T2[29] = 1.00061035e+00
+  T1[i1]*T2[i2] (float32) = 1.02732956e+00
+
+DISCREPANCY #4:
+  Input     : 0x3FE7  (+1.80468750e+00 as float)
+  CORE-MATH : 0x40C3  (+6.09375000e+00 as float)
+  MPFR      : 0x40C2  (+6.06250000e+00 as float)
+  T1 index  : 156   T1[156] = 5.75463867e+00
+  T2 index  : 79   T2[79] = 1.05621338e+00
+  T1[i1]*T2[i2] (float32) = 6.07812643e+00
+
+DISCREPANCY #5:
+  Input     : 0x4278  (+6.20000000e+01 as float)
+  CORE-MATH : 0x6C2E  (+8.41412370e+26 as float)
+  MPFR      : 0x6C2F  (+8.46248074e+26 as float)
+  T1 index  : 239   T1[239] = 8.43830222e+26
+  T2 index  : 112   T2[112] = 1.00000000e+00
+  T1[i1]*T2[i2] (float32) = 8.43830222e+26
+
+DISCREPANCY #6:
+  Input     : 0xBE9A  (-3.00781250e-01 as float)
+  CORE-MATH : 0x3F3D  (+7.38281250e-01 as float)
+  MPFR      : 0x3F3E  (+7.42187500e-01 as float)
+  T1 index  : 371   T1[371] = 7.43133545e-01
+  T2 index  : 186   T2[186] = 9.96093750e-01
+  T1[i1]*T2[i2] (float32) = 7.40230680e-01
+
+DISCREPANCY #7:
+  Input     : 0xC03B  (-2.92187500e+00 as float)
+  CORE-MATH : 0x3D5D  (+5.39550781e-02 as float)
+  MPFR      : 0x3D5C  (+5.37109375e-02 as float)
+  T1 index  : 423   T1[423] = 5.64165115e-02
+  T2 index  : 211   T2[211] = 9.54208374e-01
+  T1[i1]*T2[i2] (float32) = 5.38331084e-02
+
+=== SUMMARY ===
+Total bfloat16 inputs   : 65536
+NaN-in/NaN-out pairs    : 254  (payload not compared)
+Discrepancies           : 7
+RESULT: FAIL — 7 inputs produced incorrectly-rounded results.

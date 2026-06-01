@@ -17,7 +17,10 @@
 #include <mpfr.h>
 
 /* Pull in T1[], T2[], cr_exp_bf16(), exp_bf16() from CORE-MATH source. */
-#include "implementations/inria-expbf16.c"
+// Uncomment line to find discrepancy in rounded 16-bit precision indices.
+// Make sure to uncomment the corresponding line in main() to write results to MPFR-result16bitp.txt instead of MPFR-result24bitp.txt.
+#include "inria-16bitp.c"
+// #include "../implementations/inria-expbf16.c"
 
 /* ── helpers ───────────────────────────────────────────────────────── */
 
@@ -134,7 +137,10 @@ static void get_indices(uint16_t bits, int *i1_out, int *i2_out)
 /* ── main ──────────────────────────────────────────────────────────── */
 int main(void)
 {
-    FILE *out = fopen("MPFR-result.txt", "w");
+    // Uncomment the line below to write results for 16-bit precision
+    FILE *out = fopen("MPFR-result16bitp.txt", "w");
+    // Since the original bf16 indices were computer with 24-bit precision (32-bit)
+    // FILE *out = fopen("MPFR-result24bitp.txt", "w");
     if (!out) { perror("fopen MPFR-result.txt"); return 1; }
 
     fprintf(out,
