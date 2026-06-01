@@ -8,6 +8,11 @@
 - Compile benchmarks for Inria with `g++ -O3 -march=native -mavx2 -mfma -std=c++20 benchmark-inria.cpp -o output/bench_inria 2>&1`
 - Run benchmarks with `./output/bench 2>&1` and `./output/bench_inria 2>&1`
 
+## For MPFR cross check:
+- Ensure you have the MPFR downloaded on your system by navigating to root and compiling with `cc -o version version.c -lmpfr -lgmp`
+- If the above compilation results in a `version` file being output, all is well
+- Otherwise, install MPFR on your system with `sudo apt install libmpfr-dev`
+
 ## Why the homemade version is faster (most inputs)
 
 The benchmark labels glibc as "called via PLT (shared-library ABI)". PLT is the
