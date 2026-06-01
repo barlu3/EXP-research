@@ -7,3 +7,6 @@ CLAUDE.local.md
 .claude/
 CLAUDE.md
 implementations/output/
+
+# verifying MPFR library is downloaded and installed correctly
+version
