@@ -10,3 +10,6 @@ implementations/output/
 
 # verifying MPFR library is downloaded and installed correctly
 version
+
+# discrepancy checker for MPFR library
+verify_mpfr
