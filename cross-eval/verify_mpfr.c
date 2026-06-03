@@ -15,6 +15,10 @@
  *   gcc -O2 -std=c11              verify_mpfr.c -lmpfr -lgmp -lm -o verify_mpfr
  *   gcc -O2 -std=c11 -DVERIFY_SIN verify_mpfr.c -lmpfr -lgmp -lm -o verify_sin
  *   gcc -O2 -std=c11 -DVERIFY_LOG verify_mpfr.c -lmpfr -lgmp -lm -o verify_log
+ * For macOS: 
+ *   /opt/local/bin/gcc-mp-14 -O2 -std=c11 -I/opt/local/include -L/opt/local/lib verify_mpfr.c -lmpfr -lgmp -lm -o verify_mpfr
+ *   /opt/local/bin/gcc-mp-14 -O2 -std=c11 -I/opt/local/include -L/opt/local/lib -DVERIFY_SIN verify_mpfr.c -lmpfr -lgmp -lm -o verify_sin
+ *   /opt/local/bin/gcc-mp-14 -O2 -std=c11 -I/opt/local/include -L/opt/local/lib -DVERIFY_LOG verify_mpfr.c -lmpfr -lgmp -lm -o verify_log
  */
 
 #include <stdio.h>
