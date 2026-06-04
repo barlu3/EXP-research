@@ -208,6 +208,17 @@ int main(void)
                 if (au > 0x3de8 && au < 0x4580) {
                     int i1 = (int)((au - 0x3d80) >> 3);
                     int i2 = (int)((((au - 0x3d80) >> 7) << 3) | (au & 0x7));
+                    /* Reduced args |x| = x1 + x2 (see S1/S2 comments in
+                       inria-sinbf16.c): x1's bf16 encoding is 123*128 + i1*8;
+                       x2 = l * 2^(h-11) with i2 = 8*h + l.  Sign from bit 15. */
+                    int neg = bits >> 15;
+                    int h = i2 >> 3, l = i2 & 0x7;
+                    float x1 = bf16_to_float((uint16_t)(0x3d80 + i1 * 8));
+                    float x2 = ldexpf((float)l, h - 11);
+                    if (neg) { x1 = -x1; x2 = -x2; }
+                    fprintf(out, "  x1        : %+.8e   (sin(x1)=S1[i1], cos(x1)=C1[i1])\n", (double)x1);
+                    fprintf(out, "  x2        : %+.8e   (sin(x2)=S2[i2], cos(x2)=C2[i2])\n", (double)x2);
+                    fprintf(out, "  x1 + x2   : %+.8e\n", (double)(x1 + x2));
                     fprintf(out, "  S1 index  : %d   S1[%d] = %.8e\n",
                             i1, i1, (double)S1[i1]);
                     fprintf(out, "  C1 index  : %d   C1[%d] = %.8e\n",
@@ -236,9 +247,20 @@ int main(void)
                 int i1 = (int)(bits >> 7);
                 int i2 = (int)(bits & 0x7f);
                 if (i1 == 0) {
+                    /* subnormal: x = x2 directly, log(x2) = T3[i2], no x1 */
+                    fprintf(out, "  x2        : %+.8e   (log(x2)=T3[i2], x = x2 subnormal)\n",
+                            (double)bf16_to_float(bits));
                     fprintf(out, "  T3 index  : %d   T3[%d] = %.8e\n",
                             i2, i2, (double)T3[i2].f);
                 } else {
+                    /* normal: x = x1 * x2 (see T1/T2 comments in inria-logbf16.c).
+                       x1 = 2^e (mantissa cleared), log(x1)=T1[i1]; x2 in [1,2)
+                       is the significand, log(x2)=T2[i2]. */
+                    float x1 = bf16_to_float(bits & 0xff80);
+                    float x2 = bf16_to_float((uint16_t)(0x3f80 | i2));
+                    fprintf(out, "  x1        : %+.8e   (log(x1)=T1[i1])\n", (double)x1);
+                    fprintf(out, "  x2        : %+.8e   (log(x2)=T2[i2])\n", (double)x2);
+                    fprintf(out, "  x1 * x2   : %+.8e\n", (double)(x1 * x2));
                     fprintf(out, "  T1 index  : %d   T1[%d] = %.8e\n",
                             i1, i1, (double)T1[i1]);
                     fprintf(out, "  T2 index  : %d   T2[%d] = %.8e\n",
@@ -253,6 +275,20 @@ int main(void)
             int i1, i2;
             get_indices(bits, &i1, &i2);
             if (i1 >= 0) {
+                /* Reconstruct the reduced arguments x = x1 + x2 from the table
+                   indices (see T1/T2 comments in inria-expbf16.c): x1's bf16
+                   encoding is (118*16 + i1_low)*8; x2 = l * 2^(h-16) with
+                   i2_low = 8*h + l.  The +256/+128 table halves carry the sign. */
+                int neg    = bits >> 15;
+                int i1_low = i1 & 0xff;
+                int i2_low = i2 & 0x7f;
+                int h = i2_low >> 3, l = i2_low & 0x7;
+                float x1 = bf16_to_float((uint16_t)((118 * 16 + i1_low) * 8));
+                float x2 = ldexpf((float)l, h - 16);
+                if (neg) { x1 = -x1; x2 = -x2; }
+                fprintf(out, "  x1        : %+.8e   (exp(x1) = T1[i1])\n", (double)x1);
+                fprintf(out, "  x2        : %+.8e   (exp(x2) = T2[i2])\n", (double)x2);
+                fprintf(out, "  x1 + x2   : %+.8e\n", (double)(x1 + x2));
                 fprintf(out, "  T1 index  : %d   T1[%d] = %.8e\n",
                         i1, i1, (double)T1[i1]);
                 fprintf(out, "  T2 index  : %d   T2[%d] = %.8e\n",

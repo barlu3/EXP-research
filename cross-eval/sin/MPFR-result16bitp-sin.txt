@@ -6,6 +6,9 @@ DISCREPANCY #1:
   Input     : 0x4117  (+9.43750000e+00 as float)
   CORE-MATH : 0xBC51  (-1.27563477e-02 as float)
   MPFR      : 0xBC50  (-1.26953125e-02 as float)
+  x1        : +9.00000000e+00   (sin(x1)=S1[i1], cos(x1)=C1[i1])
+  x2        : +4.37500000e-01   (sin(x2)=S2[i2], cos(x2)=C2[i2])
+  x1 + x2   : +9.43750000e+00
   S1 index  : 114   S1[114] = 4.12117004e-01
   C1 index  : 114   C1[114] = -9.11132812e-01
   S2 index  : 63   S2[63] = 4.23675537e-01
@@ -16,6 +19,9 @@ DISCREPANCY #2:
   Input     : 0x414D  (+1.28125000e+01 as float)
   CORE-MATH : 0x3E7A  (+2.44140625e-01 as float)
   MPFR      : 0x3E79  (+2.43164062e-01 as float)
+  x1        : +1.25000000e+01   (sin(x1)=S1[i1], cos(x1)=C1[i1])
+  x2        : +3.12500000e-01   (sin(x2)=S2[i2], cos(x2)=C2[i2])
+  x1 + x2   : +1.28125000e+01
   S1 index  : 121   S1[121] = -6.63223267e-02
   C1 index  : 121   C1[121] = 9.97802734e-01
   S2 index  : 61   S2[61] = 3.07441711e-01
@@ -26,6 +32,9 @@ DISCREPANCY #3:
   Input     : 0x4284  (+6.60000000e+01 as float)
   CORE-MATH : 0xBCD9  (-2.64892578e-02 as float)
   MPFR      : 0xBCDA  (-2.66113281e-02 as float)
+  x1        : +6.40000000e+01   (sin(x1)=S1[i1], cos(x1)=C1[i1])
+  x2        : +2.00000000e+00   (sin(x2)=S2[i2], cos(x2)=C2[i2])
+  x1 + x2   : +6.60000000e+01
   S1 index  : 160   S1[160] = 9.20028687e-01
   C1 index  : 160   C1[160] = 3.91860962e-01
   S2 index  : 84   S2[84] = 9.09301758e-01
@@ -36,6 +45,9 @@ DISCREPANCY #4:
   Input     : 0x4349  (+2.01000000e+02 as float)
   CORE-MATH : 0xBD7D  (-6.17675781e-02 as float)
   MPFR      : 0xBD7E  (-6.20117188e-02 as float)
+  x1        : +2.00000000e+02   (sin(x1)=S1[i1], cos(x1)=C1[i1])
+  x2        : +1.00000000e+00   (sin(x2)=S2[i2], cos(x2)=C2[i2])
+  x1 + x2   : +2.01000000e+02
   S1 index  : 185   S1[185] = -8.73291016e-01
   C1 index  : 185   C1[185] = 4.87190247e-01
   S2 index  : 89   S2[89] = 8.41476440e-01
@@ -46,6 +58,9 @@ DISCREPANCY #5:
   Input     : 0x43BE  (+3.80000000e+02 as float)
   CORE-MATH : 0x3E08  (+1.32812500e-01 as float)
   MPFR      : 0x3E07  (+1.31835938e-01 as float)
+  x1        : +3.68000000e+02   (sin(x1)=S1[i1], cos(x1)=C1[i1])
+  x2        : +1.20000000e+01   (sin(x2)=S2[i2], cos(x2)=C2[i2])
+  x1 + x2   : +3.80000000e+02
   S1 index  : 199   S1[199] = -4.20196533e-01
   C1 index  : 199   C1[199] = -9.07440186e-01
   S2 index  : 102   S2[102] = -5.36575317e-01
@@ -56,6 +71,9 @@ DISCREPANCY #6:
   Input     : 0x43FA  (+5.00000000e+02 as float)
   CORE-MATH : 0xBEF0  (-4.68750000e-01 as float)
   MPFR      : 0xBEEF  (-4.66796875e-01 as float)
+  x1        : +4.96000000e+02   (sin(x1)=S1[i1], cos(x1)=C1[i1])
+  x2        : +4.00000000e+00   (sin(x2)=S2[i2], cos(x2)=C2[i2])
+  x1 + x2   : +5.00000000e+02
   S1 index  : 207   S1[207] = -3.63143921e-01
   C1 index  : 207   C1[207] = 9.31732178e-01
   S2 index  : 98   S2[98] = -7.56805420e-01
@@ -577,6 +595,9 @@ DISCREPANCY #80:
   Input     : 0xC117  (-9.43750000e+00 as float)
   CORE-MATH : 0x3C51  (+1.27563477e-02 as float)
   MPFR      : 0x3C50  (+1.26953125e-02 as float)
+  x1        : -9.00000000e+00   (sin(x1)=S1[i1], cos(x1)=C1[i1])
+  x2        : -4.37500000e-01   (sin(x2)=S2[i2], cos(x2)=C2[i2])
+  x1 + x2   : -9.43750000e+00
   S1 index  : 114   S1[114] = 4.12117004e-01
   C1 index  : 114   C1[114] = -9.11132812e-01
   S2 index  : 63   S2[63] = 4.23675537e-01
@@ -587,6 +608,9 @@ DISCREPANCY #81:
   Input     : 0xC14D  (-1.28125000e+01 as float)
   CORE-MATH : 0xBE7A  (-2.44140625e-01 as float)
   MPFR      : 0xBE79  (-2.43164062e-01 as float)
+  x1        : -1.25000000e+01   (sin(x1)=S1[i1], cos(x1)=C1[i1])
+  x2        : -3.12500000e-01   (sin(x2)=S2[i2], cos(x2)=C2[i2])
+  x1 + x2   : -1.28125000e+01
   S1 index  : 121   S1[121] = -6.63223267e-02
   C1 index  : 121   C1[121] = 9.97802734e-01
   S2 index  : 61   S2[61] = 3.07441711e-01
@@ -597,6 +621,9 @@ DISCREPANCY #82:
   Input     : 0xC284  (-6.60000000e+01 as float)
   CORE-MATH : 0x3CD9  (+2.64892578e-02 as float)
   MPFR      : 0x3CDA  (+2.66113281e-02 as float)
+  x1        : -6.40000000e+01   (sin(x1)=S1[i1], cos(x1)=C1[i1])
+  x2        : -2.00000000e+00   (sin(x2)=S2[i2], cos(x2)=C2[i2])
+  x1 + x2   : -6.60000000e+01
   S1 index  : 160   S1[160] = 9.20028687e-01
   C1 index  : 160   C1[160] = 3.91860962e-01
   S2 index  : 84   S2[84] = 9.09301758e-01
@@ -607,6 +634,9 @@ DISCREPANCY #83:
   Input     : 0xC349  (-2.01000000e+02 as float)
   CORE-MATH : 0x3D7D  (+6.17675781e-02 as float)
   MPFR      : 0x3D7E  (+6.20117188e-02 as float)
+  x1        : -2.00000000e+02   (sin(x1)=S1[i1], cos(x1)=C1[i1])
+  x2        : -1.00000000e+00   (sin(x2)=S2[i2], cos(x2)=C2[i2])
+  x1 + x2   : -2.01000000e+02
   S1 index  : 185   S1[185] = -8.73291016e-01
   C1 index  : 185   C1[185] = 4.87190247e-01
   S2 index  : 89   S2[89] = 8.41476440e-01
@@ -617,6 +647,9 @@ DISCREPANCY #84:
   Input     : 0xC3BE  (-3.80000000e+02 as float)
   CORE-MATH : 0xBE08  (-1.32812500e-01 as float)
   MPFR      : 0xBE07  (-1.31835938e-01 as float)
+  x1        : -3.68000000e+02   (sin(x1)=S1[i1], cos(x1)=C1[i1])
+  x2        : -1.20000000e+01   (sin(x2)=S2[i2], cos(x2)=C2[i2])
+  x1 + x2   : -3.80000000e+02
   S1 index  : 199   S1[199] = -4.20196533e-01
   C1 index  : 199   C1[199] = -9.07440186e-01
   S2 index  : 102   S2[102] = -5.36575317e-01
@@ -627,6 +660,9 @@ DISCREPANCY #85:
   Input     : 0xC3FA  (-5.00000000e+02 as float)
   CORE-MATH : 0x3EF0  (+4.68750000e-01 as float)
   MPFR      : 0x3EEF  (+4.66796875e-01 as float)
+  x1        : -4.96000000e+02   (sin(x1)=S1[i1], cos(x1)=C1[i1])
+  x2        : -4.00000000e+00   (sin(x2)=S2[i2], cos(x2)=C2[i2])
+  x1 + x2   : -5.00000000e+02
   S1 index  : 207   S1[207] = -3.63143921e-01
   C1 index  : 207   C1[207] = 9.31732178e-01
   S2 index  : 98   S2[98] = -7.56805420e-01
