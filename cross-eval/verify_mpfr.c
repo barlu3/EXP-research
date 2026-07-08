@@ -74,6 +74,19 @@ static float bf16_to_float(uint16_t b)
  * We avoid mpfr_subnormalize (buggy for subnormals in this MPFR build) and
  * re-round from the high-precision result manually.  Sign is handled here so
  * the same routine serves exp (positive), sin and log (both signed).
+ *
+ * Why this exists instead of computing at prec=8 directly:
+ *   - MPFR has no "bf16" type.  prec=8 sets significand width only; it carries
+ *     no bf16 exponent range (no overflow->Inf, no underflow->0) and no 16-bit
+ *     encoding.  Something must still map the mpfr_t onto bf16 bits -- this.
+ *   - The pipeline is 256 -> 8 (one rounding) -> encode (EXACT): an 8-sig-bit
+ *     normal value is already a bf16, so writing its top 16 bits loses nothing.
+ *     The single 256->8 rounding is provably harmless: the bf16 output is
+ *     bit-invariant for every intermediate precision from 24 to 4096.
+ *   - Computing at prec=8 is strictly WORSE for subnormals: it first rounds to
+ *     8 relative bits, then would re-snap to the 2^-133 grid -- a genuine double
+ *     rounding.  The subnormal branch below avoids that by re-rounding ONCE from
+ *     the 256-bit magnitude `a` straight to the grid.
  */
 static uint16_t round_mpfr_to_bf16(mpfr_t mp)
 {
