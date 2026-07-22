@@ -18,3 +18,11 @@ verify_log
 
 # rounding binary compilation
 cross-eval/round-16bitp
+
+# err files
+*.err 
+*.stderr
+
+# log computation compile files
+precompute
+bound-calc
