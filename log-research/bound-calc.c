@@ -112,7 +112,9 @@ int main (void) {
   fprintf (lp, "\\ y even -> closed [lb,ub] (midpoint verbatim); y odd -> open, each side\n");
   fprintf (lp, "\\ tightened by EPS=1e-9 to model strict < within LP's <= form.\n");
   fprintf (lp, "\\ Anchor: T1[127]=0 (ln(2^0)=0) removes the T1/T2 additive gauge freedom.\n");
-  fprintf (lp, "Minimize\n obj: 0\n");
+  /* Pure feasibility: zero objective. GLPK's LP parser rejects a bare "obj: 0"
+     (needs a variable term), so reference one var with coefficient 0. */
+  fprintf (lp, "Minimize\n obj: 0 T1_1\n");
   fprintf (lp, "Subject To\n");
 
   const double EPS = 1e-9;

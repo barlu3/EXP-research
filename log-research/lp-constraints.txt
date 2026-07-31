@@ -7,7 +7,7 @@
 \ tightened by EPS=1e-9 to model strict < within LP's <= form.
 \ Anchor: T1[127]=0 (ln(2^0)=0) removes the T1/T2 additive gauge freedom.
 Minimize
- obj: 0
+ obj: 0 T1_1
 Subject To
  c128_lo: T1_1 + T2_0 >= -87.749999998999996
  c128_hi: T1_1 + T2_0 <= -87.250000001000004
