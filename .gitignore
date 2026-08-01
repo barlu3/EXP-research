@@ -1,5 +1,7 @@
 # verification files used to extract
 glibc-2.43/
+dependencies/*.tar.xz
+dependencies/*.sig
 
 handoff.md
 bench
@@ -24,6 +26,7 @@ cross-eval/round-16bitp
 *.stderr
 
 # log computation compile files
+milp-gen
 precompute
 bound-calc
 *.lp
