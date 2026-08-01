@@ -26,7 +26,7 @@ cross-eval/round-16bitp
 *.stderr
 
 # log computation compile files
-milp-gen
-precompute
-bound-calc
+log-research/milp-gen
+log-research/precompute
+log-research/bound-calc
 *.lp
