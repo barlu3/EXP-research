@@ -26,3 +26,4 @@ cross-eval/round-16bitp
 # log computation compile files
 precompute
 bound-calc
+*.lp

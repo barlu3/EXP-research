@@ -21,6 +21,7 @@
    Output: milp-constraints.lp (CPLEX LP format with a Binary section) — read by
    HiGHS, GLPK (glpsol --lp), Gurobi, or CPLEX. Solve for feasibility:
      highs milp-constraints.lp        # "Optimal" => a correctly-rounded table exists
+     glpsol --lp milp-constraints.lp   # "OPTIMAL" => a correctly-rounded table exists
    then read chosen candidates from the zV_j set to 1 in the solution.
 
    Build (compile as C; matches the rest of log-research):
