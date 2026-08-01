@@ -20,6 +20,11 @@ verify_log
 
 # rounding binary compilation
 cross-eval/round-16bitp
+cross-eval/round-sin
+cross-eval/round-log
+
+# cmake build tree
+build/
 
 # err files
 *.err 

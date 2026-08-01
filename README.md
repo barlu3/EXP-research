@@ -1,46 +1,48 @@
 # EXP-research
 
-## Setup:
-- Extract folders with `tar xf glibc-2.43.tar.xz`
-- Verify `find glibc-2.43/ -name "e_exp.c"`
-- `cd` into `implementations/`
-- Compile benchmarks for homemade with `g++ -O3 -march=native -mavx2 -mfma -std=c++20 benchmark-home.cpp -o output/bench 2>&1`
-- Compile benchmarks for Inria with `g++ -O3 -march=native -mavx2 -mfma -std=c++20 benchmark-inria.cpp -o output/bench_inria 2>&1`
-- Run benchmarks with `./output/bench 2>&1` and `./output/bench_inria 2>&1`
+Correctly-rounded `exp`, `sin`, and `log` for 16-bit floats, cross-checked
+exhaustively against MPFR.
 
-## For MPFR cross check:
-- Ensure you have the MPFR downloaded on your system by navigating to root and compiling with `cc -o version version.c -lmpfr -lgmp`
-- If the above compilation results in a `version` file being output, all is well
-- Otherwise, install MPFR on your system with `sudo apt install libmpfr-dev`
+## Build
 
-## Cross-evaluation (exp / sin / log):
-The `cross-eval/` directory holds two MPFR-driven tools. Both select the target
-function at **compile time** (default = exp; `-DVERIFY_*` / `-DROUND_*` for the
-others). Run every command from inside `cross-eval/`.
+Requires CMake ≥ 3.20, a C11/C++20 compiler, and MPFR + GMP
+(`sudo apt install libmpfr-dev libgmp-dev`, or `brew install mpfr gmp`).
 
-### `verify_mpfr.c` — exhaustive CORE-MATH vs MPFR check
-Compares all 65536 bfloat16 patterns against correctly-rounded MPFR and logs each
-discrepancy with the CORE-MATH lookup-table indices (T1/T2 for exp, S1/C1/S2/C2 or
-S3/C3 for sin, T1/T2 or T3 for log).
-- exp → `MPFR-result16bitp.txt`:
-  `gcc -O2 -std=c11 verify_mpfr.c -lmpfr -lgmp -lm -o verify_mpfr && ./verify_mpfr`
-- sin → `sin/MPFR-result16bitp-sin.txt`:
-  `gcc -O2 -std=c11 -DVERIFY_SIN verify_mpfr.c -lmpfr -lgmp -lm -o verify_sin && ./verify_sin`
-- log → `log/MPFR-result16bitp-log.txt`:
-  `gcc -O2 -std=c11 -DVERIFY_LOG verify_mpfr.c -lmpfr -lgmp -lm -o verify_log && ./verify_log`
-- Each source `#include`s the 16-bit-rounded tables by default (`inria-exp16bitp.c`,
-  `sin/inria-sin16bitp.c`, `log/inria-log16bitp.c`). To check the unmodified 24-bit
-  Inria tables, swap the `#include` (and matching `OUT_FILE`) at the top of the file.
+```
+make            # build everything
+make help       # list every target
+```
 
-### `round-16bitp.c` — round lookup tables to 16-bit precision
-Loads each binary32 table value exactly into MPFR, re-rounds to 16-bit (RNDN), and
-emits a per-entry diff plus paste-ready C arrays.
-- exp T1/T2 → `round-16bitp.txt`:
-  `gcc -O2 -std=c11 round-16bitp.c -lmpfr -lgmp -lm -o round-16bitp && ./round-16bitp`
-- sin S1/C1/S2/C2/S3/C3 → `sin/round-16bitp-sin.txt`:
-  `gcc -O2 -std=c11 -DROUND_SIN round-16bitp.c -lmpfr -lgmp -lm -o round-sin && ./round-sin`
-- log T1/T2/T3 → `log/round-16bitp-log.txt`:
-  `gcc -O2 -std=c11 -DROUND_LOG round-16bitp.c -lmpfr -lgmp -lm -o round-log && ./round-log`
+See [BUILD.md](BUILD.md) for the full target reference.
+
+| Target | Purpose |
+| --- | --- |
+| `make verify` | Exhaustive 65536-pattern check vs MPFR (exp, sin, log) |
+| `make bench` | Build + run the throughput benchmarks |
+| `make round` | Regenerate the 16-bit-rounded table reports |
+| `make glibc` | Fetch + extract the glibc reference source |
+| `make check-mpfr` | Confirm MPFR is installed and print its version |
+| `make test` | Run the verification suite through CTest |
+
+## Cross-evaluation (exp / sin / log)
+
+`cross-eval/` holds two MPFR-driven tools. Both select the target function at
+**compile time**, so the build produces one executable per function.
+
+`verify_mpfr.c` compares all 65536 bfloat16 patterns against correctly-rounded
+MPFR and logs each discrepancy with the CORE-MATH lookup-table indices (T1/T2
+for exp, S1/C1/S2/C2 or S3/C3 for sin, T1/T2 or T3 for log). Reports land in
+`MPFR-result16bitp.txt`, `sin/MPFR-result16bitp-sin.txt`, and
+`log/MPFR-result16bitp-log.txt`.
+
+Each source `#include`s the 16-bit-rounded tables by default
+(`inria-exp16bitp.c`, `sin/inria-sin16bitp.c`, `log/inria-log16bitp.c`). To
+check the unmodified 24-bit Inria tables, swap the `#include` (and matching
+`OUT_FILE`) at the top of the file.
+
+`round-16bitp.c` loads each binary32 table value exactly into MPFR, re-rounds to
+16-bit (RNDN), and emits a per-entry diff plus paste-ready C arrays into
+`round-16bitp.txt`, `sin/round-16bitp-sin.txt`, and `log/round-16bitp-log.txt`.
 
 ## Why the homemade version is faster (most inputs)
 
