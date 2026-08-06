@@ -20,11 +20,12 @@ for lp in fragments/*.lp; do
     glpsol --lp "$lp" --tmlim "$tmlim" --output "$outdir/$name.sol" >"$log" 2>&1
     elapsed=$((SECONDS - start))
 
-    if   grep -q "INTEGER OPTIMAL SOLUTION FOUND"  "$log"; then status=OPTIMAL
-    elif grep -q "PROBLEM HAS NO INTEGER FEASIBLE" "$log"; then status=INFEASIBLE; fail=1
-    elif grep -q "PROBLEM HAS NO PRIMAL FEASIBLE"  "$log"; then status=INFEASIBLE; fail=1
-    elif grep -q "TIME LIMIT EXCEEDED"             "$log"; then status=TIMEOUT;    fail=1
-    else                                                      status=UNKNOWN;    fail=1
+    if   grep -q "INTEGER OPTIMAL SOLUTION FOUND"     "$log"; then status=OPTIMAL
+    elif grep -q "HAS NO INTEGER FEASIBLE SOLUTION"   "$log"; then status=INFEASIBLE; fail=1
+    elif grep -q "HAS NO PRIMAL FEASIBLE SOLUTION"    "$log"; then status=INFEASIBLE; fail=1
+    elif grep -q "HAS NO FEASIBLE SOLUTION"           "$log"; then status=INFEASIBLE; fail=1
+    elif grep -q "TIME LIMIT EXCEEDED"                "$log"; then status=TIMEOUT;    fail=1
+    else                                                         status=UNKNOWN;    fail=1
     fi
     printf '%-26s %-14s %ss\n' "$name" "$status" "$elapsed"
 done
