@@ -9,7 +9,13 @@ set -uo pipefail
 cd "$(dirname "$0")"
 tmlim=${TMLIM:-300}
 outdir=fragments/solutions
+
+# Clear prior results first. Logs from an earlier CAND_ULP linger otherwise, and
+# a stale INTEGER OPTIMAL next to a current INFEASIBLE reads as a contradiction.
+rm -rf "$outdir"
 mkdir -p "$outdir"
+
+grep -m1 'CAND_ULP' fragments/*.lp 2>/dev/null | head -1 | cut -d'\' -f2-
 
 printf '%-26s %-14s %s\n' FRAGMENT STATUS TIME
 fail=0
