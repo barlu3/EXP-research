@@ -123,9 +123,10 @@ The search runs linearly upward rather than bisecting: feasibility is not known
 to be monotone in `p`. A finer `T2` grid moves every candidate, so a width that
 fails says nothing rigorous about a narrower one.
 
-`milp-gen` now takes `[T2_PREC [OUT_FILE]]`. At the default `8` it emits the
-original model byte for byte; only `T2`'s candidate grid changes above that.
-`T1` and the coupling bounds are identical at every width.
+`milp-gen` takes `[T2_PREC [OUT_FILE [T1_PREC]]]`. At the defaults it emits the
+original model, identical apart from the header comment; only `T2`'s candidate
+grid changes above that. `T1` and the coupling bounds are identical at every
+width.
 
 ### Result: T2 width is not the binding constraint
 
@@ -142,6 +143,76 @@ satisfies their rows.
 
 The constraint is `CAND_ULP`, which confines `T1` to ±3 bf16 ULPs of its ideal.
 Widening `T2` cannot rescue a row that `T1`'s own window already excludes.
+
+## T1 precision sweep
+
+The mirror experiment: pin `T2` and widen `T1` instead.
+
+```bash
+cmake --build build --target t1-precision-sweep
+./log-research/t1-precision-sweep                          # T2 pinned at 10
+./log-research/t1-precision-sweep --t2-bits 16 --tmlim 120
+```
+
+`milp-gen` takes `[T2_PREC [OUT_FILE [T1_PREC]]]`; `T1_PREC` is last so existing
+two-argument calls keep working. Both default to 8, which reproduces the
+original model exactly — the sole difference is the `\`-prefixed header comment,
+which now also records `T1_PREC` (solvers ignore comment lines).
+
+### With T2 pinned at 10 bits: blocked by one index
+
+| T1 bits | Result |
+|---|---|
+| 8 … 12 | INFEASIBLE (1/17 fragments optimal) |
+| 13 … 15 | INFEASIBLE (2–15/17) |
+| 16 … 24 | INFEASIBLE (**16/17** — one fragment holds out) |
+
+Unlike the T2 sweep, this one makes real progress: fragments flip to OPTIMAL as
+`T1` widens, and from 16 bits up exactly **one** fragment remains infeasible.
+At `T1 >= 16` the LP relaxation is feasible and only the *integer* problem
+fails — a qualitative change from the T2 sweep, where every width died at the
+relaxation.
+
+Bisecting that fragment isolates the obstruction to a single entry, **`T1_126`**
+— exponent −1, the binade `x` in `[0.5, 1)`. It is infeasible *on its own*, with
+all 128 `T2` entries free to help. Testing all 254 indices individually at
+`T1=20, T2=10`, it is the **only** singleton-infeasible one.
+
+That obstruction is `T2`-driven, not `T1`-driven. Holding `T1` at a generous 24
+bits and varying `T2`:
+
+| T2 bits | `T1_126` alone |
+|---|---|
+| 10, 12 | INFEASIBLE |
+| 16, 20, 24 | OPTIMAL |
+
+So `T2 = 10` is what caps this sweep. `T2` needs ~16 bits before the near-1
+binade can be served at all.
+
+### With T2 pinned at 16 bits: OPTIMAL, but not correct
+
+| T1 bits | Result |
+|---|---|
+| 8 … 14 | INFEASIBLE (1/17) |
+| 15 | INFEASIBLE (7/17) |
+| 16 | INFEASIBLE (16/17) |
+| 17 … 24 | **VIOLATED** — 17/17 optimal, exact re-check fails |
+
+This is the trap the section above warns about, caught automatically. From 17
+bits every fragment reports `INTEGER OPTIMAL`; a sweep trusting bare status
+would report **17 bits** as the answer. `check-solution.py` rejects it — the
+composed assignment violates real coupling rows by 1e-5 to 9e-5, four orders of
+magnitude past the 1e-9 tolerance:
+
+```
+VIOLATION c13797_hi: T1_107 + T2_101 <= -13.281250001
+                     -> -13.281158447265625  (slack -9.155e-5)
+```
+
+`glpsol` accepts these because they fall inside its default integer tolerance.
+They are genuine violations of the source model, not composition artifacts.
+
+**No `T1` width in 8..24 yields a correct table at either pinned `T2`.**
 
 ## Current status
 

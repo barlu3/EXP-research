@@ -24,10 +24,12 @@ set_target_properties(milp-gen PROPERTIES
 
 # Drives milp-gen/split-milp.py/glpsol/check-solution.py as subprocesses, so it
 # needs no MPFR of its own. Like the others it must run from the repo root.
-add_executable(t2-precision-sweep t2-precision-sweep.c)
-target_compile_options(t2-precision-sweep PRIVATE -O2)
-set_target_properties(t2-precision-sweep PROPERTIES
-  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+foreach(sweep t2-precision-sweep t1-precision-sweep)
+  add_executable(${sweep} ${sweep}.c)
+  target_compile_options(${sweep} PRIVATE -O2)
+  set_target_properties(${sweep} PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+endforeach()
 
 # precompute writes its table to stdout; the others manage their own files.
 add_custom_target(ln-precompute
@@ -60,4 +62,12 @@ add_custom_target(ln-t2-sweep
   DEPENDS t2-precision-sweep milp-gen
   WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
   COMMENT "Sweeping T2 significand width for the minimum feasible precision"
+  USES_TERMINAL)
+
+# Mirror image: widen T1 with T2 pinned (10 bits by default).
+add_custom_target(ln-t1-sweep
+  COMMAND t1-precision-sweep
+  DEPENDS t1-precision-sweep milp-gen
+  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+  COMMENT "Sweeping T1 significand width with T2 pinned"
   USES_TERMINAL)
