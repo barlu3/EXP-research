@@ -27,6 +27,8 @@ build/
 log-research/milp-gen
 log-research/precompute
 log-research/bound-calc
+log-research/t2-precision-sweep
+log-research/sweep/
 *.lp
 log-research/fragments/
 __pycache__/

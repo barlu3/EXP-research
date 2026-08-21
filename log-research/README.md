@@ -102,6 +102,47 @@ This is not hypothetical. Pinning a `T2` taken from one solved block at
 `CAND_ULP=6` produced `OPTIMAL` on all 16 `T1` blocks, yet 97 genuine
 violations (worst slack -7.7e-4), with one landing at exactly -1.0e-9.
 
+## T2 precision sweep
+
+`t2-precision-sweep.c` asks the natural follow-up: if `T2` were *stored wider
+than bf16* — `T1` still bf16, the correctness target still bf16 rounding — how
+many significand bits does `T2` need?
+
+```bash
+cmake --build build --target t2-precision-sweep
+./log-research/t2-precision-sweep               # widths 8..24
+./log-research/t2-precision-sweep --min-bits 8 --max-bits 32 --keep
+```
+
+It drives the existing pipeline once per width (`milp-gen p FILE` →
+`split-milp.py` → `glpsol` → `check-solution.py`) and accepts a width only when
+**every fragment is OPTIMAL *and* the exact re-check is clean** — never on a
+bare `Optimal`, for the reason in the section above.
+
+The search runs linearly upward rather than bisecting: feasibility is not known
+to be monotone in `p`. A finer `T2` grid moves every candidate, so a width that
+fails says nothing rigorous about a narrower one.
+
+`milp-gen` now takes `[T2_PREC [OUT_FILE]]`. At the default `8` it emits the
+original model byte for byte; only `T2`'s candidate grid changes above that.
+`T1` and the coupling bounds are identical at every width.
+
+### Result: T2 width is not the binding constraint
+
+Every width from 8 to 24 bits is **INFEASIBLE**, all at the LP relaxation:
+
+| T2 bits | Result |
+|---|---|
+| 8 … 24 | INFEASIBLE (16/16 T1 fragments, LP relaxation) |
+
+This is not a limit of the sweep range. With `T2` given *unlimited* precision
+and `T1` free to take any of its 7 candidates, 95 of the 128 `T2` indices still
+have an **empty** feasible interval — no real number, at any storage width,
+satisfies their rows.
+
+The constraint is `CAND_ULP`, which confines `T1` to ±3 bf16 ULPs of its ideal.
+Widening `T2` cannot rescue a row that `T1`'s own window already excludes.
+
 ## Current status
 
 At the current `CAND_ULP=3` (see `milp-gen.cc:42`), **every fragment is
@@ -110,13 +151,17 @@ is not tolerance-sensitive. Infeasibility composes upward, so the full model is
 infeasible: no bf16-grid `T1`/`T2` pair reproduces a correctly-rounded `ln()`
 within ±3 ULP candidate windows.
 
-Widening `CAND_ULP` enlarges the candidate sets and is the lever to test next.
+Note the continuous relaxation (`lp-constraints.txt`, both tables free reals) is
+**OPTIMAL**. A real-valued solution exists; it is the grid plus the ±3 ULP
+window that destroys it. Since the sweep above rules out `T2` width as the
+lever, widening `CAND_ULP` is what remains to test.
 
 ## Files
 
 | File | Role |
 |---|---|
 | `precompute.c`, `bound-calc.c`, `milp-gen.cc` | pipeline stages 1–3 |
+| `t2-precision-sweep.c` | sweeps T2 significand width over the whole pipeline |
 | `build-lp.sh` | build + split, with a row-conservation check |
 | `split-milp.py` | decomposition (`--blocks`, `--t2-blocks`, `--t1-range`, `--pin-t2`) |
 | `solve-fragments.sh` | run `glpsol` per fragment; nonzero exit if any is not OPTIMAL |

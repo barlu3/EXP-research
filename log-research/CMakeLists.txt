@@ -22,6 +22,13 @@ target_link_libraries(milp-gen PRIVATE MPFR::MPFR)
 set_target_properties(milp-gen PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 
+# Drives milp-gen/split-milp.py/glpsol/check-solution.py as subprocesses, so it
+# needs no MPFR of its own. Like the others it must run from the repo root.
+add_executable(t2-precision-sweep t2-precision-sweep.c)
+target_compile_options(t2-precision-sweep PRIVATE -O2)
+set_target_properties(t2-precision-sweep PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
 # precompute writes its table to stdout; the others manage their own files.
 add_custom_target(ln-precompute
   COMMAND sh -c "$<TARGET_FILE:precompute> > log-research/ln-precompute.txt"
@@ -44,4 +51,13 @@ add_custom_target(ln-milp
   DEPENDS milp-gen
   WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
   COMMENT "Step 3: emitting bf16-grid MILP (solve with: glpsol --lp log-research/milp-constraints.lp)"
+  USES_TERMINAL)
+
+# Sweeps T2 width and reports the minimum that solves, or that none does.
+# Needs glpsol on PATH; runs the whole pipeline once per width, so it is slow.
+add_custom_target(ln-t2-sweep
+  COMMAND t2-precision-sweep
+  DEPENDS t2-precision-sweep milp-gen
+  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+  COMMENT "Sweeping T2 significand width for the minimum feasible precision"
   USES_TERMINAL)

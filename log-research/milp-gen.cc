@@ -6,9 +6,13 @@
    a feasible solution is directly usable as the final table (no post-rounding).
 
    Model. For each table entry V in {T1[k] (k=1..254), T2[k] (k=0..127)}:
-     - Candidates C(V) = the bf16 values within +/-CAND_ULP ULPs of V's ideal
+     - Candidates C(V) = the grid values within +/-CAND_ULP ULPs of V's ideal
        ln value (T1[k] ideal = ln(2^(k-127)) = (k-127)*ln2; T2[k] ideal =
-       ln(1+k/128)). The correctly-rounded ideal is candidate 0.
+       ln(1+k/128)). The correctly-rounded ideal is candidate 0. T1 always uses
+       the bf16 grid; T2 uses a T2_PREC-bit grid (argv[1], default bf16's 8) so
+       t2-precision-sweep can ask how wide T2 must be stored. The correctness
+       bounds are bf16 rounding intervals either way -- they define the target
+       and never widen with T2.
      - Binaries zV_j pick exactly one candidate:  sum_j zV_j = 1.
      - V = sum_j c_j * zV_j   (V continuous, pinned to the chosen bf16 value).
    Each normal input u then contributes the same interval it did in the LP:
@@ -24,6 +28,8 @@
      glpsol --lp milp-constraints.lp   # "OPTIMAL" => a correctly-rounded table exists
    then read chosen candidates from the zV_j set to 1 in the solution.
 
+   Usage: milp-gen [T2_PREC [OUT_FILE]]   (defaults: 8, the path above)
+
    Build (compile as C; matches the rest of log-research):
      gcc -O2 -xc -std=c11 log-research/milp-gen.cc \
          -I/usr/include/x86_64-linux-gnu -lmpfr -lgmp -lm -o log-research/milp-gen
@@ -31,6 +37,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <mpfr.h>
 
 typedef union { __bf16 f; uint16_t u; } b16u16;
@@ -42,26 +49,35 @@ typedef union { __bf16 f; uint16_t u; } b16u16;
 #define CAND_ULP 3          /* candidates within +/- this many bf16 ULPs of ideal */
 #define MAX_CAND (2 * CAND_ULP + 1)
 
-#define OUT_FILE "log-research/milp-constraints.lp"
+/* T2 significand width, swept by t2-precision-sweep.c. At the default 8 this
+   file emits exactly the bf16-grid model it always did; above 8, T2 sits on a
+   finer grid than bf16 while T1 and the correctness bounds stay at BF16_PREC.
+   The bounds define what "correctly rounded" means, so they never move. */
+#define T2_PREC_DEFAULT BF16_PREC
+#define T2_PREC_MAX 53      /* candidate coefficients are printed via double */
+static int t2_prec = T2_PREC_DEFAULT;
 
-/* Round value to bf16 (RNDN, bf16 range) into y at BF16_PREC. */
-static void bf16_round (mpfr_t value, mpfr_t y) {
+#define OUT_FILE_DEFAULT "log-research/milp-constraints.lp"
+static const char *out_file = OUT_FILE_DEFAULT;
+
+/* Round value to the bf16 exponent range at `prec` significand bits (RNDN). */
+static void round_prec (mpfr_t value, mpfr_t y, int prec) {
   mpfr_exp_t emin = mpfr_get_emin (), emax = mpfr_get_emax ();
   mpfr_set_emin (BF16_EMIN); mpfr_set_emax (BF16_EMAX);
-  mpfr_set_prec (y, BF16_PREC);
+  mpfr_set_prec (y, prec);
   int inex = mpfr_set (y, value, MPFR_RNDN);
   mpfr_subnormalize (y, inex, MPFR_RNDN);
   mpfr_set_emin (emin); mpfr_set_emax (emax);
 }
 
-/* Fill cand[0..*n-1] with the bf16 values within +/-CAND_ULP ULP of ideal,
-   cand[0] = round_bf16(ideal). Values are returned as doubles (bf16 fits double
-   exactly). Duplicates at the exponent-boundary ULP change are dropped. */
-static void candidates (mpfr_t ideal, mpfr_t tmp, double *cand, int *n) {
+/* Fill cand[0..*n-1] with the `prec`-bit grid values within +/-CAND_ULP ULP of
+   ideal, cand[0] = round to nearest. Values are returned as doubles, exact for
+   any prec <= 53. Duplicates at the exponent-boundary ULP change are dropped. */
+static void candidates (mpfr_t ideal, mpfr_t tmp, double *cand, int *n, int prec) {
   mpfr_exp_t emin = mpfr_get_emin (), emax = mpfr_get_emax ();
   mpfr_set_emin (BF16_EMIN); mpfr_set_emax (BF16_EMAX);
 
-  bf16_round (ideal, tmp);          /* tmp = nearest bf16 = candidate 0 */
+  round_prec (ideal, tmp, prec);    /* tmp = nearest grid value = candidate 0 */
   double center = mpfr_get_d (tmp, MPFR_RNDN);
 
   /* Walk down CAND_ULP steps, then up CAND_ULP steps, collecting uniques. */
@@ -69,13 +85,13 @@ static void candidates (mpfr_t ideal, mpfr_t tmp, double *cand, int *n) {
   int c = 0;
   list[c++] = center;
 
-  mpfr_t lo; mpfr_init2 (lo, BF16_PREC); mpfr_set (lo, tmp, MPFR_RNDN);
+  mpfr_t lo; mpfr_init2 (lo, prec); mpfr_set (lo, tmp, MPFR_RNDN);
   for (int i = 0; i < CAND_ULP; i++) {
     mpfr_nextbelow (lo);
     double v = mpfr_get_d (lo, MPFR_RNDN);
     list[c++] = v;
   }
-  mpfr_t hi; mpfr_init2 (hi, BF16_PREC); mpfr_set (hi, tmp, MPFR_RNDN);
+  mpfr_t hi; mpfr_init2 (hi, prec); mpfr_set (hi, tmp, MPFR_RNDN);
   for (int i = 0; i < CAND_ULP; i++) {
     mpfr_nextabove (hi);
     double v = mpfr_get_d (hi, MPFR_RNDN);
@@ -94,10 +110,22 @@ static void candidates (mpfr_t ideal, mpfr_t tmp, double *cand, int *n) {
   *n = m;
 }
 
-int main (void) {
+int main (int argc, char **argv) {
+  /* argv[1] = T2 significand bits, argv[2] = output path. Both optional; the
+     defaults reproduce the original bf16-grid model byte for byte. */
+  if (argc > 1) {
+    t2_prec = atoi (argv[1]);
+    if (t2_prec < BF16_PREC || t2_prec > T2_PREC_MAX) {
+      fprintf (stderr, "milp-gen: T2 precision must be %d..%d, got %s\n",
+               BF16_PREC, T2_PREC_MAX, argv[1]);
+      return 2;
+    }
+  }
+  if (argc > 2) out_file = argv[2];
+
   mpfr_set_emin (BF16_EMIN); mpfr_set_emax (BF16_EMAX);
-  FILE *o = fopen (OUT_FILE, "w");
-  if (!o) { perror ("fopen " OUT_FILE); return 1; }
+  FILE *o = fopen (out_file, "w");
+  if (!o) { perror (out_file); return 1; }
 
   mpfr_t ideal, tmp, ln2, x, lnx, y, n_prev, n_next, lb, ub;
   mpfr_init2 (ideal, WORK_PREC); mpfr_init2 (tmp, BF16_PREC);
@@ -113,7 +141,7 @@ int main (void) {
 
   for (int k = 1; k <= 254; k++) {
     mpfr_mul_si (ideal, ln2, k - 127, MPFR_RNDN); /* ln(2^(k-127)) */
-    candidates (ideal, tmp, t1c[k], &t1n[k]);
+    candidates (ideal, tmp, t1c[k], &t1n[k], BF16_PREC);
   }
   /* T1[127] = ln(2^0) = 0 exactly: pin to a single candidate. This keeps the
      additive gauge fixed and stops the near-zero subnormal neighbors from
@@ -123,7 +151,7 @@ int main (void) {
     mpfr_set_si (ideal, 128 + k, MPFR_RNDN);
     mpfr_div_si (ideal, ideal, 128, MPFR_RNDN);  /* 1 + k/128 */
     mpfr_log (ideal, ideal, MPFR_RNDN);          /* ln(1+k/128) */
-    candidates (ideal, tmp, t2c[k], &t2n[k]);
+    candidates (ideal, tmp, t2c[k], &t2n[k], t2_prec);
   }
   /* T2[0] = ln(1) = 0 exactly: pin it. Its +/-ULP neighbors are subnormal bf16
      values (~1e-41) that both are meaningless candidates and wreck LP scaling
@@ -132,8 +160,8 @@ int main (void) {
 
   /* --- LP-format preamble. --- */
   fprintf (o, "\\ bf16-grid MILP for correctly-rounded ln() tables T1, T2\n");
-  fprintf (o, "\\ Generated by log-research/milp-gen.cc (MPFR %s), CAND_ULP=%d\n",
-           mpfr_get_version (), CAND_ULP);
+  fprintf (o, "\\ Generated by log-research/milp-gen.cc (MPFR %s), CAND_ULP=%d, T2_PREC=%d\n",
+           mpfr_get_version (), CAND_ULP, t2_prec);
   fprintf (o, "\\ Each T1[k]/T2[k] is pinned to one bf16 candidate via binaries zT*_j.\n");
   fprintf (o, "\\ Feasible ('Optimal') => a correctly-rounded single-rounded table exists.\n");
   /* Pure feasibility: zero objective. GLPK's LP parser rejects a bare "obj: 0"
@@ -180,7 +208,7 @@ int main (void) {
 
     mpfr_set_d (x, (double) (float) v.f, MPFR_RNDN);
     mpfr_log (lnx, x, MPFR_RNDN);
-    bf16_round (lnx, y);
+    round_prec (lnx, y, BF16_PREC);
 
     mpfr_exp_t emin = mpfr_get_emin (), emax = mpfr_get_emax ();
     mpfr_set_emin (BF16_EMIN); mpfr_set_emax (BF16_EMAX);
@@ -218,8 +246,8 @@ int main (void) {
   fclose (o);
 
   fprintf (stderr,
-    "milp-gen: %ld interval rows, %ld binaries, CAND_ULP=%d -> %s\n",
-    rows, nbin, CAND_ULP, OUT_FILE);
+    "milp-gen: %ld interval rows, %ld binaries, CAND_ULP=%d, T2_PREC=%d -> %s\n",
+    rows, nbin, CAND_ULP, t2_prec, out_file);
 
   mpfr_clear (ideal); mpfr_clear (tmp); mpfr_clear (ln2);
   mpfr_clear (x); mpfr_clear (lnx); mpfr_clear (y);
