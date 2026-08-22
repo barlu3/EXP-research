@@ -1,12 +1,13 @@
 # log-research
 
-Does a correctly-rounded `ln()` for bfloat16 exist using a two-table
-(`T1`, `T2`) reconstruction, where both tables are themselves bf16 values?
+Does a correctly-rounded `ln()` for bfloat16 exist using CORE-MATH's table
+layout — `T1 + T2` for normal inputs, a direct `T3` lookup for subnormals —
+where every table entry is itself a bf16 value?
 
-The question is posed as a MILP: if the model is **feasible**, such a table
-pair exists. If it is **infeasible**, no bf16-grid table can be correctly
-rounded at that candidate width — a property of the format, not of any
-particular implementation.
+The question is posed as a MILP: if the model is **feasible**, such a table set
+exists. If it is **infeasible**, no bf16-grid table can be correctly rounded at
+that candidate width — a property of the format, not of any particular
+implementation.
 
 ## Pipeline
 
@@ -28,9 +29,9 @@ It then splits the model and checks that no coupling rows were lost.
 
 ## Model structure
 
-254 `T1` entries, 128 `T2` entries. Each is pinned to one of `2*CAND_ULP+1`
-bf16 candidates by a `selT*` (choose exactly one) and `linkT*` (bind the
-continuous value to the chosen candidate) row pair.
+254 `T1` entries, 128 `T2` entries, 127 `T3` entries. Each is pinned to one of
+`2*CAND_ULP+1` bf16 candidates by a `selT*` (choose exactly one) and `linkT*`
+(bind the continuous value to the chosen candidate) row pair.
 
 Every coupling row has the exact form:
 
@@ -41,6 +42,27 @@ c<N>_hi: T1_a + T2_b <= <bound>
 
 254 × 128 × 2 = **65024 coupling rows**. There is no T1–T1 or T2–T2 coupling,
 which is what makes the model decomposable.
+
+### T3 is a lookup, not a summand
+
+`cr_log_bf16` returns `T3[i2]` **outright** when `i1 == 0` — it does not add a
+third term. For subnormal `x` the split `x = 2^(i1-127) * (1 + i2/128)` breaks
+down (no implicit leading 1), so the subnormal band gets its own direct table.
+Each of the 127 subnormal inputs (`u == i2`, `i2 = 1..127`) therefore
+contributes a **single-variable** row pair:
+
+```
+s<u>_lo: T3_k >= <bound>
+s<u>_hi: T3_k <= <bound>
+```
+
+127 × 2 = **254 subnormal rows**. `T3[0]` (`x = +0`, `ln = -Inf`) is exact and
+carries no rounding interval, so it is left out of the model entirely — matching
+CORE-MATH's hardcoded `-Inf`.
+
+The consequence is that `T3` is independent of `T1`, of `T2`, and of the rest of
+`T3`. Its 127 entries are 127 separate one-variable feasibility questions, which
+is why it needs no decomposition and why its `OPTIMAL` means what it says.
 
 ```mermaid
 graph LR
@@ -66,7 +88,8 @@ valid standalone LP.
 | Result | Means |
 |---|---|
 | Any fragment **INFEASIBLE** | Full model **INFEASIBLE**, proven. Fragment rows are a subset, so infeasibility lifts. |
-| All fragments **OPTIMAL** | **Nothing.** Each fragment picks its own `T2`; they need not agree. Feasibility does not compose. |
+| All `T1` fragments **OPTIMAL** | **Nothing.** Each fragment picks its own `T2`; they need not agree. Feasibility does not compose. |
+| `frag-t3-only` **OPTIMAL** | `T3` is **solved**. Its rows are single-variable, so there is no shared value to disagree about and nothing to compose. |
 
 ## Fragment modes
 
@@ -123,10 +146,9 @@ The search runs linearly upward rather than bisecting: feasibility is not known
 to be monotone in `p`. A finer `T2` grid moves every candidate, so a width that
 fails says nothing rigorous about a narrower one.
 
-`milp-gen` takes `[T2_PREC [OUT_FILE [T1_PREC]]]`. At the defaults it emits the
-original model, identical apart from the header comment; only `T2`'s candidate
-grid changes above that. `T1` and the coupling bounds are identical at every
-width.
+`milp-gen` takes `[T2_PREC [OUT_FILE [T1_PREC [T3_PREC]]]]`. At the defaults it
+emits the bf16-grid model; only `T2`'s candidate grid changes above that. `T1`,
+`T3` and the coupling bounds are identical at every width.
 
 ### Result: T2 width is not the binding constraint
 
@@ -148,16 +170,21 @@ Widening `T2` cannot rescue a row that `T1`'s own window already excludes.
 
 The mirror experiment: pin `T2` and widen `T1` instead.
 
+> The `n/17` counts in the two tables below predate `T3`. The sweeps count every
+> fragment in `fragments/`, so they now report `n+1` out of **18** — the extra
+> one is `frag-t3-only`, which is always OPTIMAL and never the deciding
+> fragment. The verdicts are unchanged.
+
 ```bash
 cmake --build build --target t1-precision-sweep
 ./log-research/t1-precision-sweep                          # T2 pinned at 10
 ./log-research/t1-precision-sweep --t2-bits 16 --tmlim 120
 ```
 
-`milp-gen` takes `[T2_PREC [OUT_FILE [T1_PREC]]]`; `T1_PREC` is last so existing
-two-argument calls keep working. Both default to 8, which reproduces the
-original model exactly — the sole difference is the `\`-prefixed header comment,
-which now also records `T1_PREC` (solvers ignore comment lines).
+`milp-gen` takes `[T2_PREC [OUT_FILE [T1_PREC [T3_PREC]]]]`; `T1_PREC` and
+`T3_PREC` come last so existing two- and three-argument calls keep working. All
+default to 8. `T3_PREC` is present for symmetry only — `T3` already solves at 8
+bits, so there is nothing to sweep.
 
 ### With T2 pinned at 10 bits: blocked by one index
 
@@ -214,13 +241,52 @@ They are genuine violations of the source model, not composition artifacts.
 
 **No `T1` width in 8..24 yields a correct table at either pinned `T2`.**
 
+## T3 result: solved at 8 bits
+
+`T3` is **feasible on the bf16 grid**, and unlike the `T1`/`T2` fragments this
+is a real answer rather than a non-result:
+
+| Fragment | Status | Exact re-check |
+|---|---|---|
+| `frag-t3-only` | OPTIMAL | 254/254 rows clean, worst slack 0 |
+
+Every one of the 127 subnormal inputs has an 8-bit grid value inside its
+rounding interval, within ±3 ULP of its ideal. `check-solution.py` re-validates
+all 254 rows in exact decimal arithmetic and finds zero violations — so this is
+not a bare `Optimal` of the kind the section above warns about. It could not be:
+single-variable rows have no composition step to go wrong.
+
+### The solved table is narrower than CORE-MATH's
+
+CORE-MATH stores `T3` as `b32u32_u` — **float32**, not bf16. Its entries carry
+more significand than bf16 has (`T3[1] = -0x1.70c2p+6 = -92.189453125`), and 126
+of the 127 differ from the solved 8-bit values.
+
+Both are correct. Checked against `round_bf16(ln(k * 2^-133))` for all 127
+indices:
+
+| Table | Wrong bf16 roundings |
+|---|---|
+| solved 8-bit `T3` | 0 / 127 |
+| CORE-MATH float32 `T3` | 0 / 127 |
+
+So the extra float32 width in CORE-MATH's `T3` is not needed for bf16 correct
+rounding — an 8-bit `T3` suffices, halving that table's storage. This is the
+opposite of the `T1`/`T2` finding, where 8 bits is not enough and even 24 is not.
+
 ## Current status
 
-At the current `CAND_ULP=3` (see `milp-gen.cc:42`), **every fragment is
+At the current `CAND_ULP=3` (see `milp-gen.cc:64`), **every `T1` fragment is
 INFEASIBLE**, detected at the LP relaxation before branching — so this verdict
 is not tolerance-sensitive. Infeasibility composes upward, so the full model is
 infeasible: no bf16-grid `T1`/`T2` pair reproduces a correctly-rounded `ln()`
 within ±3 ULP candidate windows.
+
+Adding `T3` does not change that verdict and was never going to: `T3` shares no
+variable with `T1` or `T2`, so it can neither rescue nor worsen them. What it
+adds is that the subnormal band — previously outside the model entirely, marked
+`NON-LP` by `bound-calc` — is now proven solvable at bf16 width. The obstruction
+is confined to the `T1 + T2` reconstruction for normal inputs.
 
 Note the continuous relaxation (`lp-constraints.txt`, both tables free reals) is
 **OPTIMAL**. A real-valued solution exists; it is the grid plus the ±3 ULP
@@ -232,6 +298,7 @@ lever, widening `CAND_ULP` is what remains to test.
 | File | Role |
 |---|---|
 | `precompute.c`, `bound-calc.c`, `milp-gen.cc` | pipeline stages 1–3 |
+| `frag-t3-only.lp` | the whole `T3` subproblem, emitted unsliced |
 | `t2-precision-sweep.c` | sweeps T2 significand width over the whole pipeline |
 | `build-lp.sh` | build + split, with a row-conservation check |
 | `split-milp.py` | decomposition (`--blocks`, `--t2-blocks`, `--t1-range`, `--pin-t2`) |

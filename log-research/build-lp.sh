@@ -63,4 +63,15 @@ if [ "$src" -ne "$frg" ]; then
     exit 1
 fi
 
+# Same check for the T3 subnormal rows, which live in their own fragment. They
+# are single-variable, so they are never split -- but a missing frag-t3-only.lp
+# would drop 127 inputs from the model without changing the coupling count.
+t3src=$(grep -cP '^ s[0-9]+_(lo|hi):' "$lp") || t3src=0
+t3frg=$(grep -chP '^ s[0-9]+_(lo|hi):' "$here"/fragments/frag-t3-only.lp 2>/dev/null) || t3frg=0
+printf 'subnormal rows: source=%s fragments=%s\n' "$t3src" "$t3frg"
+if [ "$t3src" -ne "$t3frg" ]; then
+    echo "error: fragments dropped $((t3src - t3frg)) subnormal rows" >&2
+    exit 1
+fi
+
 echo "ok -- next: ./solve-fragments.sh"

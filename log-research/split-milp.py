@@ -32,6 +32,13 @@ Decomposition modes:
   t2only   Just the T2 sel/link rows, no coupling. Sanity check that the T2
            candidate sets are non-empty. Should always be OPTIMAL.
 
+T3 is not part of any decomposition. Its rows are single-variable
+(`lb <= T3_k <= ub`), so the 127 T3 entries are independent of each other and
+of T1/T2 -- there is nothing to decompose. They are emitted whole into one
+`frag-t3-only.lp`, which is exactly the T3 subproblem. INFEASIBLE there names a
+subnormal input no 8-bit grid value within +/-CAND_ULP can serve, and lifts to
+the full model just as a T1 fragment's does.
+
 Usage:
     python3 split-milp.py                       # 16 block fragments in fragments/
     python3 split-milp.py --blocks 32
@@ -46,11 +53,12 @@ import sys
 from pathlib import Path
 
 HEADER_RE = re.compile(r"^(Minimize|Maximize|Subject To|Bounds|Binary|Binaries|General|Generals|End)\s*$")
-SEL_RE = re.compile(r"^\s*sel(T[12])_(\d+):")
-LINK_RE = re.compile(r"^\s*link(T[12])_(\d+):")
+SEL_RE = re.compile(r"^\s*sel(T[123])_(\d+):")
+LINK_RE = re.compile(r"^\s*link(T[123])_(\d+):")
 COUPLE_RE = re.compile(r"^\s*c\d+_(?:lo|hi): T1_(\d+) \+ T2_(\d+) ")
-BOUND_RE = re.compile(r"^\s*(T[12])_(\d+)\s+free")
-BINARY_RE = re.compile(r"^\s*z(T[12])_(\d+)_\d+\s*$")
+SUBNORM_RE = re.compile(r"^\s*s\d+_(?:lo|hi): T3_(\d+) ")
+BOUND_RE = re.compile(r"^\s*(T[123])_(\d+)\s+free")
+BINARY_RE = re.compile(r"^\s*z(T[123])_(\d+)_\d+\s*$")
 SOL_COL_RE = re.compile(r"^\s*\d+\s+(zT2_\d+_\d+)\s+\*?\s+(\d+)")
 
 
@@ -62,6 +70,7 @@ class Model:
         self.sel = {}       # (table, idx) -> line
         self.link = {}      # (table, idx) -> line
         self.couple = {}    # t1_idx -> [line, ...]
+        self.subnorm = {}   # t3_idx -> [line, ...]
         self.bounds = {}    # (table, idx) -> line
         self.binaries = {}  # (table, idx) -> [line, ...]
 
@@ -97,6 +106,10 @@ def parse(path):
             m = COUPLE_RE.match(line)
             if m:
                 model.couple.setdefault(int(m.group(1)), []).append(line)
+                continue
+            m = SUBNORM_RE.match(line)
+            if m:
+                model.subnorm.setdefault(int(m.group(1)), []).append(line)
                 continue
             sys.exit(f"unrecognized constraint row: {line[:80]}")
         elif section == "Bounds":
@@ -175,6 +188,36 @@ def emit(model, out_path, t1_keep, t2_keep, note, pins=None):
     return len(lines)
 
 
+def emit_t3(model, out_path, t3_keep):
+    """Write the T3 subproblem: sel/link plus the single-variable bound rows.
+
+    T3 has its own emitter rather than sharing `emit` because its rows name one
+    variable, not a T1/T2 pair -- there is no coupling to filter and no shared
+    table to duplicate across fragments.
+    """
+    keys = [("T3", i) for i in sorted(t3_keep)]
+
+    lines = list(model.comments)
+    lines.append(f"\\ FRAGMENT: T3_{min(t3_keep)}..T3_{max(t3_keep)}, subnormal lookups")
+    lines.append("Minimize")
+    lines.append(f" obj: 0 T3_{min(t3_keep)}")
+    lines.append("Subject To")
+    for key in keys:
+        lines.append(model.sel[key])
+        lines.append(model.link[key])
+    for i in sorted(t3_keep):
+        lines.extend(model.subnorm[i])
+    lines.append("Bounds")
+    lines.extend(model.bounds[key] for key in keys)
+    lines.append("Binary")
+    for key in keys:
+        lines.extend(model.binaries[key])
+    lines.append("End")
+
+    out_path.write_text("\n".join(lines) + "\n")
+    return len(lines)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", type=Path, default=Path(__file__).parent / "milp-constraints.lp")
@@ -191,10 +234,19 @@ def main():
     model = parse(args.input)
     t1_all = sorted({i for (t, i) in model.sel if t == "T1"})
     t2_all = sorted({i for (t, i) in model.sel if t == "T2"})
-    print(f"parsed: {len(t1_all)} T1, {len(t2_all)} T2, "
-          f"{sum(len(v) for v in model.couple.values())} coupling rows")
+    t3_all = sorted({i for (t, i) in model.sel if t == "T3"})
+    print(f"parsed: {len(t1_all)} T1, {len(t2_all)} T2, {len(t3_all)} T3, "
+          f"{sum(len(v) for v in model.couple.values())} coupling rows, "
+          f"{sum(len(v) for v in model.subnorm.values())} subnormal rows")
 
     args.outdir.mkdir(exist_ok=True)
+
+    # T3 always ships as one whole fragment: single-variable rows, nothing to
+    # slice. Skipped for --t1-range, which deliberately emits a partial model.
+    if t3_all and not args.t1_range:
+        t3_out = args.outdir / "frag-t3-only.lp"
+        n = emit_t3(model, t3_out, t3_all)
+        print(f"{t3_out.name}: {n} lines, {len(t3_all)} T3 entries")
 
     if args.t1_range:
         lo, hi = args.t1_range

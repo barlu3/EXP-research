@@ -1,22 +1,36 @@
-/* Emit a bf16-GRID MILP for the correctly-rounded ln() tables T1, T2.
+/* Emit a bf16-GRID MILP for the correctly-rounded ln() tables T1, T2, T3.
 
    The continuous LP (lp-constraints.txt) lets T1[k]/T2[k] be any real. A feasible
    real solution may fail once rounded to bf16, so this file emits the exact
    integer model: every table entry is forced onto a bf16-representable value, and
    a feasible solution is directly usable as the final table (no post-rounding).
 
-   Model. For each table entry V in {T1[k] (k=1..254), T2[k] (k=0..127)}:
+   Model. For each table entry V in {T1[k] (k=1..254), T2[k] (k=0..127),
+   T3[k] (k=1..127)}:
      - Candidates C(V) = the grid values within +/-CAND_ULP ULPs of V's ideal
        ln value (T1[k] ideal = ln(2^(k-127)) = (k-127)*ln2; T2[k] ideal =
-       ln(1+k/128)). The correctly-rounded ideal is candidate 0. T1 sits on a
-       T1_PREC-bit grid and T2 on a T2_PREC-bit grid (both default to bf16's 8)
-       so t1-/t2-precision-sweep can ask how wide each table must be stored.
+       ln(1+k/128); T3[k] ideal = ln(k*2^-133), the subnormal input itself).
+       The correctly-rounded ideal is candidate 0. T1 sits on a T1_PREC-bit
+       grid, T2 on a T2_PREC-bit grid and T3 on a T3_PREC-bit grid (all
+       default to bf16's 8) so the precision sweeps can ask how wide each
+       table must be stored.
        The correctness bounds are bf16 rounding intervals regardless -- they
        define the target and never widen with either table.
      - Binaries zV_j pick exactly one candidate:  sum_j zV_j = 1.
      - V = sum_j c_j * zV_j   (V continuous, pinned to the chosen bf16 value).
    Each normal input u then contributes the same interval it did in the LP:
      lb_u <= T1[i1] + T2[i2] <= ub_u   (closed/open per ties-to-even, EPS on open).
+
+   T3 is a DIRECT lookup, not a third summand. CORE-MATH's cr_log_bf16 returns
+   T3[i2] outright when i1 == 0 (see cross-eval/log/inria-log16bitp.c), because
+   for subnormal x the split x = 2^(i1-127) * (1 + i2/128) no longer holds --
+   there is no implicit leading 1. So each subnormal input u (i1 == 0,
+   i2 = 1..127, hence u == i2) contributes a single-variable row pair:
+     lb_u <= T3[i2] <= ub_u
+   This makes the 127 T3 entries independent of each other and of T1/T2: T3 can
+   only be infeasible entry-by-entry, when a subnormal input's rounding
+   interval contains no grid value within +/-CAND_ULP of its ideal. u = 0
+   (x = +0, ln = -Inf) is excluded -- T3[0] = -Inf is exact and unconstrained.
 
    T1[0], T1[255] are unused (T1[0]=0 for x=2^-127 exponent field 0 is subnormal;
    index 255 is the Inf/NaN slot). T1[127]=0 exactly (ln 2^0) is pinned as a
@@ -28,7 +42,8 @@
      glpsol --lp milp-constraints.lp   # "OPTIMAL" => a correctly-rounded table exists
    then read chosen candidates from the zV_j set to 1 in the solution.
 
-   Usage: milp-gen [T2_PREC [OUT_FILE [T1_PREC]]]  (defaults: 8, path above, 8)
+   Usage: milp-gen [T2_PREC [OUT_FILE [T1_PREC [T3_PREC]]]]
+          (defaults: 8, path above, 8, 8)
 
    Build (compile as C; matches the rest of log-research):
      gcc -O2 -xc -std=c11 log-research/milp-gen.cc \
@@ -62,6 +77,12 @@ static int t2_prec = T2_PREC_DEFAULT;
    emits the original model. The correctness bounds stay bf16 either way. */
 #define T1_PREC_DEFAULT BF16_PREC
 static int t1_prec = T1_PREC_DEFAULT;
+
+/* T3 significand width. Same contract again: at the default 8 the subnormal
+   table sits on the bf16 grid. T3's rows are single-variable, so widening it
+   trades directly against CAND_ULP and nothing else. */
+#define T3_PREC_DEFAULT BF16_PREC
+static int t3_prec = T3_PREC_DEFAULT;
 
 #define OUT_FILE_DEFAULT "log-research/milp-constraints.lp"
 static const char *out_file = OUT_FILE_DEFAULT;
@@ -117,10 +138,11 @@ static void candidates (mpfr_t ideal, mpfr_t tmp, double *cand, int *n, int prec
 }
 
 int main (int argc, char **argv) {
-  /* argv[1] = T2 significand bits, argv[2] = output path, argv[3] = T1 bits.
-     All optional; at the defaults the emitted model matches the original
-     bf16-grid one, apart from the header comment recording both widths. T1
-     comes last so the existing two-argument calls keep working. */
+  /* argv[1] = T2 significand bits, argv[2] = output path, argv[3] = T1 bits,
+     argv[4] = T3 bits. All optional; at the defaults the emitted model matches
+     the original bf16-grid one plus the T3 block, apart from the header comment
+     recording all three widths. T1 and T3 come last so the existing two- and
+     three-argument calls keep working. */
   if (argc > 1) {
     t2_prec = atoi (argv[1]);
     if (t2_prec < BF16_PREC || t2_prec > T2_PREC_MAX) {
@@ -135,6 +157,14 @@ int main (int argc, char **argv) {
     if (t1_prec < BF16_PREC || t1_prec > T2_PREC_MAX) {
       fprintf (stderr, "milp-gen: T1 precision must be %d..%d, got %s\n",
                BF16_PREC, T2_PREC_MAX, argv[3]);
+      return 2;
+    }
+  }
+  if (argc > 4) {
+    t3_prec = atoi (argv[4]);
+    if (t3_prec < BF16_PREC || t3_prec > T2_PREC_MAX) {
+      fprintf (stderr, "milp-gen: T3 precision must be %d..%d, got %s\n",
+               BF16_PREC, T2_PREC_MAX, argv[4]);
       return 2;
     }
   }
@@ -154,6 +184,7 @@ int main (int argc, char **argv) {
   /* --- Precompute candidate sets per entry. --- */
   static double t1c[256][MAX_CAND]; static int t1n[256];
   static double t2c[128][MAX_CAND]; static int t2n[128];
+  static double t3c[128][MAX_CAND]; static int t3n[128];
 
   for (int k = 1; k <= 254; k++) {
     mpfr_mul_si (ideal, ln2, k - 127, MPFR_RNDN); /* ln(2^(k-127)) */
@@ -174,11 +205,24 @@ int main (int argc, char **argv) {
      (coefficient ratio ~1e42 -> false infeasibility from numeric instability). */
   t2c[0][0] = 0.0; t2n[0] = 1;
 
+  /* T3[k] serves the subnormal input x = k * 2^-133 directly, so its ideal is
+     just ln(x) -- no exponent/mantissa split. T3[0] (x = +0, ln = -Inf) has no
+     finite candidate and no rounding interval; it is left out of the model
+     entirely, matching CORE-MATH's hardcoded T3[0] = -Inf. */
+  for (int k = 1; k <= 127; k++) {
+    mpfr_set_si (ideal, k, MPFR_RNDN);
+    mpfr_mul_2si (ideal, ideal, -133, MPFR_RNDN);  /* x = k * 2^-133 */
+    mpfr_log (ideal, ideal, MPFR_RNDN);
+    candidates (ideal, tmp, t3c[k], &t3n[k], t3_prec);
+  }
+  t3n[0] = 0;
+
   /* --- LP-format preamble. --- */
-  fprintf (o, "\\ bf16-grid MILP for correctly-rounded ln() tables T1, T2\n");
-  fprintf (o, "\\ Generated by log-research/milp-gen.cc (MPFR %s), CAND_ULP=%d, T1_PREC=%d, T2_PREC=%d\n",
-           mpfr_get_version (), CAND_ULP, t1_prec, t2_prec);
-  fprintf (o, "\\ Each T1[k]/T2[k] is pinned to one bf16 candidate via binaries zT*_j.\n");
+  fprintf (o, "\\ bf16-grid MILP for correctly-rounded ln() tables T1, T2, T3\n");
+  fprintf (o, "\\ Generated by log-research/milp-gen.cc (MPFR %s), CAND_ULP=%d, T1_PREC=%d, T2_PREC=%d, T3_PREC=%d\n",
+           mpfr_get_version (), CAND_ULP, t1_prec, t2_prec, t3_prec);
+  fprintf (o, "\\ Each T1[k]/T2[k]/T3[k] is pinned to one candidate via binaries zT*_j.\n");
+  fprintf (o, "\\ T1+T2 serve normal inputs; T3 is a direct lookup for subnormals (i1==0).\n");
   fprintf (o, "\\ Feasible ('Optimal') => a correctly-rounded single-rounded table exists.\n");
   /* Pure feasibility: zero objective. GLPK's LP parser rejects a bare "obj: 0"
      (needs a variable term), so reference one var with coefficient 0. */
@@ -211,16 +255,31 @@ int main (int argc, char **argv) {
     }
     fprintf (o, " = 0\n");
   }
+  for (int k = 1; k <= 127; k++) {
+    fprintf (o, " selT3_%d:", k);
+    for (int j = 0; j < t3n[k]; j++) fprintf (o, " + zT3_%d_%d", k, j);
+    fprintf (o, " = 1\n");
+    fprintf (o, " linkT3_%d: T3_%d", k, k);
+    for (int j = 0; j < t3n[k]; j++) {
+      double c = t3c[k][j];
+      if (c >= 0) fprintf (o, " - %.17g zT3_%d_%d", c, k, j);
+      else        fprintf (o, " + %.17g zT3_%d_%d", -c, k, j);
+    }
+    fprintf (o, " = 0\n");
+  }
 
-  /* --- Interval rows: one pair per normal input (same as the LP). --- */
+  /* --- Interval rows: one pair per input. Normals bound T1[i1]+T2[i2] (as the
+     LP always did); subnormals bound the single variable T3[i2]. --- */
   const double EPS = 1e-9;
-  long rows = 0;
+  long rows = 0, t3_rows = 0;
   for (uint32_t uu = 0; uu <= 0xFFFF; uu++) {
     uint16_t u = (uint16_t) uu;
     b16u16 v; v.u = u;
     uint16_t exp = (u >> 7) & 0xFF, mant = u & 0x7f;
-    if (u >> 15 || exp == 0xFF || exp == 0) continue; /* normal inputs only */
+    if (u >> 15 || exp == 0xFF) continue;  /* -0/negative, Inf, NaN */
+    if (u == 0x0000) continue;             /* x=+0 -> ln=-Inf, T3[0] exact */
     uint16_t i1 = u >> 7, i2 = mant;
+    int subnormal = (exp == 0);
 
     mpfr_set_d (x, (double) (float) v.f, MPFR_RNDN);
     mpfr_log (lnx, x, MPFR_RNDN);
@@ -241,15 +300,22 @@ int main (int argc, char **argv) {
     double lo = y_even ? lbd : lbd + EPS;
     double hi = y_even ? ubd : ubd - EPS;
 
-    fprintf (o, " c%u_lo: T1_%u + T2_%u >= %.17g\n", u, i1, i2, lo);
-    fprintf (o, " c%u_hi: T1_%u + T2_%u <= %.17g\n", u, i1, i2, hi);
-    rows += 2;
+    if (subnormal) {
+      fprintf (o, " s%u_lo: T3_%u >= %.17g\n", u, i2, lo);
+      fprintf (o, " s%u_hi: T3_%u <= %.17g\n", u, i2, hi);
+      t3_rows += 2;
+    } else {
+      fprintf (o, " c%u_lo: T1_%u + T2_%u >= %.17g\n", u, i1, i2, lo);
+      fprintf (o, " c%u_hi: T1_%u + T2_%u <= %.17g\n", u, i1, i2, hi);
+      rows += 2;
+    }
   }
 
   /* Bounds: T1/T2 continuous & free (candidates set their actual range). */
   fprintf (o, "Bounds\n");
   for (int k = 1; k <= 254; k++) fprintf (o, " T1_%d free\n", k);
   for (int k = 0; k <= 127; k++) fprintf (o, " T2_%d free\n", k);
+  for (int k = 1; k <= 127; k++) fprintf (o, " T3_%d free\n", k);
 
   /* Binary section: every candidate selector. */
   fprintf (o, "Binary\n");
@@ -258,12 +324,15 @@ int main (int argc, char **argv) {
     for (int j = 0; j < t1n[k]; j++) { fprintf (o, " zT1_%d_%d\n", k, j); nbin++; }
   for (int k = 0; k <= 127; k++)
     for (int j = 0; j < t2n[k]; j++) { fprintf (o, " zT2_%d_%d\n", k, j); nbin++; }
+  for (int k = 1; k <= 127; k++)
+    for (int j = 0; j < t3n[k]; j++) { fprintf (o, " zT3_%d_%d\n", k, j); nbin++; }
   fprintf (o, "End\n");
   fclose (o);
 
   fprintf (stderr,
-    "milp-gen: %ld interval rows, %ld binaries, CAND_ULP=%d, T1_PREC=%d, T2_PREC=%d -> %s\n",
-    rows, nbin, CAND_ULP, t1_prec, t2_prec, out_file);
+    "milp-gen: %ld T1+T2 rows, %ld T3 rows, %ld binaries, CAND_ULP=%d, "
+    "T1_PREC=%d, T2_PREC=%d, T3_PREC=%d -> %s\n",
+    rows, t3_rows, nbin, CAND_ULP, t1_prec, t2_prec, t3_prec, out_file);
 
   mpfr_clear (ideal); mpfr_clear (tmp); mpfr_clear (ln2);
   mpfr_clear (x); mpfr_clear (lnx); mpfr_clear (y);
