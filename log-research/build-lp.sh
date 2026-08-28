@@ -74,4 +74,4 @@ if [ "$t3src" -ne "$t3frg" ]; then
     exit 1
 fi
 
-echo "ok -- next: ./solve-fragments.sh"
+echo "ok -- next: ./solve-fragments.sh test"
