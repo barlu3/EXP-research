@@ -1,0 +1,11 @@
+MPFR vs limb-table bfloat16 log() — exhaustive verification
+Implementation: cr_log_bf16_limb (3x bf16 limbs for T1, 2x for T2,
+                1x for T3; float32 accumulation, single final rounding)
+MPFR version: 4.2.1
+Checking all 65536 bfloat16 bit patterns (0x0000–0xFFFF)...
+
+=== SUMMARY ===
+Total bfloat16 inputs   : 65536
+NaN-in/NaN-out pairs    : 32894  (payload not compared)
+Discrepancies           : 0
+RESULT: PASS — cr_log_bf16_limb matches MPFR for all non-NaN bfloat16 inputs.
