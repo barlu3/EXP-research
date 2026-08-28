@@ -53,13 +53,17 @@ import sys
 from pathlib import Path
 
 HEADER_RE = re.compile(r"^(Minimize|Maximize|Subject To|Bounds|Binary|Binaries|General|Generals|End)\s*$")
-SEL_RE = re.compile(r"^\s*sel(T[123])_(\d+):")
-LINK_RE = re.compile(r"^\s*link(T[123])_(\d+):")
+# The limb model (milp-limb-gen.cc) names rows sel/link/sum T1_<entry>_<limb>
+# and variables T1_<entry>_<limb>; the single-value model omits the limb index.
+# Both are keyed by (table, entry) so a fragment keeps an entry's limbs together.
+SEL_RE = re.compile(r"^\s*sel(T[123])_(\d+)(?:_\d+)?:")
+LINK_RE = re.compile(r"^\s*link(T[123])_(\d+)(?:_\d+)?:")
+SUM_RE = re.compile(r"^\s*sum(T[123])_(\d+):")
 COUPLE_RE = re.compile(r"^\s*c\d+_(?:lo|hi): T1_(\d+) \+ T2_(\d+) ")
 SUBNORM_RE = re.compile(r"^\s*s\d+_(?:lo|hi): T3_(\d+) ")
-BOUND_RE = re.compile(r"^\s*(T[123])_(\d+)\s+free")
-BINARY_RE = re.compile(r"^\s*z(T[123])_(\d+)_\d+\s*$")
-SOL_COL_RE = re.compile(r"^\s*\d+\s+(zT2_\d+_\d+)\s+\*?\s+(\d+)")
+BOUND_RE = re.compile(r"^\s*(T[123])_(\d+)(?:_\d+)?\s+free")
+BINARY_RE = re.compile(r"^\s*z(T[123])_(\d+)_\d+(?:_\d+)?\s*$")
+SOL_COL_RE = re.compile(r"^\s*\d+\s+(zT2_\d+_\d+(?:_\d+)?)\s+\*?\s+(\d+)")
 
 
 class Model:
@@ -67,8 +71,9 @@ class Model:
 
     def __init__(self):
         self.comments = []
-        self.sel = {}       # (table, idx) -> line
-        self.link = {}      # (table, idx) -> line
+        self.sel = {}       # (table, idx) -> [line, ...]  (one per limb)
+        self.link = {}      # (table, idx) -> [line, ...]  (one per limb)
+        self.sum = {}       # (table, idx) -> line  (limb model only)
         self.couple = {}    # t1_idx -> [line, ...]
         self.subnorm = {}   # t3_idx -> [line, ...]
         self.bounds = {}    # (table, idx) -> line
@@ -97,11 +102,15 @@ def parse(path):
         elif section == "Subject To":
             m = SEL_RE.match(line)
             if m:
-                model.sel[(m.group(1), int(m.group(2)))] = line
+                model.sel.setdefault((m.group(1), int(m.group(2))), []).append(line)
                 continue
             m = LINK_RE.match(line)
             if m:
-                model.link[(m.group(1), int(m.group(2)))] = line
+                model.link.setdefault((m.group(1), int(m.group(2))), []).append(line)
+                continue
+            m = SUM_RE.match(line)
+            if m:
+                model.sum[(m.group(1), int(m.group(2)))] = line
                 continue
             m = COUPLE_RE.match(line)
             if m:
@@ -116,7 +125,7 @@ def parse(path):
             m = BOUND_RE.match(line)
             if not m:
                 sys.exit(f"unrecognized bound row: {line[:80]}")
-            model.bounds[(m.group(1), int(m.group(2)))] = line
+            model.bounds.setdefault((m.group(1), int(m.group(2))), []).append(line)
         elif section in ("Binary", "Binaries"):
             m = BINARY_RE.match(line)
             if not m:
@@ -144,6 +153,8 @@ def parse_pins(path):
 
 def require_full_t2_coverage(pins, t2_all):
     """A partially-pinned fragment leaves T2 free, which silently defeats --pin-t2."""
+    # Entry index only -- the limb model's names carry a limb field after it,
+    # which must not be mistaken for the entry.
     pinned = {int(m.group(1)) for m in (re.match(r"zT2_(\d+)_", v) for v in pins) if m}
     missing = sorted(set(t2_all) - pinned)
     if missing:
@@ -167,13 +178,16 @@ def emit(model, out_path, t1_keep, t2_keep, note, pins=None):
     lines.append(f" obj: 0 {anchor}")
     lines.append("Subject To")
     for key in keys:
-        lines.append(model.sel[key])
-        lines.append(model.link[key])
+        lines.extend(model.sel[key])
+        lines.extend(model.link[key])
+        if key in model.sum:
+            lines.append(model.sum[key])
     for i in sorted(t1_keep):
         lines.extend(line for line in model.couple[i]
                      if int(COUPLE_RE.match(line).group(2)) in t2_set)
     lines.append("Bounds")
-    lines.extend(model.bounds[key] for key in keys)
+    for key in keys:
+        lines.extend(model.bounds[key])
     if pins:
         for key in keys:
             for var in (BINARY_RE.match(b).group(0).strip() for b in model.binaries[key]):
@@ -203,12 +217,15 @@ def emit_t3(model, out_path, t3_keep):
     lines.append(f" obj: 0 T3_{min(t3_keep)}")
     lines.append("Subject To")
     for key in keys:
-        lines.append(model.sel[key])
-        lines.append(model.link[key])
+        lines.extend(model.sel[key])
+        lines.extend(model.link[key])
+        if key in model.sum:
+            lines.append(model.sum[key])
     for i in sorted(t3_keep):
         lines.extend(model.subnorm[i])
     lines.append("Bounds")
-    lines.extend(model.bounds[key] for key in keys)
+    for key in keys:
+        lines.extend(model.bounds[key])
     lines.append("Binary")
     for key in keys:
         lines.extend(model.binaries[key])

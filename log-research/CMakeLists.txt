@@ -7,8 +7,9 @@
 # NOTE: milp-gen.cc is C, not C++ — it is compiled with -xc to match
 # inria-log16bitp.c. Letting CMake infer C++ from the extension breaks the build.
 set_source_files_properties(milp-gen.cc PROPERTIES LANGUAGE C)
+set_source_files_properties(milp-limb-gen.cc PROPERTIES LANGUAGE C)
 
-foreach(tool precompute bound-calc)
+foreach(tool precompute bound-calc limb-gen)
   add_executable(${tool} ${tool}.c)
   target_compile_options(${tool} PRIVATE -O2)
   target_link_libraries(${tool} PRIVATE MPFR::MPFR)
@@ -16,11 +17,13 @@ foreach(tool precompute bound-calc)
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 endforeach()
 
-add_executable(milp-gen milp-gen.cc)
-target_compile_options(milp-gen PRIVATE -O2)
-target_link_libraries(milp-gen PRIVATE MPFR::MPFR)
-set_target_properties(milp-gen PROPERTIES
-  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+foreach(gen milp-gen milp-limb-gen)
+  add_executable(${gen} ${gen}.cc)
+  target_compile_options(${gen} PRIVATE -O2)
+  target_link_libraries(${gen} PRIVATE MPFR::MPFR)
+  set_target_properties(${gen} PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+endforeach()
 
 # Drives milp-gen/split-milp.py/glpsol/check-solution.py as subprocesses, so it
 # needs no MPFR of its own. Like the others it must run from the repo root.
@@ -70,4 +73,24 @@ add_custom_target(ln-t1-sweep
   DEPENDS t1-precision-sweep milp-gen
   WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
   COMMENT "Sweeping T1 significand width with T2 pinned"
+  USES_TERMINAL)
+
+# Regenerates implementations/log/logbf16-limb.h (3x bf16 limbs for T1, 2x for
+# T2, 1x for T3). Writes into the source tree, so it is a manual target.
+add_custom_target(ln-limb-tables
+  COMMAND limb-gen
+  DEPENDS limb-gen
+  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+  COMMENT "Generating bf16 limb tables for cr_log_bf16_limb"
+  USES_TERMINAL)
+
+# Per-limb MILP: proves a bf16 limb table can hit every rounding interval.
+# Solve the fragments, not the whole file -- glpsol hangs on the full model.
+# Never trust a bare "Optimal" from it: the coupling bounds are ~1e-9 apart,
+# tighter than glpsol's tolerances. Re-check with check-limb-solution.py.
+add_custom_target(ln-limb-milp
+  COMMAND milp-limb-gen
+  DEPENDS milp-limb-gen
+  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+  COMMENT "Emitting per-limb MILP (split with split-milp.py, solve with glpsol)"
   USES_TERMINAL)

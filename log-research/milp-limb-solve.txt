@@ -1,0 +1,285 @@
+Per-entry MILP feasibility — 3xT1 + 2xT2 bf16 limb tables
+Model : log-research/milp-limb-constraints.lp (milp-limb-gen.cc)
+Solver: GLPSOL--GLPK LP/MIP Solver 5.0
+CAND_ULP=3, T1_LIMBS=3, T2_LIMBS=2, T3 limbs=1
+
+Each row is one T1 entry solved against ALL 128 T2 entries, every limb
+free to pick any bf16 candidate within +/-3 ULP of its ideal residual.
+Single-entry fragments are used because the full model does not finish:
+glpsol ran 611s on it without closing the tree (LP relaxation feasible
+throughout, bound 0.0 -- no infeasibility was ever proven).
+
+ENTRY      STATUS
+T1_1       OPTIMAL
+T1_2       OPTIMAL
+T1_3       OPTIMAL
+T1_4       OPTIMAL
+T1_5       OPTIMAL
+T1_6       OPTIMAL
+T1_7       OPTIMAL
+T1_8       OPTIMAL
+T1_9       OPTIMAL
+T1_10      OPTIMAL
+T1_11      OPTIMAL
+T1_12      OPTIMAL
+T1_13      OPTIMAL
+T1_14      OPTIMAL
+T1_15      OPTIMAL
+T1_16      OPTIMAL
+T1_17      OPTIMAL
+T1_18      OPTIMAL
+T1_19      OPTIMAL
+T1_20      OPTIMAL
+T1_21      OPTIMAL
+T1_22      OPTIMAL
+T1_23      OPTIMAL
+T1_24      OPTIMAL
+T1_25      OPTIMAL
+T1_26      OPTIMAL
+T1_27      OPTIMAL
+T1_28      OPTIMAL
+T1_29      OPTIMAL
+T1_30      OPTIMAL
+T1_31      OPTIMAL
+T1_32      OPTIMAL
+T1_33      OPTIMAL
+T1_34      OPTIMAL
+T1_35      OPTIMAL
+T1_36      OPTIMAL
+T1_37      OPTIMAL
+T1_38      OPTIMAL
+T1_39      OPTIMAL
+T1_40      OPTIMAL
+T1_41      OPTIMAL
+T1_42      OPTIMAL
+T1_43      OPTIMAL
+T1_44      OPTIMAL
+T1_45      OPTIMAL
+T1_46      OPTIMAL
+T1_47      OPTIMAL
+T1_48      OPTIMAL
+T1_49      OPTIMAL
+T1_50      OPTIMAL
+T1_51      OPTIMAL
+T1_52      OPTIMAL
+T1_53      OPTIMAL
+T1_54      OPTIMAL
+T1_55      OPTIMAL
+T1_56      OPTIMAL
+T1_57      OPTIMAL
+T1_58      OPTIMAL
+T1_59      OPTIMAL
+T1_60      OPTIMAL
+T1_61      OPTIMAL
+T1_62      OPTIMAL
+T1_63      OPTIMAL
+T1_64      OPTIMAL
+T1_65      OPTIMAL
+T1_66      OPTIMAL
+T1_67      OPTIMAL
+T1_68      OPTIMAL
+T1_69      OPTIMAL
+T1_70      OPTIMAL
+T1_71      OPTIMAL
+T1_72      OPTIMAL
+T1_73      OPTIMAL
+T1_74      OPTIMAL
+T1_75      OPTIMAL
+T1_76      OPTIMAL
+T1_77      OPTIMAL
+T1_78      OPTIMAL
+T1_79      OPTIMAL
+T1_80      OPTIMAL
+T1_81      OPTIMAL
+T1_82      OPTIMAL
+T1_83      OPTIMAL
+T1_84      OPTIMAL
+T1_85      OPTIMAL
+T1_86      OPTIMAL
+T1_87      OPTIMAL
+T1_88      OPTIMAL
+T1_89      OPTIMAL
+T1_90      OPTIMAL
+T1_91      OPTIMAL
+T1_92      OPTIMAL
+T1_93      OPTIMAL
+T1_94      OPTIMAL
+T1_95      OPTIMAL
+T1_96      OPTIMAL
+T1_97      OPTIMAL
+T1_98      OPTIMAL
+T1_99      OPTIMAL
+T1_100     OPTIMAL
+T1_101     OPTIMAL
+T1_102     OPTIMAL
+T1_103     OPTIMAL
+T1_104     OPTIMAL
+T1_105     OPTIMAL
+T1_106     OPTIMAL
+T1_107     OPTIMAL
+T1_108     OPTIMAL
+T1_109     OPTIMAL
+T1_110     OPTIMAL
+T1_111     OPTIMAL
+T1_112     OPTIMAL
+T1_113     OPTIMAL
+T1_114     OPTIMAL
+T1_115     OPTIMAL
+T1_116     OPTIMAL
+T1_117     OPTIMAL
+T1_118     OPTIMAL
+T1_119     OPTIMAL
+T1_120     OPTIMAL
+T1_121     OPTIMAL
+T1_122     OPTIMAL
+T1_123     OPTIMAL
+T1_124     OPTIMAL
+T1_125     OPTIMAL
+T1_126     OPTIMAL
+T1_127     OPTIMAL
+T1_128     OPTIMAL
+T1_129     OPTIMAL
+T1_130     OPTIMAL
+T1_131     OPTIMAL
+T1_132     OPTIMAL
+T1_133     OPTIMAL
+T1_134     TIMEOUT
+T1_135     OPTIMAL
+T1_136     OPTIMAL
+T1_137     OPTIMAL
+T1_138     OPTIMAL
+T1_139     OPTIMAL
+T1_140     OPTIMAL
+T1_141     OPTIMAL
+T1_142     OPTIMAL
+T1_143     OPTIMAL
+T1_144     OPTIMAL
+T1_145     OPTIMAL
+T1_146     OPTIMAL
+T1_147     OPTIMAL
+T1_148     OPTIMAL
+T1_149     OPTIMAL
+T1_150     OPTIMAL
+T1_151     OPTIMAL
+T1_152     OPTIMAL
+T1_153     OPTIMAL
+T1_154     OPTIMAL
+T1_155     OPTIMAL
+T1_156     OPTIMAL
+T1_157     OPTIMAL
+T1_158     OPTIMAL
+T1_159     OPTIMAL
+T1_160     OPTIMAL
+T1_161     OPTIMAL
+T1_162     OPTIMAL
+T1_163     OPTIMAL
+T1_164     OPTIMAL
+T1_165     OPTIMAL
+T1_166     OPTIMAL
+T1_167     OPTIMAL
+T1_168     OPTIMAL
+T1_169     OPTIMAL
+T1_170     OPTIMAL
+T1_171     OPTIMAL
+T1_172     OPTIMAL
+T1_173     OPTIMAL
+T1_174     OPTIMAL
+T1_175     OPTIMAL
+T1_176     OPTIMAL
+T1_177     OPTIMAL
+T1_178     OPTIMAL
+T1_179     OPTIMAL
+T1_180     OPTIMAL
+T1_181     OPTIMAL
+T1_182     OPTIMAL
+T1_183     OPTIMAL
+T1_184     OPTIMAL
+T1_185     OPTIMAL
+T1_186     OPTIMAL
+T1_187     OPTIMAL
+T1_188     OPTIMAL
+T1_189     OPTIMAL
+T1_190     OPTIMAL
+T1_191     OPTIMAL
+T1_192     OPTIMAL
+T1_193     OPTIMAL
+T1_194     OPTIMAL
+T1_195     OPTIMAL
+T1_196     OPTIMAL
+T1_197     OPTIMAL
+T1_198     OPTIMAL
+T1_199     OPTIMAL
+T1_200     OPTIMAL
+T1_201     OPTIMAL
+T1_202     OPTIMAL
+T1_203     OPTIMAL
+T1_204     OPTIMAL
+T1_205     OPTIMAL
+T1_206     OPTIMAL
+T1_207     OPTIMAL
+T1_208     OPTIMAL
+T1_209     OPTIMAL
+T1_210     OPTIMAL
+T1_211     OPTIMAL
+T1_212     OPTIMAL
+T1_213     OPTIMAL
+T1_214     OPTIMAL
+T1_215     OPTIMAL
+T1_216     OPTIMAL
+T1_217     OPTIMAL
+T1_218     OPTIMAL
+T1_219     OPTIMAL
+T1_220     OPTIMAL
+T1_221     OPTIMAL
+T1_222     OPTIMAL
+T1_223     OPTIMAL
+T1_224     OPTIMAL
+T1_225     OPTIMAL
+T1_226     OPTIMAL
+T1_227     OPTIMAL
+T1_228     OPTIMAL
+T1_229     OPTIMAL
+T1_230     OPTIMAL
+T1_231     OPTIMAL
+T1_232     OPTIMAL
+T1_233     OPTIMAL
+T1_234     OPTIMAL
+T1_235     OPTIMAL
+T1_236     OPTIMAL
+T1_237     OPTIMAL
+T1_238     OPTIMAL
+T1_239     OPTIMAL
+T1_240     OPTIMAL
+T1_241     OPTIMAL
+T1_242     OPTIMAL
+T1_243     OPTIMAL
+T1_244     OPTIMAL
+T1_245     OPTIMAL
+T1_246     OPTIMAL
+T1_247     OPTIMAL
+T1_248     OPTIMAL
+T1_249     OPTIMAL
+T1_250     OPTIMAL
+T1_251     OPTIMAL
+T1_252     OPTIMAL
+T1_253     OPTIMAL
+T1_254     OPTIMAL
+
+=== SUMMARY ===
+T1 entries tested : 254
+OPTIMAL           : 253
+INFEASIBLE        : 0
+TIMEOUT           : 1
+
+--- exact re-check of the emitted tables (not a glpsol status) ---
+  checked 65024 coupling rows, 254 subnormal rows
+  violations: 0, worst slack 0.000e+3
+
+RESULT: FEASIBLE — no fragment infeasible, and the emitted limb tables
+        satisfy all 65278 rows in exact decimal arithmetic.
+        (1 entry -- T1_134 -- undecided by glpsol within the time limit.
+         It is not hard, only large: glpsol explored 3.1M nodes in 900s
+         without closing the tree. Pinning its 21 T1 binaries to the emitted
+         limb values, with all 128 T2 entries left free for the solver to
+         choose, yields INTEGER OPTIMAL in 0.0s. So a consistent assignment
+         exists and the entry is feasible; the timeout is search cost only.)

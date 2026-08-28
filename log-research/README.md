@@ -293,6 +293,35 @@ Note the continuous relaxation (`lp-constraints.txt`, both tables free reals) is
 window that destroys it. Since the sweep above rules out `T2` width as the
 lever, widening `CAND_ULP` is what remains to test.
 
+## bf16 limb tables — a positive result for T1/T2
+
+The MILP above asks whether ONE bf16 grid value per entry can serve every
+input. It cannot: every `T1` fragment is infeasible. The weaker question --
+can each entry be a SUM of bf16 limbs? -- is feasible, and the tables are
+generated and shipped.
+
+`limb-gen.c` emits `implementations/log/logbf16-limb.h`: 3 bf16 limbs per `T1`
+entry, 2 per `T2`, 1 per `T3`. `inria-logbf16-limb.c` sums them in float32 and
+rounds once. `cross-eval/log/verify-limb.c` checks all 65536 bf16 inputs
+against MPFR and reports **0 discrepancies**.
+
+`milp-limb-gen.cc` emits the corresponding per-limb MILP, and
+`check-limb-solution.py` re-validates the emitted tables against all 65278
+rows in exact decimal arithmetic -- 0 violations, worst slack 0. That exact
+re-check, not any `glpsol` status, is what makes the feasibility claim safe:
+the rows are ~1e-9 wide, so a bare `Optimal` means nothing here, exactly as
+the section above warns.
+
+Storage is a regression, not a saving: 48 bits per `T1` entry against 32 for
+CORE-MATH's float32, +12.5% overall (`T3` halves, `T1` grows). The scheme is
+for targets with bf16 storage or bf16 MACs and no float32 table path. On the
+benchmark it runs ~2.2x slower than the float32 tables for normals and ~0.6x
+(faster) for subnormals, where it reads one bf16 instead of one float32.
+
+See `EXP-LIMB-PLAN.md` for whether the same trick can work for `exp()`; the
+short answer is that `exp` reconstructs by a product, so limbs multiply out
+into n*m cross terms rather than n+m summands.
+
 ## Files
 
 | File | Role |
