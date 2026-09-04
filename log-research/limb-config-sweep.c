@@ -74,11 +74,15 @@ static float reconstruct (float v, int n) {
 
 /* ── exp ─────────────────────────────────────────────────────────────────── */
 
+static int exp_path_inputs = 0, sin_mid_inputs = 0;
+
 static int exp_mismatches (int n1, int n2) {
   int bad = 0;
+  exp_path_inputs = 0;
   for (uint32_t b = 0; b <= 0xFFFF; b++) {
     uint16_t u = (uint16_t) b, au = u & 0x7fff;
     if (au <= 0x3b00 || au >= 0x42ba) continue;
+    exp_path_inputs++;
     uint16_t i1 = ((u >> 15) << 8) + (au >> 3) - 0x760;
     uint16_t i2 = ((u >> 15) << 7) + (((au >> 7) << 3) | (au & 0x7)) - 0x3b0;
     b16s got; got.f = (__bf16) (reconstruct (T1[i1], n1) * reconstruct (T2[i2], n2));
@@ -135,9 +139,11 @@ static void exp_tune_report (void) {
 
 static int sin_mid_mismatches (int n1, int n2) {
   int bad = 0;
+  sin_mid_inputs = 0;
   for (uint32_t b = 0; b <= 0xFFFF; b++) {
     uint16_t u = (uint16_t) b, au = u & 0x7fff;
     if (au <= 0x3de8 || au >= 0x4580) continue;
+    sin_mid_inputs++;
     uint16_t i1 = (au - 0x3d80) >> 3;
     uint16_t i2 = ((((au - 0x3d80) >> 7) << 3) | (au & 0x7));
     float sg = (u >> 15) ? -1.0f : 1.0f;
@@ -290,24 +296,47 @@ int main (void) {
           "wrong roundings, not merely differences.\n");
 
   printf ("\n-- exp: T1 limbs x T2 limbs, canonical split --\n");
-  printf ("    %-8s %s\n", "config", "mismatches (of 3954 table-path inputs)");
+  int exp_grid[4][4];
   for (int n1 = 1; n1 <= 3; n1++)
-    for (int n2 = 1; n2 <= 3; n2++) {
-      int m = exp_mismatches (n1, n2);
-      printf ("    %d x %d    %6d%s\n", n1, n2, m, m ? "" : "   <-- exact");
-    }
+    for (int n2 = 1; n2 <= 3; n2++) exp_grid[n1][n2] = exp_mismatches (n1, n2);
+  printf ("    %-8s mismatches (of %d table-path inputs)\n",
+          "config", exp_path_inputs);
+  for (int n1 = 1; n1 <= 3; n1++)
+    for (int n2 = 1; n2 <= 3; n2++)
+      printf ("    %d x %d    %6d%s\n", n1, n2, exp_grid[n1][n2],
+              exp_grid[n1][n2] ? "" : "   <-- exact");
   printf ("\n-- exp: can 3x2 be repaired per entry? --\n");
   exp_tune_report ();
 
   printf ("\n-- sin mid path: S1/C1 limbs x S2/C2 limbs, canonical split --\n");
-  printf ("    %-8s %s\n", "config", "mismatches (of 6136 mid-path inputs)");
+  int sin_grid[4][4];
   for (int n1 = 1; n1 <= 3; n1++)
-    for (int n2 = 1; n2 <= 3; n2++) {
-      int m = sin_mid_mismatches (n1, n2);
-      printf ("    %d x %d    %6d%s\n", n1, n2, m, m ? "" : "   <-- exact");
-    }
+    for (int n2 = 1; n2 <= 3; n2++) sin_grid[n1][n2] = sin_mid_mismatches (n1, n2);
+  printf ("    %-8s mismatches (of %d mid-path inputs)\n",
+          "config", sin_mid_inputs);
+  for (int n1 = 1; n1 <= 3; n1++)
+    for (int n2 = 1; n2 <= 3; n2++)
+      printf ("    %d x %d    %6d%s\n", n1, n2, sin_grid[n1][n2],
+              sin_grid[n1][n2] ? "" : "   <-- exact");
 
-  printf ("\n-- sin mid path: can 3x2 be repaired per entry? --\n");
+  /* Two arrangements reach zero; they are not equivalent. S1/C1 have 256
+     entries each against S2/C2's 128, so the third limb is half the price on
+     S2/C2 -- and 2x3 needs no tuning, while its mirror needs three adjusted
+     index pairs. 2x3 is what sin-limb-gen.c emits. */
+  {
+    long f32 = (long) (256 * 2 + 128 * 2 + 123 * 2) * 4;
+    long a   = (long) (256 * 2 * 2 + 128 * 2 * 3 + 123 * 2 * 3) * 2;  /* 2x3 */
+    long b   = (long) (256 * 2 * 3 + 128 * 2 * 2 + 123 * 2 * 3) * 2;  /* 3x2 */
+    printf ("\n    both 2x3 and 3x2 can reach zero, but they cost differently:\n");
+    printf ("      2x3 (shipped)  %ld B  %+.1f%% vs float32   0 tuned pairs\n",
+            a, 100.0 * (a - f32) / f32);
+    printf ("      3x2 (mirror)   %ld B  %+.1f%% vs float32   3 tuned pairs\n",
+            b, 100.0 * (b - f32) / f32);
+  }
+
+  printf ("\n-- sin mid path: the 3x2 mirror, repaired per entry --\n");
+  printf ("    (not shipped -- 512 B larger than 2x3 and needs these nudges;\n"
+          "     kept to show the repair works from either side of the product)\n");
   sin_mid_tune_report ();
 
   printf ("\n-- sin large path: S3/C3 limbs --\n");

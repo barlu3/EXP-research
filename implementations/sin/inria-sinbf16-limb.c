@@ -16,19 +16,28 @@
                            the output is identical to cr_sin_bf16 by
                            construction rather than by testing.
 
-     cr_sin_bf16_limb_min  3 limbs on S1/C1 and S3/C3, 2 on S2/C2. The mid path
-                           is the same 3x2 shape that solves ln and exp: three
-                           of the 128 (S2,C2) index pairs carry a one-ULP
-                           adjustment. Correctly rounded on all 65536 inputs,
-                           verified exhaustively against MPFR.
+     cr_sin_bf16_limb_min  2 limbs on S1/C1, 3 on S2/C2 and S3/C3. Holding
+                           S2/C2 exact confines the residual error to one side
+                           of each product, which is what lets each i1 be
+                           chosen independently -- the same argument that makes
+                           exp's 3x2 searchable, anchored on the other factor.
+                           Correctly rounded on all 65536 inputs, verified
+                           exhaustively against MPFR, with no tuned entries:
+                           the canonical split misrounds nothing here.
+
+                           The third limb sits on S2/C2 rather than S1/C1
+                           because those tables are half the size -- 128
+                           entries against 256 -- so it is 512 bytes cheaper
+                           there. The mirror arrangement also works but needs
+                           three hand-adjusted index pairs to do it.
 
    S3/C3 keep three limbs in both variants. The large path chains up to eight
    lookups and reuses each entry across many inputs, so its errors compound and
    the per-entry independence that makes the mid path tunable does not hold --
    two limbs there misround 70 inputs and no per-entry choice repairs them.
 
-   Storage, against 4056 B of float32 tables: 6084 B exact (+50%), 5572 B
-   minimal (+37%). Like the ln and exp versions this is a size regression --
+   Storage, against 4056 B of float32 tables: 6084 B exact (+50%), 5060 B
+   minimal (+25%). Like the ln and exp versions this is a size regression --
    the scheme targets hardware with bf16 storage or bf16 MACs and no float32
    table path, not a space saving.
 
@@ -115,7 +124,7 @@ __bf16 cr_sin_bf16_limb (__bf16 x) {
   return (__bf16) (sgn_limb[u >> 15] * sin_large (au));
 }
 
-/* Minimal: S2/C2 at two limbs, three index pairs tuned by one ULP. */
+/* Minimal: S1/C1 at two limbs, S2/C2 and S3/C3 exact. No tuned entries. */
 __bf16 cr_sin_bf16_limb_min (__bf16 x) {
   b16u16_slimb v = {.f = x};
   uint16_t u = v.u, au = u & 0x7fff;
@@ -125,10 +134,10 @@ __bf16 cr_sin_bf16_limb_min (__bf16 x) {
   if (au < 0x4580) {
     uint16_t i1 = (au - 0x3d80) >> 3;
     uint16_t i2 = (((au - 0x3d80) >> 7) << 3) | (au & 0x7);
-    float res = __builtin_fmaf (rebuild (S1L[i1], SINBF16_LIMBS_EXACT),
-                                rebuild (C2M[i2], SINBF16_LIMBS_MIN),
-                                rebuild (C1L[i1], SINBF16_LIMBS_EXACT)
-                              * rebuild (S2M[i2], SINBF16_LIMBS_MIN));
+    float res = __builtin_fmaf (rebuild (S1M[i1], SINBF16_LIMBS_MIN),
+                                rebuild (C2L[i2], SINBF16_LIMBS_EXACT),
+                                rebuild (C1M[i1], SINBF16_LIMBS_MIN)
+                              * rebuild (S2L[i2], SINBF16_LIMBS_EXACT));
     return (__bf16) (sgn_limb[u >> 15] * res);
   }
   return (__bf16) (sgn_limb[u >> 15] * sin_large (au));

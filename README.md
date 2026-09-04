@@ -38,15 +38,17 @@ are larger, not smaller.
 |---|---|---|---|---|
 | `cr_log_bf16_limb` | `T1 + T2` | 3×2 | 0 | 0 discrepancies / 65536 |
 | `cr_exp_bf16_limb` | `T1 * T2` | 3×2 | 2 | 0 discrepancies / 65536 |
-| `cr_sin_bf16_limb` | `fma(S1, C2, C1*S2)` | 3×2 (mid path) | 3 | 0 discrepancies / 65536 |
+| `cr_sin_bf16_limb` | `fma(S1, C2, C1*S2)` | 2×3 (mid path) | 0 | 0 discrepancies / 65536 |
 
 A sum splits into limbs trivially; a product looks like it should not, since
 expanding `(a1+a2)(b1+b2)` gives `n·m` cross terms. It does not have to be
 expanded — rebuild each *factor* from its limbs first, then do the single
 multiply, for `n+m` adds at any limb count. Three bf16 limbs carry float32's
 24 significand bits exactly, so that variant is bit-identical to CORE-MATH by
-construction; the 3×2 variants are correctly rounded with a one-ULP adjustment
-on a handful of entries.
+construction; the minimal variants drop one limb from a single factor and stay
+correctly rounded, `exp` with a one-ULP adjustment on two entries and `sin`
+with none. Where the spare limb goes is decided by table size, which is why
+`sin` is 2×3 where `ln` and `exp` are 3×2.
 
 See [log-research/EXP-SIN-LIMB-RESULTS.md](log-research/EXP-SIN-LIMB-RESULTS.md).
 

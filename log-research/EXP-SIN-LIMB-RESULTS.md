@@ -5,14 +5,25 @@ Result document. Supersedes `EXP-LIMB-PLAN.md`, whose central claim — that the
 identifiable reason.
 
 Both functions now have correctly-rounded bf16-only limb tables, verified
-exhaustively against MPFR. So does `ln()`, from the earlier work. The three
-land on the same configuration.
+exhaustively against MPFR. So does `ln()`, from the earlier work.
+
+The *method* is the same for all three — split every entry into bf16 limbs by
+iterated round-and-subtract, rebuild each factor in float32, run the function's
+own arithmetic unchanged. The *configuration* is not: it lands wherever each
+function's table shapes put it.
 
 | function | reconstruction | minimal config | tuned entries | verified |
 |---|---|---|---|---|
 | `ln`  | `T1 + T2` | 3×2 | 0 | 0 discrepancies / 65536 |
 | `exp` | `T1 * T2` | 3×2 | 2 | 0 discrepancies / 65536 |
-| `sin` | `fma(S1, C2, C1*S2)` | 3×2 (mid path) | 3 | 0 discrepancies / 65536 |
+| `sin` | `fma(S1, C2, C1*S2)` | 2×3 (mid path) | 0 | 0 discrepancies / 65536 |
+
+`sin` differs because its two index families are different sizes: `S1`/`C1`
+hold 256 entries each against `S2`/`C2`'s 128, so the third limb is half the
+price on `S2`/`C2`. The mirror arrangement (3×2, matching `ln` and `exp`)
+also reaches zero, but costs 512 B more and needs three hand-adjusted index
+pairs to get there. Symmetry with the other two functions is not a reason to
+pay for it.
 
 ## What the plan got wrong
 
@@ -103,9 +114,17 @@ and `T2[91]` and `T2[182]` each need their second limb moved by one ULP. This
 is the same manual adjustment CORE-MATH's own `.sage` generators apply (see
 `report.md` §6f), applied per limb instead of per entry.
 
-`sin`'s mid path is the same shape, with one wrinkle: `S2[i2]` and `C2[i2]`
-both feed a single `fma`, so they are chosen jointly — a 2-D search per index,
-still independent across indices. Three of the 128 index pairs need a nudge.
+`sin`'s mid path is the same argument anchored on the other factor: `S2`/`C2`
+stay exact at three limbs and `S1`/`C1` drop to two, so the search decouples
+across `i1`. One wrinkle either way — `S1[i1]` and `C1[i1]` both feed a single
+`fma`, so they are chosen jointly, a 2-D search per index but still independent
+across indices. At the shipped 2×3 the canonical split already serves every
+input and **nothing is tuned**; the generator keeps the search anyway, so that
+"two limbs suffice" stays a checked property rather than an assumption.
+
+The mirror (3×2, `S1`/`C1` exact) needs three adjusted pairs — `i2` = 89, 98
+and 123. It is reported by `limb-config-sweep` to show the repair works from
+either side of the product, but it is not what ships.
 
 ## Where it does not work: `sin`'s large path
 
@@ -134,12 +153,16 @@ are wrong roundings, not merely differences.
 
 ```
 exp: T1 x T2 limbs                sin mid: S1/C1 x S2/C2         sin large: S3/C3
+  (3954 table-path inputs)          (3886 mid-path inputs)
   1x1  886    2x1  664   3x1 656    1x1 1204   2x1 820  3x1 818     1 limb  15076
   1x2  722    2x2    3   3x2   2    1x2 1026   2x2   4  3x2   6     2 limbs    70
   1x3  722    2x3    3   3x3   0    1x3 1026   2x3   0  3x3   0     3 limbs     0
-                              ^exact                 ^exact                  ^exact
+                              ^exact                 ^shipped                 ^exact
 with per-entry tuning:  3x2 -> 0 (2 entries)   3x2 -> 0 (3 pairs)   2 -> 8 (greedy floor)
 ```
+
+Two cells reach zero on `sin`'s mid path. 2×3 is shipped: 5060 B against 3×2's
+5572 B, and no tuned entries against three.
 
 ## Storage and cost
 
@@ -150,7 +173,7 @@ space optimisation.
 | function | float32 | exact | minimal |
 |---|---|---|---|
 | `exp` | 3072 B | 4608 B (+50%) | 4096 B (+33%) |
-| `sin` | 4056 B | 6084 B (+50%) | 5572 B (+37%) |
+| `sin` | 4056 B | 6084 B (+50%) | 5060 B (+25%) |
 
 Throughput, from `make bench` on an Apple M-series (best of 3 runs per
 measurement; ratios against the float32 tables, lower is better):
@@ -158,7 +181,7 @@ measurement; ratios against the float32 tables, lower is better):
 | function | path | exact | minimal |
 |---|---|---|---|
 | `exp` | table path | 1.31–1.37× | 1.24–1.30× |
-| `sin` | mid path | ~1.87× | ~1.70× |
+| `sin` | mid path | ~1.86× | ~1.70× |
 | `sin` | large path | ~1.14× | ~1.12× |
 
 `exp` is the cheapest of the three — one multiply, and the limb sums pipeline

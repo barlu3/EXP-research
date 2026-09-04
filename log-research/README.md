@@ -320,7 +320,7 @@ benchmark it runs ~2.2x slower than the float32 tables for normals and ~0.6x
 
 ## The same trick for exp and sin
 
-It carries over to both, and to the same 3x2 configuration. `EXP-LIMB-PLAN.md`
+It carries over to both. `EXP-LIMB-PLAN.md`
 argued it could not, on the grounds that `exp` reconstructs by a product and
 limbs multiply out into n*m cross terms; that document is superseded and its
 conclusion is wrong. The product never has to be expanded -- rebuild each
@@ -331,15 +331,20 @@ does, for n+m adds at any limb count.
 |---|---|---|---|---|
 | `ln`  | `T1 + T2` | 3x2 | 0 | 0 discrepancies / 65536 |
 | `exp` | `T1 * T2` | 3x2 | 2 | 0 discrepancies / 65536 |
-| `sin` | `fma(S1, C2, C1*S2)` | 3x2 (mid path) | 3 | 0 discrepancies / 65536 |
+| `sin` | `fma(S1, C2, C1*S2)` | 2x3 (mid path) | 0 | 0 discrepancies / 65536 |
 
 Three bf16 limbs carry 24 significand bits, exactly float32's, so a 3-limb
 reconstruction is *exact* and its output is bit-identical to the shipped
-implementation by construction. At 3x2 the second factor is genuinely lossy,
-and correctness holds because the first factor stays exact: that confines the
-error to one side of each product and turns the bilinear feasibility question
-into independent per-entry searches. A handful of entries need a one-ULP nudge
-on their second limb.
+implementation by construction. In the minimal configurations one factor is
+genuinely lossy, and correctness holds because the OTHER stays exact: that
+confines the error to one side of each product and turns the bilinear
+feasibility question into independent per-entry searches. `exp` needs a
+one-ULP nudge on two entries; `sin` needs none.
+
+Which factor keeps the third limb is a storage question, not a correctness
+one. `sin` puts it on `S2`/`C2` (128 entries each) rather than `S1`/`C1` (256),
+which is 512 B cheaper and, as it happens, needs no tuning -- so `sin` is 2x3
+where `ln` and `exp` are 3x2.
 
 The one place it fails is `sin`'s large path (`|x| >= 4096`), whose
 angle-addition chain reuses each entry across many inputs, so the errors

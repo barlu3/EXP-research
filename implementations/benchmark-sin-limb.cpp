@@ -22,9 +22,12 @@
 
      exact   3 limbs on all six tables. Bit-identical to CORE-MATH by
              construction: 3 bf16 limbs carry 24 significand bits.
-     min     2 limbs on S2/C2, 3 elsewhere. Three index pairs carry a one-ULP
-             adjustment. S3/C3 cannot drop to two limbs -- the large path
-             chains its lookups, so the errors compound.
+     min     2 limbs on S1/C1, 3 on S2/C2 and S3/C3, and no tuned entries at
+             all. The third limb goes on S2/C2 because those tables hold 128
+             entries against S1/C1's 256, making it 512 B cheaper there; the
+             mirror arrangement also reaches zero but costs more and needs
+             three hand-adjusted index pairs. S3/C3 cannot drop to two limbs
+             -- the large path chains its lookups, so the errors compound.
 
    Build (from implementations/). The implementations must be compiled as C.
      cc -O3 -march=native -std=c11 -c sin/inria-sinbf16.c      -o output/inria-sinbf16.o
@@ -122,15 +125,15 @@ int main() {
     // S1/C1: 256 entries each, S2/C2: 128 each, S3/C3: 123 each.
     const long f32_bytes   = (256L*2 + 128L*2 + 123L*2) * 4;
     const long exact_bytes = (256L*2 + 128L*2 + 123L*2) * 3 * 2;
-    const long min_bytes   = (256L*2*3 + 128L*2*2 + 123L*2*3) * 2;
+    const long min_bytes   = (256L*2*2 + 128L*2*3 + 123L*2*3) * 2;
 
     lprintf("\n");
     lprintf("┌────────────────────────────────────────────────────────────────┐\n");
     lprintf("│  TABLE STORAGE                                                 │\n");
     lprintf("└────────────────────────────────────────────────────────────────┘\n");
     lprintf("  %-24s %10s %10s %10s\n", "table", "float32", "exact", "minimal");
-    lprintf("  %-24s %9ldB %9ldB %9ldB\n", "S1+C1 (256 each)", 256L*2*4, 256L*2*3*2, 256L*2*3*2);
-    lprintf("  %-24s %9ldB %9ldB %9ldB\n", "S2+C2 (128 each)", 128L*2*4, 128L*2*3*2, 128L*2*2*2);
+    lprintf("  %-24s %9ldB %9ldB %9ldB\n", "S1+C1 (256 each)", 256L*2*4, 256L*2*3*2, 256L*2*2*2);
+    lprintf("  %-24s %9ldB %9ldB %9ldB\n", "S2+C2 (128 each)", 128L*2*4, 128L*2*3*2, 128L*2*3*2);
     lprintf("  %-24s %9ldB %9ldB %9ldB\n", "S3+C3 (123 each)", 123L*2*4, 123L*2*3*2, 123L*2*3*2);
     lprintf("  %-24s %9ldB %9ldB %9ldB\n", "total", f32_bytes, exact_bytes, min_bytes);
     lprintf("  %-24s %10s %+9.1f%% %+9.1f%%\n", "vs float32", "",

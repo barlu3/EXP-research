@@ -49,7 +49,7 @@
 #define S2_N 128
 #define S3_N 123
 #define LIMBS_X   3   /* exact configuration            */
-#define LIMBS_M   2   /* minimal configuration, S2/C2   */
+#define LIMBS_M   2   /* minimal configuration, S1/C1   */
 #define TUNE_WIN  8   /* bf16 ULPs searched either side */
 
 typedef union { __bf16 f; uint16_t u; } b16g;
@@ -82,13 +82,15 @@ static float sum_limbs (const float *limb, int n) {
   return s;
 }
 
-/* Mid-path inputs served by each i2, with the correctly-rounded result each
-   must produce. cr_sin_bf16 is verified correctly rounded on every bfloat16
+/* Mid-path inputs served by each i1, with the correctly-rounded result each
+   must produce. Each i1 covers 8 consecutive encodings and both signs, so 16
+   inputs at most. cr_sin_bf16 is verified correctly rounded on every bfloat16
    input, so matching it is equivalent to matching MPFR. */
-static int      n_use[S2_N];
-static uint16_t use_i1[S2_N][96];
-static uint16_t use_ref[S2_N][96];
-static uint8_t  use_neg[S2_N][96];
+#define MAX_USE 16
+static int      n_use[S1_N];
+static uint16_t use_i2[S1_N][MAX_USE];
+static uint16_t use_ref[S1_N][MAX_USE];
+static uint8_t  use_neg[S1_N][MAX_USE];
 
 static void collect_usage (void) {
   for (uint32_t b = 0; b <= 0xFFFF; b++) {
@@ -98,36 +100,41 @@ static void collect_usage (void) {
     uint16_t i2 = ((((au - 0x3d80) >> 7) << 3) | (au & 0x7));
     b16g in; in.u = u;
     b16g ref; ref.f = cr_sin_bf16 (in.f);
-    use_i1[i2][n_use[i2]]  = i1;
-    use_ref[i2][n_use[i2]] = ref.u;
-    use_neg[i2][n_use[i2]] = (uint8_t) (u >> 15);
-    n_use[i2]++;
+    use_i2[i1][n_use[i1]]  = i2;
+    use_ref[i1][n_use[i1]] = ref.u;
+    use_neg[i1][n_use[i1]] = (uint8_t) (u >> 15);
+    n_use[i1]++;
   }
 }
 
-/* Choose the two-limb values for S2[i2] and C2[i2] together -- both appear in
+/* Choose the two-limb values for S1[i1] and C1[i1] together -- both appear in
    the same fma, so they cannot be picked independently of each other, though
-   they are independent of every other index. Canonical is tried first and the
-   scan is ordered by total displacement, so a reported nudge is the smallest
-   one that works. */
-static int tune_pair (int i2, const float *s1v, const float *c1v,
+   they are independent of every other index because S2/C2 are exact. Canonical
+   is tried first and the scan is ordered by total displacement, so a reported
+   nudge is the smallest one that works.
+
+   At the shipped configuration the canonical split already serves every input
+   and nothing is tuned. The search is kept because it is what makes that a
+   checked property rather than an assumption: if the CORE-MATH tables are ever
+   regenerated, this reports whether two limbs still suffice and by how much. */
+static int tune_pair (int i1, const float *s2v, const float *c2v,
                       float *slimb, float *climb, int *ds_out, int *dc_out) {
-  float sa = bf16_of (S2[i2]), sb = bf16_of (S2[i2] - sa);
-  float ca = bf16_of (C2[i2]), cb = bf16_of (C2[i2] - ca);
+  float sa = bf16_of (S1[i1]), sb = bf16_of (S1[i1] - sa);
+  float ca = bf16_of (C1[i1]), cb = bf16_of (C1[i1] - ca);
   int best = 1 << 30, bs = 0, bc = 0, found = 0;
 
   for (int ds = -TUNE_WIN; ds <= TUNE_WIN; ds++)
     for (int dc = -TUNE_WIN; dc <= TUNE_WIN; dc++) {
       int d = abs (ds) + abs (dc);
       if (found && d >= best) continue;
-      float s2v = sa + bstep (sb, ds), c2v = ca + bstep (cb, dc);
+      float s1v = sa + bstep (sb, ds), c1v = ca + bstep (cb, dc);
       int ok = 1;
-      for (int k = 0; k < n_use[i2]; k++) {
-        int i1 = use_i1[i2][k];
-        float sgn = use_neg[i2][k] ? -1.0f : 1.0f;
+      for (int k = 0; k < n_use[i1]; k++) {
+        int i2 = use_i2[i1][k];
+        float sgn = use_neg[i1][k] ? -1.0f : 1.0f;
         b16g g;
-        g.f = (__bf16) (sgn * __builtin_fmaf (s1v[i1], c2v, c1v[i1] * s2v));
-        if (g.u != use_ref[i2][k]) { ok = 0; break; }
+        g.f = (__bf16) (sgn * __builtin_fmaf (s1v, c2v[i2], c1v * s2v[i2]));
+        if (g.u != use_ref[i1][k]) { ok = 0; break; }
       }
       if (ok) { found = 1; best = d; bs = ds; bc = dc; }
     }
@@ -157,16 +164,16 @@ int main (int argc, char **argv) {
                                     : "implementations/sin/sinbf16-limb.h";
 
   static float s1[S1_N][3], c1[S1_N][3], s2[S2_N][3], c2[S2_N][3];
-  static float s3[S3_N][3], c3[S3_N][3], s2m[S2_N][3], c2m[S2_N][3];
-  static float s1v[S1_N], c1v[S1_N];
+  static float s3[S3_N][3], c3[S3_N][3], s1m[S1_N][3], c1m[S1_N][3];
+  static float s2v[S2_N], c2v[S2_N];
 
   for (int i = 0; i < S1_N; i++) {
-    split_limbs (S1[i], LIMBS_X, s1[i]); s1v[i] = sum_limbs (s1[i], LIMBS_X);
-    split_limbs (C1[i], LIMBS_X, c1[i]); c1v[i] = sum_limbs (c1[i], LIMBS_X);
+    split_limbs (S1[i], LIMBS_X, s1[i]);
+    split_limbs (C1[i], LIMBS_X, c1[i]);
   }
   for (int i = 0; i < S2_N; i++) {
-    split_limbs (S2[i], LIMBS_X, s2[i]);
-    split_limbs (C2[i], LIMBS_X, c2[i]);
+    split_limbs (S2[i], LIMBS_X, s2[i]); s2v[i] = sum_limbs (s2[i], LIMBS_X);
+    split_limbs (C2[i], LIMBS_X, c2[i]); c2v[i] = sum_limbs (c2[i], LIMBS_X);
   }
   for (int i = 0; i < S3_N; i++) {
     split_limbs (S3[i], LIMBS_X, s3[i]);
@@ -175,17 +182,19 @@ int main (int argc, char **argv) {
 
   collect_usage ();
 
-  int tuned = 0, unsolved = 0, log_i[S2_N][3], nlog = 0;
-  for (int i = 0; i < S2_N; i++) {
-    if (!n_use[i]) {
-      split_limbs (S2[i], LIMBS_M, s2m[i]);
-      split_limbs (C2[i], LIMBS_M, c2m[i]);
+  int tuned = 0, unsolved = 0, log_i[S1_N][3], nlog = 0;
+  for (int i = 0; i < S1_N; i++) {
+    if (!n_use[i]) {          /* index outside the mid path: canonical is fine */
+      split_limbs (S1[i], LIMBS_M, s1m[i]);
+      split_limbs (C1[i], LIMBS_M, c1m[i]);
       continue;
     }
     int ds, dc;
-    if (!tune_pair (i, s1v, c1v, s2m[i], c2m[i], &ds, &dc)) {
+    if (!tune_pair (i, s2v, c2v, s1m[i], c1m[i], &ds, &dc)) {
       unsolved++;
-      fprintf (stderr, "sin-limb-gen: i2=%d has no 2-limb (S2,C2) pair within "
+      split_limbs (S1[i], LIMBS_M, s1m[i]);
+      split_limbs (C1[i], LIMBS_M, c1m[i]);
+      fprintf (stderr, "sin-limb-gen: i1=%d has no 2-limb (S1,C1) pair within "
                        "+/-%d ULP serving all %d of its inputs\n",
                i, TUNE_WIN, n_use[i]);
     } else if (ds || dc) {
@@ -210,9 +219,11 @@ int main (int argc, char **argv) {
     "   bits, exactly float32's, so the reconstruction is bit-for-bit the\n"
     "   shipped value and the result matches cr_sin_bf16 by construction.\n"
     "\n"
-    "   S2M/C2M are the two-limb mid-path tables, %d of the 128 index pairs\n"
-    "   carrying a one-ULP adjustment on a second limb. S1/C1 stay exact,\n"
-    "   which is what keeps the index pairs independent of one another.\n"
+    "   S1M/C1M are the two-limb mid-path tables, %d of the 256 index pairs\n"
+    "   carrying a one-ULP adjustment on a second limb. S2/C2 stay exact,\n"
+    "   which is what keeps the index pairs independent of one another. The\n"
+    "   third limb sits on S2/C2 rather than S1/C1 because those tables are\n"
+    "   half the size, so it is 512 bytes cheaper there.\n"
     "*/\n\n"
     "#pragma once\n\n"
     "/* Every literal below is an exact bf16 value, so the initialiser loses\n"
@@ -232,22 +243,22 @@ int main (int argc, char **argv) {
   emit_table (o, "C2L", "/* C2L[i2] sums to C2[i2], exactly. */", c2, S2_N, LIMBS_X);
   emit_table (o, "S3L", "/* S3L[i] sums to S3[i] = sin(2^(5+i)), exactly. */", s3, S3_N, LIMBS_X);
   emit_table (o, "C3L", "/* C3L[i] sums to C3[i] = cos(2^(5+i)), exactly. */", c3, S3_N, LIMBS_X);
-  emit_table (o, "S2M", "/* S2M[i2]: two limbs, tuned where the canonical split misrounds. */", s2m, S2_N, LIMBS_M);
-  emit_table (o, "C2M", "/* C2M[i2]: two limbs, tuned alongside S2M -- both feed one fma. */", c2m, S2_N, LIMBS_M);
+  emit_table (o, "S1M", "/* S1M[i1]: two limbs, tuned where the canonical split misrounds. */", s1m, S1_N, LIMBS_M);
+  emit_table (o, "C1M", "/* C1M[i1]: two limbs, tuned alongside S1M -- both feed one fma. */", c1m, S1_N, LIMBS_M);
 
   fprintf (o, "#ifdef __cplusplus\n#pragma GCC diagnostic pop\n#endif\n");
   fclose (o);
 
   long f32 = (long) (S1_N * 2 + S2_N * 2 + S3_N * 2) * 4;
   long ex  = (long) (S1_N * 2 + S2_N * 2 + S3_N * 2) * LIMBS_X * 2;
-  long mn  = (long) (S1_N * 2 * LIMBS_X + S2_N * 2 * LIMBS_M + S3_N * 2 * LIMBS_X) * 2;
+  long mn  = (long) (S1_N * 2 * LIMBS_M + S2_N * 2 * LIMBS_X + S3_N * 2 * LIMBS_X) * 2;
   printf ("sin-limb-gen: S1/C1 %d, S2/C2 %d, S3/C3 %d entries -> %s\n",
           S1_N, S2_N, S3_N, out_file);
   printf ("  storage: float32 %ld B | exact %ld B (%+.0f%%) | minimal %ld B (%+.0f%%)\n",
           f32, ex, 100.0 * (ex - f32) / f32, mn, 100.0 * (mn - f32) / f32);
-  printf ("  mid-path 3x2 tuned index pairs: %d", tuned);
+  printf ("  mid-path S1/C1 2-limb tuned index pairs: %d", tuned);
   for (int i = 0; i < nlog; i++)
-    printf ("%s i2=%d(S2%+d,C2%+d)", i ? "," : "", log_i[i][0], log_i[i][1], log_i[i][2]);
+    printf ("%s i1=%d(S1%+d,C1%+d)", i ? "," : "", log_i[i][0], log_i[i][1], log_i[i][2]);
   printf ("\n");
   if (unsolved) {
     printf ("  UNSOLVED index pairs: %d -- the minimal table is NOT correctly rounded\n",
