@@ -43,16 +43,71 @@ discrepancy count instead of the exit status.
 **These currently fail** — exp 7, sin 158, log 33 discrepancies against the
 16-bit-rounded tables. Those are open research findings, not build breakage.
 
+The bf16 limb tables have their own verifiers, and these are expected to
+**pass**: they exit nonzero on any discrepancy, so CTest uses the exit status
+directly.
+
+| Target | Output |
+| --- | --- |
+| `cmake --build build --target verify-exp-limb-run` | `cross-eval/MPFR-result-limb-exp.txt` |
+| `cmake --build build --target verify-sin-limb-run` | `cross-eval/sin/MPFR-result-limb-sin.txt` |
+| `cmake --build build --target verify-log-limb-run` | `cross-eval/log/MPFR-result-limb-log.txt` |
+| `cmake --build build --target verify-limb` | all three |
+
+`verify-limb.c` selects its function at compile time (`-DVERIFY_SIN_LIMB`) and
+checks both variants — exact and minimal — of that function in one run. The ln
+verifier is a separate, older file (`cross-eval/log/verify-limb.c`).
+
+### bf16 limb tables
+
+| Target | Output |
+| --- | --- |
+| `make limb-tables` | all three headers below |
+| `cmake --build build --target exp-limb-tables` | `implementations/expbf16-limb.h` |
+| `cmake --build build --target sin-limb-tables` | `implementations/sin/sinbf16-limb.h` |
+| `cmake --build build --target ln-limb-tables` | `implementations/log/logbf16-limb.h` |
+| `make limb-sweep` | the limb-configuration frontier, to stdout |
+
+The exp and sin generators split the **shipped** CORE-MATH tables rather than
+recomputing ideals in MPFR, so they need no MPFR. That is deliberate: those
+tables carry manual ULP adjustments and an overflow cap, and splitting the
+shipped values is what makes the generated limb tables reproduce
+`cr_exp_bf16` / `cr_sin_bf16` exactly. `limb-gen.c` (ln) does use MPFR, because
+CORE-MATH's ln tables are plain correctly-rounded values.
+
+Like `ln`, these write into the source tree and so are manual targets — nothing
+regenerates them as a build dependency.
+
 ### Benchmarks
 
 `make bench` builds and runs both benchmarks. They measure throughput, not
 correctness — run `make verify` first.
 
-Benchmarks compile with `-O3 -march=native -mavx2 -mfma`. `-march=native` makes
-binaries non-portable across machines; configure with
+Benchmarks compile with `-O3` plus whichever of `-march=native`, `-mavx2` and
+`-mfma` the compiler accepts — each is probed rather than assumed, since the
+AVX flags hard-error on ARM targets. `-march=native` makes binaries
+non-portable across machines; configure with
 `cmake -S . -B build -DEXP_NATIVE_ARCH=OFF` to drop the architecture flags.
 
 Executables land in `implementations/output/`.
+
+| Benchmark | Compares |
+| --- | --- |
+| `bench-home`, `bench-inria` | float64 `exp`: homemade vs CORE-MATH vs libm |
+| `bench-log-limb` | bf16 `ln`: limb tables vs CORE-MATH's float32 tables |
+| `bench-exp-limb` | bf16 `exp`: 3×3 and 3×2 limb tables vs float32 |
+| `bench-sin-limb` | bf16 `sin`: exact and minimal limb tables vs float32 |
+
+The three limb benchmarks end with an exhaustive agreement check against the
+float32 tables and exit nonzero if it fails, so CTest runs them as regression
+tests too. Each reports the best of three timed runs per measurement: a single
+run is noisy enough to swing a ratio by ~0.4×, which the no-table control
+cluster in each benchmark makes visible.
+
+**`bench-home` and `bench-inria` are x86-only.** `exp.hpp`, `inria-exp.hpp` and
+`inria-exp-seg.hpp` include `<immintrin.h>` / `<x86intrin.h>`, so those two
+targets do not build on ARM. The limb benchmarks are unaffected; build them by
+name, or use `make bench` on x86.
 
 ### Lookup tables
 

@@ -17,12 +17,38 @@ See [BUILD.md](BUILD.md) for the full target reference.
 
 | Target | Purpose |
 | --- | --- |
-| `make verify` | Exhaustive 65536-pattern check vs MPFR (exp, sin, log) |
+| `make verify` | Exhaustive 65536-pattern check vs MPFR (exp, sin, log; float32 and bf16 limb tables) |
 | `make bench` | Build + run the throughput benchmarks |
 | `make round` | Regenerate the 16-bit-rounded table reports |
+| `make limb-tables` | Regenerate the bf16 limb tables (ln, exp, sin) |
+| `make limb-sweep` | Measure the bf16 limb-configuration frontier |
 | `make glibc` | Fetch + extract the glibc reference source |
 | `make check-mpfr` | Confirm MPFR is installed and print its version |
 | `make test` | Run the verification suite through CTest |
+
+## bf16-only limb tables
+
+Alongside the CORE-MATH implementations, all three functions have variants
+whose lookup tables contain **no float32 at all**: each entry is stored as a
+sum of non-overlapping bf16 limbs, summed back in float32 at use. The target is
+hardware with bf16 storage or bf16 MACs and no float32 table path — the tables
+are larger, not smaller.
+
+| function | reconstruction | minimal config | tuned entries | verified |
+|---|---|---|---|---|
+| `cr_log_bf16_limb` | `T1 + T2` | 3×2 | 0 | 0 discrepancies / 65536 |
+| `cr_exp_bf16_limb` | `T1 * T2` | 3×2 | 2 | 0 discrepancies / 65536 |
+| `cr_sin_bf16_limb` | `fma(S1, C2, C1*S2)` | 3×2 (mid path) | 3 | 0 discrepancies / 65536 |
+
+A sum splits into limbs trivially; a product looks like it should not, since
+expanding `(a1+a2)(b1+b2)` gives `n·m` cross terms. It does not have to be
+expanded — rebuild each *factor* from its limbs first, then do the single
+multiply, for `n+m` adds at any limb count. Three bf16 limbs carry float32's
+24 significand bits exactly, so that variant is bit-identical to CORE-MATH by
+construction; the 3×2 variants are correctly rounded with a one-ULP adjustment
+on a handful of entries.
+
+See [log-research/EXP-SIN-LIMB-RESULTS.md](log-research/EXP-SIN-LIMB-RESULTS.md).
 
 ## Cross-evaluation (exp / sin / log)
 

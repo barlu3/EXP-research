@@ -318,9 +318,35 @@ for targets with bf16 storage or bf16 MACs and no float32 table path. On the
 benchmark it runs ~2.2x slower than the float32 tables for normals and ~0.6x
 (faster) for subnormals, where it reads one bf16 instead of one float32.
 
-See `EXP-LIMB-PLAN.md` for whether the same trick can work for `exp()`; the
-short answer is that `exp` reconstructs by a product, so limbs multiply out
-into n*m cross terms rather than n+m summands.
+## The same trick for exp and sin
+
+It carries over to both, and to the same 3x2 configuration. `EXP-LIMB-PLAN.md`
+argued it could not, on the grounds that `exp` reconstructs by a product and
+limbs multiply out into n*m cross terms; that document is superseded and its
+conclusion is wrong. The product never has to be expanded -- rebuild each
+FACTOR from its limbs in float32, then do the single multiply CORE-MATH already
+does, for n+m adds at any limb count.
+
+| function | reconstruction | minimal config | tuned entries | verified |
+|---|---|---|---|---|
+| `ln`  | `T1 + T2` | 3x2 | 0 | 0 discrepancies / 65536 |
+| `exp` | `T1 * T2` | 3x2 | 2 | 0 discrepancies / 65536 |
+| `sin` | `fma(S1, C2, C1*S2)` | 3x2 (mid path) | 3 | 0 discrepancies / 65536 |
+
+Three bf16 limbs carry 24 significand bits, exactly float32's, so a 3-limb
+reconstruction is *exact* and its output is bit-identical to the shipped
+implementation by construction. At 3x2 the second factor is genuinely lossy,
+and correctness holds because the first factor stays exact: that confines the
+error to one side of each product and turns the bilinear feasibility question
+into independent per-entry searches. A handful of entries need a one-ULP nudge
+on their second limb.
+
+The one place it fails is `sin`'s large path (`|x| >= 4096`), whose
+angle-addition chain reuses each entry across many inputs, so the errors
+compound and nothing decouples. `S3`/`C3` keep three limbs.
+
+See [EXP-SIN-LIMB-RESULTS.md](EXP-SIN-LIMB-RESULTS.md) for the full frontier,
+the storage and throughput numbers, and what is still open.
 
 ## Files
 
@@ -333,6 +359,12 @@ into n*m cross terms rather than n+m summands.
 | `split-milp.py` | decomposition (`--blocks`, `--t2-blocks`, `--t1-range`, `--pin-t2`) |
 | `solve-fragments.sh` | run `glpsol` per fragment; nonzero exit if any is not OPTIMAL |
 | `check-solution.py` | exact re-validation of a composed assignment |
+| `limb-gen.c` | `ln` bf16 limb tables (3xT1, 2xT2, 1xT3) |
+| `exp-limb-gen.c` | `exp` bf16 limb tables (3x3 exact, 3x2 minimal) |
+| `sin-limb-gen.c` | `sin` bf16 limb tables (exact and minimal) |
+| `limb-config-sweep.c` | limb-configuration frontier + per-entry repair searches |
+| `EXP-SIN-LIMB-RESULTS.md` | the `exp`/`sin` limb result |
+| `EXP-LIMB-PLAN.md` | superseded; kept for the research trail |
 
 `fragments/` and all `.lp` files are gitignored — regenerate with `build-lp.sh`.
 

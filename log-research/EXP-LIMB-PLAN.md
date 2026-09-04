@@ -1,5 +1,25 @@
 # Plan: bf16 limb tables for `cr_exp_bf16`
 
+> **Superseded — and its central conclusion is wrong.** See
+> [EXP-SIN-LIMB-RESULTS.md](EXP-SIN-LIMB-RESULTS.md). `exp` and `sin` both have
+> correctly-rounded bf16-only limb tables now, at the same 3x2 configuration
+> that solves `ln`.
+>
+> The error is below, in "Why exp is a different problem": the product does not
+> have to be expanded into cross terms. Reconstructing each *factor* from its
+> limbs in float32 and then doing the single multiply CORE-MATH already does
+> costs `n+m` adds at any limb count. At 3 limbs the reconstruction is exact
+> (three bf16 limbs carry float32's 24 significand bits), so the output is
+> bit-identical to `cr_exp_bf16`; at 3x2 two entries need a one-ULP nudge.
+>
+> Task 7's "the coupling rows become bilinear" is right only when *both*
+> factors are inexact. Holding `T1` exact makes the entries independent and the
+> search collapses to 256 separate enumerations.
+>
+> The document is kept because the measurement it reports (task 1) and the
+> decision gate it proposes (task 3) were the right instincts; only the scheme
+> being measured was too narrow.
+
 Companion to the `ln()` limb work (`inria-logbf16-limb.c`). The question is
 whether the same trick — store each table entry as a sum of bf16 limbs so the
 table needs no float32 — carries over to `exp()`.
