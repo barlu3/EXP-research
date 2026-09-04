@@ -1,0 +1,14 @@
+MPFR vs limb-table bfloat16 exp() -- exhaustive verification
+Implementation: cr_exp_bf16_limb and cr_exp_bf16_limb_min
+Configuration : 3 limbs on T1, 3 (exact) or 2 (minimal) on T2
+                float32 accumulation per factor, single final rounding;
+                the product is never expanded into cross terms.
+MPFR version  : 4.2.2
+Checking all 65536 bfloat16 bit patterns (0x0000-0xFFFF)...
+
+=== SUMMARY ===
+Total bfloat16 inputs   : 65536
+NaN-in/NaN-out pairs    : 254  (payload not compared)
+Discrepancies (exact)   : 0
+Discrepancies (minimal) : 0
+RESULT: PASS -- both limb variants match MPFR for all non-NaN bfloat16 inputs.
