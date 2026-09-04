@@ -35,10 +35,12 @@ add_custom_target(check-mpfr
 # discrepancies required. Each tool writes its report relative to cross-eval/.
 add_custom_target(verify
   DEPENDS verify-exp verify-sin verify-log
-  COMMENT "Exhaustive CORE-MATH vs MPFR verification (exp, sin, log)")
+          verify-exp-limb-run verify-sin-limb-run verify-log-limb-run
+  COMMENT "Exhaustive CORE-MATH vs MPFR verification (exp, sin, log; float32 and bf16 limb tables)")
 
 add_custom_target(bench
   DEPENDS run-bench-home run-bench-inria
+          run-bench-log-limb run-bench-exp-limb run-bench-sin-limb
   COMMENT "Running throughput benchmarks")
 
 message(STATUS "")
@@ -47,6 +49,8 @@ message(STATUS "  native arch for benchmarks : ${EXP_NATIVE_ARCH}")
 message(STATUS "  make verify      - exhaustive MPFR check (pass = 0 discrepancies)")
 message(STATUS "  make bench       - build + run benchmarks")
 message(STATUS "  make round       - regenerate 16-bit-rounded tables")
+message(STATUS "  make limb-tables - regenerate the bf16 limb tables (ln, exp, sin)")
+message(STATUS "  make limb-sweep  - measure the limb-configuration frontier")
 message(STATUS "  make glibc       - fetch + extract glibc reference source")
 message(STATUS "  make check-mpfr  - print MPFR version")
 message(STATUS "")

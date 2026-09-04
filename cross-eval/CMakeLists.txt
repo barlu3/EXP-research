@@ -36,6 +36,63 @@ add_custom_target(round
   DEPENDS run-round-exp run-round-sin run-round-log
   COMMENT "Regenerating all 16-bit-rounded table reports")
 
+# ── bf16-only limb tables ────────────────────────────────────────────────────
+# These verifiers link an implementation rather than #include-ing a table
+# source, so they take an extra source and an include dir. verify-limb.c checks
+# BOTH variants (exact and minimal) of its function in one run.
+#
+# add_limb_verifier(<binary> <run-target> <impl source> <include dir> <comment> [define])
+function(add_limb_verifier binname runtarget impl incdir comment)
+  add_executable(${binname} verify-limb.c ${impl})
+  target_compile_options(${binname} PRIVATE -O2)
+  target_link_libraries(${binname} PRIVATE MPFR::MPFR)
+  target_include_directories(${binname} PRIVATE "${incdir}")
+  if(ARGC GREATER 5)
+    target_compile_definitions(${binname} PRIVATE ${ARGV5})
+  endif()
+  set_target_properties(${binname} PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
+  # Reports are written with repo-root-relative paths, matching the ln verifier.
+  add_custom_target(${runtarget}
+    COMMAND ${binname}
+    DEPENDS ${binname}
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    COMMENT "${comment}"
+    USES_TERMINAL)
+endfunction()
+
+add_limb_verifier(verify-exp-limb verify-exp-limb-run
+  "${CMAKE_SOURCE_DIR}/implementations/inria-expbf16-limb.c"
+  "${CMAKE_SOURCE_DIR}/implementations"
+  "Verifying exp limb tables: ${VERIFY_COMMENT}")
+
+add_limb_verifier(verify-sin-limb verify-sin-limb-run
+  "${CMAKE_SOURCE_DIR}/implementations/sin/inria-sinbf16-limb.c"
+  "${CMAKE_SOURCE_DIR}/implementations/sin"
+  "Verifying sin limb tables: ${VERIFY_COMMENT}" VERIFY_SIN_LIMB)
+
+# The ln limb verifier predates this wiring and was only ever built by the
+# hand-written gcc line in its header comment.
+add_executable(verify-log-limb log/verify-limb.c
+  "${CMAKE_SOURCE_DIR}/implementations/log/inria-logbf16-limb.c")
+target_compile_options(verify-log-limb PRIVATE -O2)
+target_link_libraries(verify-log-limb PRIVATE MPFR::MPFR)
+target_include_directories(verify-log-limb PRIVATE
+  "${CMAKE_SOURCE_DIR}/implementations/log")
+set_target_properties(verify-log-limb PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/log")
+add_custom_target(verify-log-limb-run
+  COMMAND verify-log-limb
+  DEPENDS verify-log-limb
+  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+  COMMENT "Verifying log limb tables: ${VERIFY_COMMENT}"
+  USES_TERMINAL)
+
+add_custom_target(verify-limb
+  DEPENDS verify-exp-limb-run verify-sin-limb-run verify-log-limb-run
+  COMMENT "Exhaustive MPFR verification of all bf16-only limb tables")
+
 # CTest wires the same binaries up as a pass/fail suite. The tools always exit
 # 0, so the pass condition comes from the report text: zero discrepancies.
 # These currently FAIL (exp 7, sin 158, log 33) — those are open research
@@ -46,3 +103,10 @@ add_test(NAME verify-log COMMAND verify_log  WORKING_DIRECTORY "${CMAKE_CURRENT_
 
 set_tests_properties(verify-exp verify-sin verify-log PROPERTIES
   FAIL_REGULAR_EXPRESSION "Discrepancies: *[1-9]")
+
+# The limb verifiers exit nonzero on any discrepancy, so CTest can use the exit
+# status directly. Unlike the three above, these are expected to PASS: the
+# tables are generated to be correctly rounded, not rounded down from float32.
+add_test(NAME verify-exp-limb COMMAND verify-exp-limb WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+add_test(NAME verify-sin-limb COMMAND verify-sin-limb WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+add_test(NAME verify-log-limb COMMAND verify-log-limb WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")

@@ -34,3 +34,15 @@ log-research/sweep-t1/
 *.lp
 log-research/fragments/
 __pycache__/
+# bf16 limb-table tools: generators, sweeps, and MPFR verifiers.
+# CMake writes these into the source tree to match the other tools here.
+log-research/limb-gen
+log-research/milp-limb-gen
+log-research/exp-limb-gen
+log-research/sin-limb-gen
+log-research/limb-config-sweep
+cross-eval/verify-exp-limb
+cross-eval/verify-sin-limb
+cross-eval/sin/verify-sin-limb
+cross-eval/log/verify-limb
+cross-eval/log/verify-log-limb
