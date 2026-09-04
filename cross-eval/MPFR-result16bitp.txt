@@ -1,5 +1,5 @@
 MPFR vs CORE-MATH bfloat16 exp() — exhaustive verification
-MPFR version: 4.2.1
+MPFR version: 4.2.2
 Checking all 65536 bfloat16 bit patterns (0x0000–0xFFFF)...
 
 DISCREPANCY #1:
