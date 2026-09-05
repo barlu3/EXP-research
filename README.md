@@ -32,12 +32,13 @@ Alongside the CORE-MATH implementations, all three functions have variants
 whose lookup tables contain **no float32 at all**: each entry is stored as a
 sum of non-overlapping bf16 limbs, summed back in float32 at use. The target is
 hardware with bf16 storage or bf16 MACs and no float32 table path — the tables
-are larger, not smaller.
+are larger, not smaller — except `exp`'s minimal variant, which is exactly the
+same size.
 
 | function | reconstruction | minimal config | tuned entries | verified |
 |---|---|---|---|---|
 | `cr_log_bf16_limb` | `T1 + T2` | 3×2 | 0 | 0 discrepancies / 65536 |
-| `cr_exp_bf16_limb` | `T1 * T2` | 3×2 | 2 | 0 discrepancies / 65536 |
+| `cr_exp_bf16_limb` | `T1 * T2` | 2×2 | 3 | 0 discrepancies / 65536 |
 | `cr_sin_bf16_limb` | `fma(S1, C2, C1*S2)` | 2×3 (mid path) | 0 | 0 discrepancies / 65536 |
 
 A sum splits into limbs trivially; a product looks like it should not, since
@@ -45,10 +46,13 @@ expanding `(a1+a2)(b1+b2)` gives `n·m` cross terms. It does not have to be
 expanded — rebuild each *factor* from its limbs first, then do the single
 multiply, for `n+m` adds at any limb count. Three bf16 limbs carry float32's
 24 significand bits exactly, so that variant is bit-identical to CORE-MATH by
-construction; the minimal variants drop one limb from a single factor and stay
-correctly rounded, `exp` with a one-ULP adjustment on two entries and `sin`
-with none. Where the spare limb goes is decided by table size, which is why
-`sin` is 2×3 where `ln` and `exp` are 3×2.
+construction. The minimal variants give that up. `ln` and `sin` drop one limb
+from a single factor, keeping the other exact so the error stays on one side of
+the product; `sin` needs no tuning at all. `exp` goes further and drops **both**
+factors to two limbs — neither is exact, so correctness is established by the
+exhaustive check rather than by construction, and three entries carry a one- or
+two-ULP adjustment. That configuration is the same size as the float32 table it
+replaces, so on `exp` the scheme costs no storage at all.
 
 See [log-research/EXP-SIN-LIMB-RESULTS.md](log-research/EXP-SIN-LIMB-RESULTS.md).
 

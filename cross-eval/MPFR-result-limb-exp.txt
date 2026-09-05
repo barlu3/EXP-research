@@ -1,6 +1,6 @@
 MPFR vs limb-table bfloat16 exp() -- exhaustive verification
 Implementation: cr_exp_bf16_limb and cr_exp_bf16_limb_min
-Configuration : 3 limbs on T1, 3 (exact) or 2 (minimal) on T2
+Configuration : 3 limbs on T1/T2 (exact), 2 on both (minimal)
                 float32 accumulation per factor, single final rounding;
                 the product is never expanded into cross terms.
 MPFR version  : 4.2.2

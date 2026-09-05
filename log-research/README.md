@@ -330,21 +330,29 @@ does, for n+m adds at any limb count.
 | function | reconstruction | minimal config | tuned entries | verified |
 |---|---|---|---|---|
 | `ln`  | `T1 + T2` | 3x2 | 0 | 0 discrepancies / 65536 |
-| `exp` | `T1 * T2` | 3x2 | 2 | 0 discrepancies / 65536 |
+| `exp` | `T1 * T2` | 2x2 | 3 | 0 discrepancies / 65536 |
 | `sin` | `fma(S1, C2, C1*S2)` | 2x3 (mid path) | 0 | 0 discrepancies / 65536 |
 
 Three bf16 limbs carry 24 significand bits, exactly float32's, so a 3-limb
 reconstruction is *exact* and its output is bit-identical to the shipped
-implementation by construction. In the minimal configurations one factor is
-genuinely lossy, and correctness holds because the OTHER stays exact: that
-confines the error to one side of each product and turns the bilinear
-feasibility question into independent per-entry searches. `exp` needs a
-one-ULP nudge on two entries; `sin` needs none.
+implementation by construction. In the minimal configurations for `ln` and `sin` one
+factor is genuinely lossy, and correctness holds because the OTHER stays exact:
+that confines the error to one side of each product and turns the bilinear
+feasibility question into independent per-entry searches. `sin` needs no tuning
+at all.
 
 Which factor keeps the third limb is a storage question, not a correctness
 one. `sin` puts it on `S2`/`C2` (128 entries each) rather than `S1`/`C1` (256),
 which is 512 B cheaper and, as it happens, needs no tuning -- so `sin` is 2x3
-where `ln` and `exp` are 3x2.
+where `ln` is 3x2.
+
+`exp` is the exception: it drops BOTH factors to two limbs, so no exactness
+argument is available and the per-entry decoupling does not apply. It works
+anyway because the canonical 2x2 split misrounds only three inputs and those
+three read disjoint entries, so coordinate descent repairs them in one pass
+(T1[16] +1, T2[105] +2, T2[182] +1 ULP on the second limb). The result is a
+table the same size as the float32 one, verified exhaustively rather than by
+construction.
 
 The one place it fails is `sin`'s large path (`|x| >= 4096`), whose
 angle-addition chain reuses each entry across many inputs, so the errors
@@ -365,7 +373,7 @@ the storage and throughput numbers, and what is still open.
 | `solve-fragments.sh` | run `glpsol` per fragment; nonzero exit if any is not OPTIMAL |
 | `check-solution.py` | exact re-validation of a composed assignment |
 | `limb-gen.c` | `ln` bf16 limb tables (3xT1, 2xT2, 1xT3) |
-| `exp-limb-gen.c` | `exp` bf16 limb tables (3x3 exact, 3x2 minimal) |
+| `exp-limb-gen.c` | `exp` bf16 limb tables (3x3 exact, 2x2 minimal) |
 | `sin-limb-gen.c` | `sin` bf16 limb tables (exact and minimal) |
 | `limb-config-sweep.c` | limb-configuration frontier + per-entry repair searches |
 | `EXP-SIN-LIMB-RESULTS.md` | the `exp`/`sin` limb result |

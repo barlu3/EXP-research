@@ -95,7 +95,7 @@ Executables land in `implementations/output/`.
 | --- | --- |
 | `bench-home`, `bench-inria` | float64 `exp`: homemade vs CORE-MATH vs libm |
 | `bench-log-limb` | bf16 `ln`: limb tables vs CORE-MATH's float32 tables |
-| `bench-exp-limb` | bf16 `exp`: 3×3 and 3×2 limb tables vs float32 |
+| `bench-exp-limb` | bf16 `exp`: 3×3 and 2×2 limb tables vs float32 |
 | `bench-sin-limb` | bf16 `sin`: exact and minimal limb tables vs float32 |
 
 The three limb benchmarks end with an exhaustive agreement check against the

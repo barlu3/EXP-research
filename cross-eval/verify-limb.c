@@ -9,9 +9,11 @@
    Both variants of the selected function are checked in one run against a
    correctly-rounded MPFR reference over all 65536 bfloat16 bit patterns. The
    exact variant should be bit-identical to CORE-MATH by construction; the
-   minimal one is the claim that actually needs testing, since it stores one
-   fewer limb on the second factor and repairs the resulting misroundings with
-   per-entry ULP adjustments.
+   minimal one is the claim that actually needs testing. For sin it stores one
+   fewer limb on the second factor; for exp it stores two limbs on BOTH
+   factors, so neither reconstruction is exact and the significand-width
+   argument does not apply -- this check is the whole proof of correctness
+   there, not a confirmation of one.
 
    NaN inputs are counted but their payloads are not compared, matching
    verify_mpfr.c.
@@ -44,7 +46,24 @@ extern __bf16 cr_exp_bf16_limb_min (__bf16 x);
 #define FN_MIN     cr_exp_bf16_limb_min
 #define FN_NAME    "exp"
 #define OUT_FILE   "cross-eval/MPFR-result-limb-exp.txt"
-#define CONFIG_TXT "3 limbs on T1, 3 (exact) or 2 (minimal) on T2"
+#define CONFIG_TXT "3 limbs on T1/T2 (exact), 2 on both (minimal)"
+
+/* The shape of the tables is part of the contract, not an implementation
+   detail: the minimal exp variant exists to be no larger than the float32
+   tables it replaces. Pin both configurations here so a regenerated header
+   that quietly changes limb counts fails the build rather than the run.
+
+   float32 tables: (512 + 256) * 4 B = 3072 B. The minimal variant must match
+   that exactly -- at 2x2 the limb scheme costs no storage at all. */
+#include "expbf16-limb.h"
+_Static_assert (EXPBF16_T1_LIMBS == 3 && EXPBF16_T2_LIMBS_EXACT == 3,
+                "exact exp variant must be 3x3");
+_Static_assert (EXPBF16_T1_LIMBS_MIN == 2 && EXPBF16_T2_LIMBS_MIN == 2,
+                "minimal exp variant must be 2x2");
+_Static_assert (sizeof (T1L) + sizeof (T2L) == 4608,
+                "3x3 tables must be 4608 B");
+_Static_assert (sizeof (T1M) + sizeof (T2M) == 3072,
+                "2x2 tables must be 3072 B -- parity with the float32 tables");
 #endif
 
 static float bf16_to_float (uint16_t b) {

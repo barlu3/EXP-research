@@ -15,12 +15,14 @@ function's table shapes put it.
 | function | reconstruction | minimal config | tuned entries | verified |
 |---|---|---|---|---|
 | `ln`  | `T1 + T2` | 3×2 | 0 | 0 discrepancies / 65536 |
-| `exp` | `T1 * T2` | 3×2 | 2 | 0 discrepancies / 65536 |
+| `exp` | `T1 * T2` | 2×2 | 3 | 0 discrepancies / 65536 |
 | `sin` | `fma(S1, C2, C1*S2)` | 2×3 (mid path) | 0 | 0 discrepancies / 65536 |
 
-`sin` differs because its two index families are different sizes: `S1`/`C1`
-hold 256 entries each against `S2`/`C2`'s 128, so the third limb is half the
-price on `S2`/`C2`. The mirror arrangement (3×2, matching `ln` and `exp`)
+`exp` goes furthest: two limbs on *both* factors is correctly rounded after
+three adjusted entries, which makes its table exactly the size of the float32
+table it replaces. `sin` cannot follow, because its two index families are
+different sizes: `S1`/`C1` hold 256 entries each against `S2`/`C2`'s 128, so
+the third limb is half the price on `S2`/`C2`. The mirror arrangement (3×2)
 also reaches zero, but costs 512 B more and needs three hand-adjusted index
 pairs to get there. Symmetry with the other two functions is not a reason to
 pay for it.
@@ -63,7 +65,7 @@ graph TD
     F2["T2: b1+b2"] --> FB["sum -> t2"]
     FA --> FM["t1 * t2<br/>one multiply"]
     FB --> FM
-    FM --> FR["exact at 3x3;<br/>3x2 after 2 nudges"]
+    FM --> FR["exact at 3x3;<br/>2x2 after 3 nudges"]
   end
 ```
 
@@ -126,6 +128,55 @@ The mirror (3×2, `S1`/`C1` exact) needs three adjusted pairs — `i2` = 89, 98
 and 123. It is reported by `limb-config-sweep` to show the repair works from
 either side of the product, but it is not what ships.
 
+## Why 2×2 also works, and why the coupling argument does not stop it
+
+3×2 is not `exp`'s floor. Two limbs on **both** factors is correctly rounded
+after three adjusted entries, and this is what ships as `cr_exp_bf16_limb_min`.
+
+The decoupling argument above genuinely dies here: with both factors inexact
+the correctness rows really are bilinear, and no per-entry search is valid. The
+earlier reading — that this leaves a MILP as the only route — assumed the
+problem is large. It is not. The canonical 2×2 split misrounds **three** of the
+3954 table-path inputs, and those three read three *disjoint* entries:
+
+| input | reads | repair |
+|---|---|---|
+| `3b80` | `T1[16]`, `T2[8]` | `T1[16]` limb1 **+1 ULP** |
+| `41f9` | `T1[223]`, `T2[105]` | `T2[105]` limb1 **+2 ULP** |
+| `be66` | `T1[364]`, `T2[182]` | `T2[182]` limb1 **+1 ULP** |
+
+Because no two failures share an entry, no repair can cost another, and bounded
+coordinate descent converges in a single pass. The bilinear coupling is real in
+principle and vacuous in practice.
+
+`T2[8]` is worth noting: it holds exactly `1.0`, so its second limb is zero and
+it is not a repair site at all — stepping from a bf16 zero lands on the smallest
+subnormal, ~9e-41, which cannot move any product. The fix for `3b80` has to come
+from the `T1` side. The other two failures are repairable from either factor;
+`T2` is chosen only because the descent scans `T2` first. Neither solution is
+unique, and none is a knife-edge — holding the other two fixed, every
+displacement from +1 through at least +20 ULP works for each entry.
+
+**All three failures are the same shape.** Each reference product sits *just
+above* a bf16 rounding midpoint — by +9.8e-4, +2.1e-4 and +1.7e-5 ULP — and the
+limb error carries it below, so every misrounding is −1 ULP. `3b80` is the
+extreme case: its 2-limb `T1` reconstruction is exactly `1 + 2⁻⁸` against a
+`T2` of exactly `1`, so the product lands *precisely* on the midpoint and
+round-to-nearest-ties-to-even picks the even neighbour. Only 5 of the 3954
+products sit within 5e-4 ULP of a midpoint at all; the tightest margin in the
+whole table is 1.7e-5 ULP, barely above the 2⁻¹⁶ = 1.5e-5 ULP noise floor of
+the float32 multiply itself.
+
+What this costs in rigour is worth stating plainly. At 3×3 and 3×2 the `T1`
+reconstruction is exact *by construction*, and the exhaustive check confirms a
+theorem about significand widths. At 2×2 neither factor is exact, so there is no
+such theorem — correctness rests entirely on the exhaustive MPFR run over all
+65536 inputs. For a 16-bit domain that is complete, so the result is not weaker;
+but it does not transfer, and a regenerated table has to re-run the search
+rather than just re-split. `exp-limb-gen.c` re-scores every table-path input
+against the values it is about to emit and refuses to write a table that
+misrounds anything.
+
 ## Where it does not work: `sin`'s large path
 
 For `|x| >= 4096` the implementation runs an angle-addition chain over `S3`/`C3`,
@@ -157,22 +208,30 @@ exp: T1 x T2 limbs                sin mid: S1/C1 x S2/C2         sin large: S3/C
   1x1  886    2x1  664   3x1 656    1x1 1204   2x1 820  3x1 818     1 limb  15076
   1x2  722    2x2    3   3x2   2    1x2 1026   2x2   4  3x2   6     2 limbs    70
   1x3  722    2x3    3   3x3   0    1x3 1026   2x3   0  3x3   0     3 limbs     0
-                              ^exact                 ^shipped                 ^exact
-with per-entry tuning:  3x2 -> 0 (2 entries)   3x2 -> 0 (3 pairs)   2 -> 8 (greedy floor)
+                  ^shipped     ^exact                 ^shipped                 ^exact
+with tuning:  2x2 -> 0 (3 entries)             3x2 -> 0 (3 pairs)   2 -> 8 (greedy floor)
+              3x2 -> 0 (2 entries)
 ```
 
 Two cells reach zero on `sin`'s mid path. 2×3 is shipped: 5060 B against 3×2's
 5572 B, and no tuned entries against three.
 
+On `exp` both 2×2 and 3×2 reach zero under tuning, and 2×2 is shipped: 3072 B
+against 3×2's 4096 B, at the cost of one extra tuned entry and the loss of the
+exactness-by-construction argument on `T1`.
+
 ## Storage and cost
 
-Storage is a regression in every case, as it was for `ln`. The scheme targets
-hardware with bf16 storage or bf16 MACs and no float32 table path; it is not a
-space optimisation.
+Storage is a regression for the exact variants and for `sin`, as it was for
+`ln` — but **not** for `exp` at its minimal configuration, which is exactly the
+size of the float32 table it replaces. On `exp` the scheme buys bf16-only
+storage for nothing; elsewhere it still costs, and targets hardware with bf16
+storage or bf16 MACs and no float32 table path rather than being a space
+optimisation.
 
 | function | float32 | exact | minimal |
 |---|---|---|---|
-| `exp` | 3072 B | 4608 B (+50%) | 4096 B (+33%) |
+| `exp` | 3072 B | 4608 B (+50%) | **3072 B (+0%)** |
 | `sin` | 4056 B | 6084 B (+50%) | 5060 B (+25%) |
 
 Throughput, from `make bench` on an Apple M-series (best of 3 runs per
@@ -180,12 +239,18 @@ measurement; ratios against the float32 tables, lower is better):
 
 | function | path | exact | minimal |
 |---|---|---|---|
-| `exp` | table path | 1.31–1.37× | 1.24–1.30× |
+| `exp` | table path | 1.31–1.35× | 1.07–1.11× |
 | `sin` | mid path | ~1.86× | ~1.70× |
 | `sin` | large path | ~1.14× | ~1.12× |
 
 `exp` is the cheapest of the three — one multiply, and the limb sums pipeline
-alongside it — against roughly 2.2× for the `ln` limb tables. `sin`'s mid path
+alongside it — against roughly 2.2× for the `ln` limb tables. Dropping `T1` from
+three limbs to two removes one dependent add from the critical path ahead of the
+multiply, which is where most of the remaining gap between 3×3 and 2×2 comes
+from. The compiler already vectorises the reconstruction: on AArch64 the five
+(now four) limbs are widened with `shll` — bf16 → float32 is a 16-bit shift —
+and summed in `fadd.2s`, both factors in parallel, with the final rounding a
+single `bfcvt` where the target has FEAT_BF16. `sin`'s mid path
 is the most expensive per lookup because it reconstructs four factors per call;
 its large path is *relatively* cheap only because the chain's arithmetic
 already dominates.
@@ -199,7 +264,7 @@ which is why the harness reports the best of three.
 
 | File | Role |
 |---|---|
-| `exp-limb-gen.c` | emits `implementations/expbf16-limb.h` (3×3 and 3×2) |
+| `exp-limb-gen.c` | emits `implementations/expbf16-limb.h` (3×3 and 2×2) |
 | `sin-limb-gen.c` | emits `implementations/sin/sinbf16-limb.h` (exact and minimal) |
 | `limb-config-sweep.c` | the frontier above, plus both repair searches |
 | `../implementations/inria-expbf16-limb.c` | `cr_exp_bf16_limb`, `cr_exp_bf16_limb_min` |
@@ -220,9 +285,20 @@ make bench         # throughput
 - **No MILP for `exp` or `sin`.** With the first factor exact the feasibility
   question is 256 (resp. 128) independent finite enumerations, which
   `limb-config-sweep` performs completely. An LP would restate a search that is
-  already exhaustive. The bilinear model `EXP-LIMB-PLAN.md` task 7 describes is
-  only needed if both factors are inexact — that is, for 2×2, which is not a
-  configuration either function needs.
+  already exhaustive. For `exp`'s 2×2 the bilinear model `EXP-LIMB-PLAN.md`
+  task 7 describes *does* apply — and is still not needed, because only three
+  inputs fail and they touch three disjoint entries, so coordinate descent
+  finds the repair in one pass and the emitted table is then verified
+  exhaustively. A MILP would be the right tool only if the failures were dense
+  enough to interact, which on this table they are not.
+
+- **`exp`'s 2×2 rests on verification, not construction.** The search is a
+  bounded neighbourhood search around the canonical split, not an exhaustive
+  search over all bf16 limb pairs — it cannot, for instance, give a zero second
+  limb a meaningful nonzero value. That is sound here because a *found* solution
+  is checked against all 65536 inputs, but a failure of this search would not be
+  evidence of infeasibility. Same asymmetry as `sin`'s large path, opposite
+  outcome.
 - **`sin`'s large path at two limbs is open**, per the section above.
 - **No `cr_cos_bf16`.** `cr_sin_bf16` uses the cosine tables and computes a
   cosine internally on the large path, so `C1`/`C2`/`C3` are covered, but the

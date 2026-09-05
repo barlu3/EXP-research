@@ -14,12 +14,15 @@
      exact (3x3)   6 bf16 loads, 4 adds, 1 multiply.  Bit-identical to
                    CORE-MATH by construction: 3 bf16 limbs carry 24
                    significand bits, exactly float32's.
-     min   (3x2)   5 bf16 loads, 3 adds, 1 multiply.  Two T2 entries carry a
-                   one-ULP adjustment to stay correctly rounded.
+     min   (2x2)   4 bf16 loads, 2 adds, 1 multiply.  Neither factor is exact
+                   at two limbs, so three entries (T1[16], T2[105], T2[182])
+                   carry a one- or two-ULP adjustment to stay correctly
+                   rounded.
 
-   Table sizes are reported alongside: both limb schemes are LARGER than the
-   float32 tables. The scheme targets hardware with bf16 storage or bf16 MACs
-   and no float32 table path, not a space saving.
+   Table sizes are reported alongside. The 3x3 table is larger than the float32
+   tables; the 2x2 table is exactly the same size, so on exp the scheme buys
+   bf16-only storage for free. It targets hardware with bf16 storage or bf16
+   MACs and no float32 table path.
 
    Build (from implementations/). The implementations must be compiled as C --
    under g++ they would get C++ linkage and fail to match the extern "C"
@@ -119,14 +122,14 @@ int main() {
     // T1: 512 entries, T2: 256.
     const long f32_bytes   = (512L * 4) + (256L * 4);
     const long exact_bytes = (512L * 3 * 2) + (256L * 3 * 2);
-    const long min_bytes   = (512L * 3 * 2) + (256L * 2 * 2);
+    const long min_bytes   = (512L * 2 * 2) + (256L * 2 * 2);
 
     lprintf("\n");
     lprintf("┌────────────────────────────────────────────────────────────────┐\n");
     lprintf("│  TABLE STORAGE                                                 │\n");
     lprintf("└────────────────────────────────────────────────────────────────┘\n");
-    lprintf("  %-24s %10s %10s %10s\n", "table", "float32", "3x3 limb", "3x2 limb");
-    lprintf("  %-24s %9ldB %9ldB %9ldB\n", "T1 (512 entries)", 512L*4, 512L*3*2, 512L*3*2);
+    lprintf("  %-24s %10s %10s %10s\n", "table", "float32", "3x3 limb", "2x2 limb");
+    lprintf("  %-24s %9ldB %9ldB %9ldB\n", "T1 (512 entries)", 512L*4, 512L*3*2, 512L*2*2);
     lprintf("  %-24s %9ldB %9ldB %9ldB\n", "T2 (256 entries)", 256L*4, 256L*3*2, 256L*2*2);
     lprintf("  %-24s %9ldB %9ldB %9ldB\n", "total", f32_bytes, exact_bytes, min_bytes);
     lprintf("  %-24s %10s %+9.1f%% %+9.1f%%\n", "vs float32", "",
@@ -145,13 +148,13 @@ int main() {
 
     lprintf("\n");
     lprintf("┌────────────────────────────────────────────────────────────────┐\n");
-    lprintf("│  BFLOAT16 — cr_exp_bf16 (float32) vs _limb (3x3) vs _min (3x2) │\n");
+    lprintf("│  BFLOAT16 — cr_exp_bf16 (float32) vs _limb (3x3) vs _min (2x2) │\n");
     lprintf("│  Inria : 2 float32 loads, 1 multiply                           │\n");
     lprintf("│  3x3   : 6 bf16 loads, 4 adds, 1 multiply                      │\n");
-    lprintf("│  3x2   : 5 bf16 loads, 3 adds, 1 multiply                      │\n");
+    lprintf("│  2x2   : 4 bf16 loads, 2 adds, 1 multiply                      │\n");
     lprintf("└────────────────────────────────────────────────────────────────┘\n");
     lprintf("  %-15s %11s %11s %11s %9s %9s\n",
-            "cluster", "inria ns", "3x3 ns", "3x2 ns", "3x3/f32", "3x2/f32");
+            "cluster", "inria ns", "3x3 ns", "2x2 ns", "3x3/f32", "2x2/f32");
 
     double sum_x = 0.0, sum_m = 0.0; int nclusters = 0;
 
@@ -172,7 +175,7 @@ int main() {
                 r_min.ns_per_call, rx, rm);
     }
 
-    lprintf("\n  mean throughput ratio vs float32 tables: 3x3 %.2fx, 3x2 %.2fx\n",
+    lprintf("\n  mean throughput ratio vs float32 tables: 3x3 %.2fx, 2x2 %.2fx\n",
             sum_x / nclusters, sum_m / nclusters);
 
     // ── Exhaustive agreement check ───────────────────────────────────────────
@@ -191,7 +194,7 @@ int main() {
     lprintf("\n  exhaustive agreement over 65536 inputs:\n");
     lprintf("    3x3 exact vs CORE-MATH : %s (%ld mismatches)\n",
             mism_x == 0 ? "IDENTICAL" : "DIFFER", mism_x);
-    lprintf("    3x2 min   vs CORE-MATH : %s (%ld mismatches)\n",
+    lprintf("    2x2 min   vs CORE-MATH : %s (%ld mismatches)\n",
             mism_m == 0 ? "IDENTICAL" : "DIFFER", mism_m);
 
     double wall = std::chrono::duration<double>(Clock::now() - wall_start).count();

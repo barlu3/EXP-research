@@ -135,6 +135,111 @@ static void exp_tune_report (void) {
           canon, tuned, unsolved);
 }
 
+/* ───────────────────────── Can 2x2 be repaired, with BOTH factors inexact? ─────────────────────────
+
+   exp_tune_report above works because T1 is exact, which confines the residual
+   error to one side of the product and makes the T2 entries independent. That
+   is gone at 2x2: the correctness rows are bilinear, and the per-entry search
+   does not apply. What replaces it is bounded coordinate descent over both
+   factors' second limbs -- the same tool that FAILS on sin's large path below.
+
+   The difference is not the tool, it is the problem. Only three inputs break,
+   and they read three disjoint entries, so no repair can cost another, and
+   descent converges in one pass. Where entries are shared across many inputs,
+   as in sin's angle-addition chain, the same descent stalls. */
+
+#define D_WIN 12
+
+static float q1a[512], q1b[512], q2a[256], q2b[256];
+static int   e1[512], e2[256];
+static int   m_use1[512], m_use2[256];
+static uint16_t m1_i2[512][16], m1_ref[512][16];
+static uint16_t m2_i1[256][64], m2_ref[256][64];
+
+static float mnudge (float v, int n) { return (v == 0.0f || n == 0) ? v : bstep (v, n); }
+static float q1 (int i) { return isfinite (q1a[i]) ? q1a[i] + mnudge (q1b[i], e1[i]) : q1a[i]; }
+static float q2 (int i) { return q2a[i] + mnudge (q2b[i], e2[i]); }
+
+static int q_bad (b16s g, uint16_t r) {
+  if ((g.u & 0x7fff) > 0x7f80 && (r & 0x7fff) > 0x7f80) return 0;
+  return g.u != r;
+}
+static int qs1 (int i) {
+  int b = 0; float a = q1 (i);
+  for (int k = 0; k < m_use1[i]; k++) {
+    b16s g; g.f = (__bf16) (a * q2 (m1_i2[i][k])); b += q_bad (g, m1_ref[i][k]);
+  }
+  return b;
+}
+static int qs2 (int i) {
+  int b = 0; float v = q2 (i);
+  for (int k = 0; k < m_use2[i]; k++) {
+    b16s g; g.f = (__bf16) (q1 (m2_i1[i][k]) * v); b += q_bad (g, m2_ref[i][k]);
+  }
+  return b;
+}
+static int q_total (void) { int t = 0; for (int i = 0; i < 512; i++) t += qs1 (i); return t; }
+
+static int q_descend (int *d, int i, int (*sc) (int)) {
+  int base = (*sc) (i); if (!base) return 0;
+  int best = base, bd = d[i];
+  for (int k = -D_WIN; k <= D_WIN; k++) {
+    d[i] = k; int v = (*sc) (i);
+    if (v < best || (v == best && abs (k) < abs (bd))) { best = v; bd = k; }
+  }
+  d[i] = bd; return base - best;
+}
+
+static void exp_tune_report_2x2 (void) {
+  for (int i = 0; i < 512; i++) {
+    q1a[i] = bf16_of (T1[i]);
+    float r = T1[i] - q1a[i];
+    q1b[i] = (isfinite (q1a[i]) && isfinite (r)) ? bf16_of (r) : 0.0f;
+    e1[i] = 0; m_use1[i] = 0;
+  }
+  for (int i = 0; i < 256; i++) {
+    q2a[i] = bf16_of (T2[i]); q2b[i] = bf16_of (T2[i] - q2a[i]);
+    e2[i] = 0; m_use2[i] = 0;
+  }
+  for (uint32_t b = 0; b <= 0xFFFF; b++) {
+    uint16_t u = (uint16_t) b, au = u & 0x7fff;
+    if (au <= 0x3b00 || au >= 0x42ba) continue;
+    uint16_t i1 = ((u >> 15) << 8) + (au >> 3) - 0x760;
+    uint16_t i2 = ((u >> 15) << 7) + (((au >> 7) << 3) | (au & 0x7)) - 0x3b0;
+    b16s ref; ref.f = T1[i1] * T2[i2];
+    /* Same fail-fast as exp-limb-gen.c's collect_usage. The true maxima are 8
+       per T1 entry and 16 per T2, so these bounds hold with headroom -- but a
+       change to the index-bit layout would otherwise overrun into the adjacent
+       statics silently instead of stopping. */
+    if (m_use1[i1] >= 16 || m_use2[i2] >= 64) {
+      fprintf (stderr, "limb-config-sweep: usage list overflow (i1=%u i2=%u)\n",
+               i1, i2);
+      exit (1);
+    }
+    m1_i2[i1][m_use1[i1]] = i2; m1_ref[i1][m_use1[i1]] = ref.u; m_use1[i1]++;
+    m2_i1[i2][m_use2[i2]] = i1; m2_ref[i2][m_use2[i2]] = ref.u; m_use2[i2]++;
+  }
+
+  printf ("    canonical split                   : %d mismatches\n", q_total ());
+  for (int pass = 0; pass < 8; pass++) {
+    int imp = 0;
+    for (int i = 0; i < 256; i++) imp += q_descend (e2, i, qs2);
+    for (int i = 0; i < 512; i++) imp += q_descend (e1, i, qs1);
+    printf ("    descent pass %d                    : %d mismatches (%d repaired)\n",
+            pass + 1, q_total (), imp);
+    if (!imp || !q_total ()) break;
+  }
+  int nt = 0;
+  for (int i = 0; i < 512; i++) if (e1[i]) { printf ("      T1[%d] limb1 %+d ULP\n", i, e1[i]); nt++; }
+  for (int i = 0; i < 256; i++) if (e2[i]) { printf ("      T2[%d] limb1 %+d ULP\n", i, e2[i]); nt++; }
+  printf ("    %d tuned entries; %d mismatches remain\n", nt, q_total ());
+  {
+    long f32 = (512 + 256) * 4, a = (512 * 2 + 256 * 2) * 2, b = (512 * 3 + 256 * 2) * 2;
+    printf ("    storage: float32 %ld B | 2x2 %ld B (%+.0f%%) | 3x2 %ld B (%+.0f%%)\n",
+            f32, a, 100.0 * (a - f32) / f32, b, 100.0 * (b - f32) / f32);
+  }
+}
+
 /* ── sin, mid path ───────────────────────────────────────────────────────── */
 
 static int sin_mid_mismatches (int n1, int n2) {
@@ -306,7 +411,14 @@ int main (void) {
       printf ("    %d x %d    %6d%s\n", n1, n2, exp_grid[n1][n2],
               exp_grid[n1][n2] ? "" : "   <-- exact");
   printf ("\n-- exp: can 3x2 be repaired per entry? --\n");
+  printf ("    (T1 exact confines the error to one factor, so the 256 T2\n"
+          "     entries are independent and each is searched on its own)\n");
   exp_tune_report ();
+
+  printf ("\n-- exp: can 2x2 be repaired? (this is what ships as _min) --\n");
+  printf ("    (both factors inexact, so the entries couple -- coordinate\n"
+          "     descent over both sides rather than a per-entry search)\n");
+  exp_tune_report_2x2 ();
 
   printf ("\n-- sin mid path: S1/C1 limbs x S2/C2 limbs, canonical split --\n");
   int sin_grid[4][4];
