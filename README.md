@@ -117,6 +117,8 @@ Finding those entries is its own problem, and for `ln` a naive search reports
 the minimal configuration as infeasible when it is not. See
 [docs/LIMB-TUNING.md](docs/LIMB-TUNING.md) for the search, and
 [docs/EXP-SIN-LIMB-RESULTS.md](docs/EXP-SIN-LIMB-RESULTS.md) for the frontier.
+[docs/BENCHMARKING.md](docs/BENCHMARKING.md) covers how the throughput numbers
+are measured, and what they can and cannot show.
 
 ## Cross-evaluation (exp / sin / log)
 

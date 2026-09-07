@@ -1,76 +1,59 @@
 /**
- * @file  benchmark.cpp
+ * @file  benchmark-home.cpp
  * @brief Benchmark + accuracy: fexp::exp/expf (homemade, glibc port) vs stdlib.
  *
- * Three benchmark sections, each over three input clusters, 1,000,000 iterations:
- *   Cluster 1 — x near 1     : x ∈ [0.9,   1.1]
- *   Cluster 2 — x near 80    : x ∈ [79.5,  80.5]
- *   Cluster 3 — x near 2e-10 : x ∈ [1e-10, 3e-10]
+ * Three sections, each over the three clusters in bench-clusters.hpp:
  *
- * Section 1 — FLOAT64 full call: times the complete fexp::exp(x) path —
+ * Section 1 -- FLOAT64 full call: times the complete fexp::exp(x) path --
  *   argument check, Cody-Waite 2-part range reduction, 128-entry paired table
  *   lookup, degree-4 polynomial (C2..C5), and final scale-and-add.
  *
- * Section 2 — FLOAT32 full call: times the complete fexp::expf(x) path —
+ * Section 2 -- FLOAT32 full call: times the complete fexp::expf(x) path --
  *   argument check, shift-trick range reduction, 32-entry table lookup,
  *   degree-3 polynomial (all arithmetic in double), and float cast.
  *
- * Section 3 — Polynomial isolation: times only the polynomial evaluation step.
+ * Section 3 -- Polynomial isolation: times only the polynomial evaluation step.
  *   Inputs are pre-reduced via fexp::exp_reduce / fexp::expf_reduce (outside the
  *   timed region) so argument checks, table lookups, and final scaling are
- *   excluded.  Polynomial coefficients and evaluation order match glibc-2.43.
+ *   excluded. Coefficients and evaluation order match glibc-2.43.
+ *
+ * Measurement lives in bench-harness.hpp: medians with an IQR taken across
+ * separate processes, since code layout is fixed within a process and re-drawn
+ * by ASLR across them. Each section carries a control kernel that only touches
+ * the input, so the loop's own cost can be subtracted rather than attributed to
+ * the function under test.
  *
  * Output goes to stdout and output/bench_results.txt.
- *
- * Compile:
- *   g++ -O3 -march=native -mavx2 -mfma -std=c++20 benchmark.cpp -o bench
  */
 
 #include "exp.hpp"
 
+#include "bench-clusters.hpp"
+#include "bench-harness.hpp"
+
 #include <algorithm>
-#include <chrono>
 #include <cmath>
-#include <cstdarg>
-#include <cstdio>
 #include <cstdint>
+#include <cstdio>
 #include <random>
 #include <vector>
-#include <bit>
 
-// No "using namespace fexp" — fexp::expf / fexp::exp would be ambiguous
-// with ::expf / std::exp at call sites.  Use explicit fexp:: qualification.
+static constexpr int BENCH_ITERS  = 2'000'000;
+static constexpr int WARMUP_ITERS =   200'000;
+static constexpr int REPS         = bench::DEFAULT_REPS;
+static constexpr int EPOCHS       = bench::DEFAULT_EPOCHS;
+static constexpr std::size_t BUFFER_N = 16384;
 
-using Clock = std::chrono::high_resolution_clock;
+// Cluster ids are offset per section so all four share one epoch table.
+static constexpr int F64_BASE   =  0;
+static constexpr int F32_BASE   = 10;
+static constexpr int POLY64_BASE = 20;
+static constexpr int POLY32_BASE = 30;
 
-// ─── Dual-output helper ───────────────────────────────────────────────────────
-
-static FILE* g_log = nullptr;
-
-__attribute__((format(printf, 1, 2)))
-static void lprintf(const char* fmt, ...) {
-    va_list ap;
-    va_start(ap, fmt);
-    std::vprintf(fmt, ap);
-    va_end(ap);
-    if (g_log) {
-        va_start(ap, fmt);
-        std::vfprintf(g_log, fmt, ap);
-        va_end(ap);
-    }
-}
-
-// ─── Anti-optimisation sinks ─────────────────────────────────────────────────
-
-static volatile float  sink_f = 0.0f;
-static volatile double sink_d = 0.0;
-
-// ─── Error metrics ───────────────────────────────────────────────────────────
-
-static uint32_t ulp_dist(float a, float b) {
-    int32_t ia = static_cast<int32_t>(FEXP_BIT_CAST(uint32_t, a));
-    int32_t ib = static_cast<int32_t>(FEXP_BIT_CAST(uint32_t, b));
-    return static_cast<uint32_t>(std::abs(ia - ib));
+static std::uint32_t ulp_dist(float a, float b) {
+    std::int32_t ia = static_cast<std::int32_t>(FEXP_BIT_CAST(std::uint32_t, a));
+    std::int32_t ib = static_cast<std::int32_t>(FEXP_BIT_CAST(std::uint32_t, b));
+    return static_cast<std::uint32_t>(std::abs(ia - ib));
 }
 
 static double rel_err(double fast, double ref) {
@@ -78,283 +61,176 @@ static double rel_err(double fast, double ref) {
     return std::abs(fast - ref) / std::abs(ref);
 }
 
-// ─── Benchmark parameters ────────────────────────────────────────────────────
-
-static constexpr int BENCH_ITERS  = 100'000'000;
-static constexpr int WARMUP_ITERS =   1'000'000;
-static constexpr int ACC_SAMPLES  =   500'000;
-
-// ─── Timing helpers ──────────────────────────────────────────────────────────
-
-struct BenchResult { double ns_per_call, total_ms; };
-
-template<typename Fn>
-static BenchResult run_bench_d(Fn fn, const std::vector<double>& inputs) {
-    double acc = 0.0;
-    for (int i = 0; i < WARMUP_ITERS; ++i) acc += fn(inputs[i % inputs.size()]);
-    sink_d = acc;
-
-    auto t0 = Clock::now();
-    acc = 0.0;
-    for (int i = 0; i < BENCH_ITERS; ++i) acc += fn(inputs[i % inputs.size()]);
-    auto t1 = Clock::now();
-    sink_d = acc;
-
-    double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
-    return { (ms * 1e6) / BENCH_ITERS, ms };
-}
-
-template<typename Fn>
-static BenchResult run_bench_f(Fn fn, const std::vector<float>& inputs) {
-    float acc = 0.0f;
-    for (int i = 0; i < WARMUP_ITERS; ++i) acc += fn(inputs[i % inputs.size()]);
-    sink_f = acc;
-
-    auto t0 = Clock::now();
-    acc = 0.0f;
-    for (int i = 0; i < BENCH_ITERS; ++i) acc += fn(inputs[i % inputs.size()]);
-    auto t1 = Clock::now();
-    sink_f = acc;
-
-    double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
-    return { (ms * 1e6) / BENCH_ITERS, ms };
-}
-
-// ─── Main ─────────────────────────────────────────────────────────────────────
-
-int main() {
-    g_log = std::fopen("output/bench_results.txt", "w");
-    if (!g_log)
-        std::fprintf(stderr, "warning: could not open output/bench_results.txt\n");
-
-    auto wall_start = Clock::now();
-
+static int run_epoch() {
     std::mt19937 rng(42);
 
-    // ── Header ────────────────────────────────────────────────────────────────
+    int ci = F64_BASE;
+    for (const auto& cl : bench::REAL_CLUSTERS) {
+        auto buf = bench::make_real_cycle_buffer<double>(cl.lo, cl.hi, rng, BUFFER_N);
+        auto s = bench::run_interleaved(
+            buf, BENCH_ITERS, REPS, WARMUP_ITERS,
+            [](double x) { return x; },
+            [](double x) { return std::exp(x); },
+            [](double x) { return fexp::exp(x); });
+        for (std::size_t v = 0; v < s.size(); ++v)
+            bench::emit_epoch_row(ci, (int)v, bench::median_of(s[v]));
+        ++ci;
+    }
 
-    lprintf("\n");
-    lprintf("══════════════════════════════════════════════════════════════════\n");
-    lprintf("  exp() Benchmark — homemade (exp.hpp, glibc-2.43 port) vs stdlib\n");
-    // Reported from what the compiler actually enabled, not from a fixed
-    // string: CMake probes -mavx2/-mfma and drops them on targets that
-    // reject them (Apple Silicon), so a literal here would misreport.
-    lprintf("  Compile flags : -O3 -march=native%s%s -std=c++20\n",
-#if defined(__AVX2__)
-            " -mavx2",
-#else
-            "",
-#endif
-#if defined(__FMA__)
-            " -mfma");
-#else
-            "");
-#endif
-    lprintf("  Iterations    : %'d per variant per cluster\n", BENCH_ITERS);
-    lprintf("  Warmup        : %'d iterations (not timed)\n",  WARMUP_ITERS);
-    lprintf("  Acc. samples  : %'d random draws per cluster\n", ACC_SAMPLES);
-    lprintf("══════════════════════════════════════════════════════════════════\n");
+    ci = F32_BASE;
+    for (const auto& cl : bench::REAL_CLUSTERS) {
+        auto buf = bench::make_real_cycle_buffer<float>(cl.lo, cl.hi, rng, BUFFER_N);
+        auto s = bench::run_interleaved(
+            buf, BENCH_ITERS, REPS, WARMUP_ITERS,
+            [](float x) { return (double)x; },
+            [](float x) { return (double)::expf(x); },
+            [](float x) { return (double)fexp::expf(x); });
+        for (std::size_t v = 0; v < s.size(); ++v)
+            bench::emit_epoch_row(ci, (int)v, bench::median_of(s[v]));
+        ++ci;
+    }
 
-    // ── Value clusters ────────────────────────────────────────────────────────
+    // Reduction happens outside the timed region; only the polynomial is timed.
+    ci = POLY64_BASE;
+    for (const auto& cl : bench::REAL_CLUSTERS) {
+        auto in = bench::make_real_cycle_buffer<double>(cl.lo, cl.hi, rng, BUFFER_N);
+        auto red = bench::make_generated_buffer<double>(BUFFER_N, [&](std::size_t i) {
+            return fexp::exp_reduce(in.storage[i]);
+        });
+        auto s = bench::run_interleaved(
+            red, BENCH_ITERS, REPS, WARMUP_ITERS,
+            [](double r) { return r; },
+            [](double r) { return fexp::exp_poly(r); });
+        bench::emit_epoch_row(ci, 0, bench::median_of(s[0]));
+        bench::emit_epoch_row(ci, 1, bench::median_of(s[1]));
+        ++ci;
+    }
 
-    struct Cluster { const char* label; double lo, hi; };
+    ci = POLY32_BASE;
+    for (const auto& cl : bench::REAL_CLUSTERS) {
+        auto in = bench::make_real_cycle_buffer<float>(cl.lo, cl.hi, rng, BUFFER_N);
+        auto red = bench::make_generated_buffer<double>(BUFFER_N, [&](std::size_t i) {
+            return fexp::expf_reduce(in.storage[i]);
+        });
+        auto s = bench::run_interleaved(
+            red, BENCH_ITERS, REPS, WARMUP_ITERS,
+            [](double r) { return r; },
+            [](double r) { return (double)fexp::expf_poly(r); });
+        bench::emit_epoch_row(ci, 0, bench::median_of(s[0]));
+        bench::emit_epoch_row(ci, 1, bench::median_of(s[1]));
+        ++ci;
+    }
+    return 0;
+}
 
-    static constexpr Cluster CLUSTERS[] = {
-        { "x near 1     ",  0.9,    1.1   },
-        { "x near 80    ", 79.5,   80.5   },
-        { "x near 2e-10 ", 1e-10,  3e-10  },
+int main(int argc, char** argv) {
+    if (bench::is_epoch_child(argc, argv)) return run_epoch();
+
+    bench::open_log("output/bench_results.txt");
+    const auto wall_start = bench::Clock::now();
+
+    bench::logf("\n");
+    bench::logf("==================================================================\n");
+    bench::logf("  exp() Benchmark -- homemade fexp vs stdlib\n");
+    bench::print_method_banner(BENCH_ITERS, REPS, WARMUP_ITERS,
+        "sampled from each real interval; float64 inputs do not "
+        "collapse onto a few values the way bf16 does");
+    bench::logf("  Epochs        : %d separate processes; medians taken across them\n", EPOCHS);
+    bench::logf("==================================================================\n");
+
+    const bench::EpochTable table = bench::gather_epochs(argv[0], EPOCHS);
+    auto at = [&](int c, int v) {
+        auto it = table.find({c, v});
+        return it == table.end() ? std::vector<double>{} : it->second;
     };
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    //  float64 (double)
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Timed per call: arg-check, Cody-Waite 2-part range reduction, 128-entry
-    // paired table lookup, degree-4 poly (C2..C5), and final scale-and-add.
-    // fexp::exp is header-inlined; std::exp dispatched via PLT.
+    bench::logf("\n");
+    bench::logf("+----------------------------------------------------------------+\n");
+    bench::logf("|  FLOAT64 (double) -- fexp::exp(x)  vs  std::exp(x)             |\n");
+    bench::logf("|  Homemade : glibc-2.43 algorithm, header-inlined, no errno     |\n");
+    bench::logf("|  Stdlib   : libm, called through the shared-library ABI        |\n");
+    bench::logf("+----------------------------------------------------------------+\n");
 
-    lprintf("\n");
-    lprintf("┌────────────────────────────────────────────────────────────────┐\n");
-    lprintf("│  FLOAT64 (double) — fexp::exp(x)  vs  std::exp(x)             │\n");
-    lprintf("│  Homemade : glibc-2.43 algorithm, header-inlined, no errno    │\n");
-    lprintf("│  Stdlib   : glibc libm, called via PLT (shared-library ABI)   │\n");
-    lprintf("└────────────────────────────────────────────────────────────────┘\n");
-
-    for (const auto& cl : CLUSTERS) {
-        std::uniform_real_distribution<double> dist(cl.lo, cl.hi);
-        std::vector<double> in(ACC_SAMPLES);
-        for (auto& v : in) v = dist(rng);
-
+    std::mt19937 rng(42);
+    int ci = F64_BASE;
+    for (const auto& cl : bench::REAL_CLUSTERS) {
+        auto acc_in = bench::make_real_cycle_buffer<double>(cl.lo, cl.hi, rng, 4096);
         double max_rel = 0.0;
-        for (auto v : in)
-            max_rel = std::max(max_rel, rel_err(fexp::exp(v), std::exp(v)));
-
-        auto r_std = run_bench_d([](double x){ return std::exp(x);  }, in);
-        auto r_our = run_bench_d([](double x){ return fexp::exp(x); }, in);
-        double su  = r_std.total_ms / r_our.total_ms;
-
-        lprintf("\n");
-        lprintf("  ── Cluster: %s  x ∈ [%.3g, %.3g]  (%d iters)\n",
-                cl.label, cl.lo, cl.hi, BENCH_ITERS);
-        lprintf("     Accuracy vs stdlib — max rel error: %.2e%s\n",
-                max_rel,
-                max_rel == 0.0 ? "  (bit-for-bit identical)" : "  (< 1 ULP)");
-        lprintf("\n");
-        lprintf("     %-42s %9s  %10s  %8s\n",
-                "Variant", "ns/call", "total (ms)", "speedup");
-        lprintf("     %-42s %9s  %10s  %8s\n",
-                "──────────────────────────────────────────",
-                "─────────", "──────────", "───────");
-        lprintf("     %-42s %9.2f  %10.2f\n",
-                "Stdlib   std::exp(x)  [glibc via PLT]",
-                r_std.ns_per_call, r_std.total_ms);
-        lprintf("     %-42s %9.2f  %10.2f  %7.2fx\n",
-                "Homemade fexp::exp(x) [exp.hpp inlined]",
-                r_our.ns_per_call, r_our.total_ms, su);
+        for (std::size_t i = 0; i < acc_in.n; ++i)
+            max_rel = std::max(max_rel,
+                               rel_err(fexp::exp(acc_in.storage[i]),
+                                       std::exp(acc_in.storage[i])));
+        bench::logf("\n     accuracy vs std::exp -- max relative error %.2e\n", max_rel);
+        if (at(ci, 0).empty() || at(ci, 1).empty() || at(ci, 2).empty())
+            bench::logf("  -- %s: incomplete epoch data\n", cl.label);
+        else
+            bench::report_cluster(cl.label, BUFFER_N, at(ci, 0),
+                                  { { "std::exp",  at(ci, 1) },
+                                    { "fexp::exp", at(ci, 2) } }, 0);
+        ++ci;
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    //  float32 (float)
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Timed per call: arg-check, shift-trick range reduction, 32-entry table
-    // lookup, degree-3 poly (all arithmetic in double), and float cast.
-    // fexp::expf is header-inlined; ::expf dispatched via PLT.
+    bench::logf("\n");
+    bench::logf("+----------------------------------------------------------------+\n");
+    bench::logf("|  FLOAT32 (float)  -- fexp::expf(x) vs  ::expf(x)               |\n");
+    bench::logf("+----------------------------------------------------------------+\n");
 
-    lprintf("\n\n");
-    lprintf("┌────────────────────────────────────────────────────────────────┐\n");
-    lprintf("│  FLOAT32 (float)  — fexp::expf(x) vs  ::expf(x)               │\n");
-    lprintf("│  Homemade : glibc-2.43 algorithm, header-inlined, no errno    │\n");
-    lprintf("│  Stdlib   : glibc libm, called via PLT (shared-library ABI)   │\n");
-    lprintf("└────────────────────────────────────────────────────────────────┘\n");
-
-    for (const auto& cl : CLUSTERS) {
-        std::uniform_real_distribution<float> dist_f(
-            static_cast<float>(cl.lo), static_cast<float>(cl.hi));
-        std::vector<float> in_f(ACC_SAMPLES);
-        for (auto& v : in_f) v = dist_f(rng);
-
-        double   max_rel_f = 0.0;
-        uint32_t max_ulp   = 0;
-        for (auto v : in_f) {
-            float ref  = ::expf(v);
-            float fast = fexp::expf(v);
-            max_rel_f  = std::max(max_rel_f, rel_err(fast, ref));
-            max_ulp    = std::max(max_ulp, ulp_dist(fast, ref));
+    ci = F32_BASE;
+    for (const auto& cl : bench::REAL_CLUSTERS) {
+        auto acc_in = bench::make_real_cycle_buffer<float>(cl.lo, cl.hi, rng, 4096);
+        double max_rel = 0.0;
+        std::uint32_t max_ulp = 0;
+        for (std::size_t i = 0; i < acc_in.n; ++i) {
+            const float v = acc_in.storage[i];
+            const float ref = ::expf(v), fast = fexp::expf(v);
+            max_rel = std::max(max_rel, rel_err(fast, ref));
+            max_ulp = std::max(max_ulp, ulp_dist(fast, ref));
         }
-
-        auto r_std = run_bench_f([](float x){ return ::expf(x);      }, in_f);
-        auto r_our = run_bench_f([](float x){ return fexp::expf(x);  }, in_f);
-        double su  = r_std.total_ms / r_our.total_ms;
-
-        lprintf("\n");
-        lprintf("  ── Cluster: %s  x ∈ [%.3g, %.3g]  (%d iters)\n",
-                cl.label, cl.lo, cl.hi, BENCH_ITERS);
-        lprintf("     Accuracy vs stdlib — max ULP error: %u%s,  max rel error: %.2e\n",
-                max_ulp,
-                max_ulp == 0 ? " (bit-for-bit identical)" : "",
-                max_rel_f);
-        lprintf("\n");
-        lprintf("     %-42s %9s  %10s  %8s\n",
-                "Variant", "ns/call", "total (ms)", "speedup");
-        lprintf("     %-42s %9s  %10s  %8s\n",
-                "──────────────────────────────────────────",
-                "─────────", "──────────", "───────");
-        lprintf("     %-42s %9.2f  %10.2f\n",
-                "Stdlib   ::expf(x)    [glibc via PLT]",
-                r_std.ns_per_call, r_std.total_ms);
-        lprintf("     %-42s %9.2f  %10.2f  %7.2fx\n",
-                "Homemade fexp::expf(x)[exp.hpp inlined]",
-                r_our.ns_per_call, r_our.total_ms, su);
+        bench::logf("\n     accuracy vs ::expf -- max relative error %.2e, max %u ULP\n",
+                    max_rel, max_ulp);
+        if (at(ci, 0).empty() || at(ci, 1).empty() || at(ci, 2).empty())
+            bench::logf("  -- %s: incomplete epoch data\n", cl.label);
+        else
+            bench::report_cluster(cl.label, BUFFER_N, at(ci, 0),
+                                  { { "::expf",     at(ci, 1) },
+                                    { "fexp::expf", at(ci, 2) } }, 0);
+        ++ci;
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    //  Polynomial isolation
-    //  Only the polynomial evaluation step is timed.  Inputs are first
-    //  range-reduced via fexp::exp_reduce / fexp::expf_reduce (outside the
-    //  timed region) so that arg checks, table lookups, and final scaling are
-    //  excluded.  Polynomial coefficients and evaluation order match glibc-2.43.
-    // ═══════════════════════════════════════════════════════════════════════════
+    bench::logf("\n");
+    bench::logf("+----------------------------------------------------------------+\n");
+    bench::logf("|  POLYNOMIAL ISOLATION -- homemade poly step only               |\n");
+    bench::logf("|  float64 degree-4: r + r2*(C2+r*C3) + r2*r2*(C4+r*C5)          |\n");
+    bench::logf("|  float32 degree-3: (C0*r+C1)*r2 + C2*r + 1  (in double)        |\n");
+    bench::logf("|  Reduced args precomputed; table lookup + scaling excluded.    |\n");
+    bench::logf("+----------------------------------------------------------------+\n");
 
-    lprintf("\n\n");
-    lprintf("┌────────────────────────────────────────────────────────────────┐\n");
-    lprintf("│  POLYNOMIAL ISOLATION — homemade poly step only               │\n");
-    lprintf("│  float64 degree-4: r + r2*(C2+r*C3) + r2*r2*(C4+r*C5)       │\n");
-    lprintf("│  float32 degree-3: (C0*r+C1)*r2 + C2*r + 1  (in double)     │\n");
-    lprintf("│  Reduced args pre-computed; table lookup + scaling excluded.  │\n");
-    lprintf("│  Coefficients match glibc-2.43 sysdeps/ieee754/{dbl,flt}-64/ │\n");
-    lprintf("└────────────────────────────────────────────────────────────────┘\n");
-
-    // float64 polynomial — benchmark just the degree-4 poly step
-    lprintf("\n");
-    lprintf("  float64 — fexp::exp_poly(r):\n");
-
-    for (const auto& cl : CLUSTERS) {
-        std::uniform_real_distribution<double> dist_p(cl.lo, cl.hi);
-        std::vector<double> in_p(ACC_SAMPLES);
-        for (auto& v : in_p) v = dist_p(rng);
-
-        // Cody-Waite reduce outside the timed region; only the polynomial is timed.
-        std::vector<double> r_d(ACC_SAMPLES);
-        for (int i = 0; i < ACC_SAMPLES; ++i) r_d[i] = fexp::exp_reduce(in_p[i]);
-
-        auto rp = run_bench_d([](double r){ return fexp::exp_poly(r); }, r_d);
-
-        lprintf("\n");
-        lprintf("  ── Cluster: %s  x ∈ [%.3g, %.3g]  (%d iters)\n",
-                cl.label, cl.lo, cl.hi, BENCH_ITERS);
-        lprintf("\n");
-        lprintf("     %-42s %9s  %10s\n", "Variant", "ns/call", "total (ms)");
-        lprintf("     %-42s %9s  %10s\n",
-                "──────────────────────────────────────────",
-                "─────────", "──────────");
-        lprintf("     %-42s %9.2f  %10.2f\n",
-                "Homemade fexp::exp_poly(r)  [poly only]",
-                rp.ns_per_call, rp.total_ms);
+    bench::logf("\n  float64 -- fexp::exp_poly(r):\n");
+    ci = POLY64_BASE;
+    for (const auto& cl : bench::REAL_CLUSTERS) {
+        if (at(ci, 0).empty() || at(ci, 1).empty())
+            bench::logf("  -- %s: incomplete epoch data\n", cl.label);
+        else
+            bench::report_cluster(cl.label, BUFFER_N, at(ci, 0),
+                                  { { "exp_poly", at(ci, 1) } }, 0);
+        ++ci;
     }
 
-    // float32 polynomial — benchmark just the degree-3 poly step
-    lprintf("\n");
-    lprintf("  float32 — fexp::expf_poly(r):\n");
-
-    for (const auto& cl : CLUSTERS) {
-        std::uniform_real_distribution<float> dist_pf(
-            static_cast<float>(cl.lo), static_cast<float>(cl.hi));
-        std::vector<float> in_pf(ACC_SAMPLES);
-        for (auto& v : in_pf) v = dist_pf(rng);
-
-        // Shift-trick reduce outside the timed region; only the polynomial is timed.
-        std::vector<double> r_f(ACC_SAMPLES);
-        for (int i = 0; i < ACC_SAMPLES; ++i) r_f[i] = fexp::expf_reduce(in_pf[i]);
-
-        auto rpf = run_bench_d(
-            [](double r){ return static_cast<double>(fexp::expf_poly(r)); }, r_f);
-
-        lprintf("\n");
-        lprintf("  ── Cluster: %s  x ∈ [%.3g, %.3g]  (%d iters)\n",
-                cl.label, cl.lo, cl.hi, BENCH_ITERS);
-        lprintf("\n");
-        lprintf("     %-42s %9s  %10s\n", "Variant", "ns/call", "total (ms)");
-        lprintf("     %-42s %9s  %10s\n",
-                "──────────────────────────────────────────",
-                "─────────", "──────────");
-        lprintf("     %-42s %9.2f  %10.2f\n",
-                "Homemade fexp::expf_poly(r) [poly only]",
-                rpf.ns_per_call, rpf.total_ms);
+    bench::logf("\n  float32 -- fexp::expf_poly(r):\n");
+    ci = POLY32_BASE;
+    for (const auto& cl : bench::REAL_CLUSTERS) {
+        if (at(ci, 0).empty() || at(ci, 1).empty())
+            bench::logf("  -- %s: incomplete epoch data\n", cl.label);
+        else
+            bench::report_cluster(cl.label, BUFFER_N, at(ci, 0),
+                                  { { "expf_poly", at(ci, 1) } }, 0);
+        ++ci;
     }
 
-    // ── Wall time ─────────────────────────────────────────────────────────────
+    const double wall =
+        std::chrono::duration<double>(bench::Clock::now() - wall_start).count();
+    bench::logf("\n  total wall time: %.1f s\n\n", wall);
 
-    auto wall_end = Clock::now();
-    double wall_s = std::chrono::duration<double>(wall_end - wall_start).count();
-
-    lprintf("\n\n");
-    lprintf("══════════════════════════════════════════════════════════════════\n");
-    lprintf("  Total benchmark wall time: %.3f s\n", wall_s);
-    lprintf("══════════════════════════════════════════════════════════════════\n\n");
-
-    if (g_log) {
-        std::fclose(g_log);
-        std::printf("Results saved to output/bench_results.txt\n");
-    }
-
+    bench::close_log();
     return 0;
 }

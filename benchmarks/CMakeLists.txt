@@ -78,6 +78,33 @@ add_limb_bench(bench-sin-limb benchmark-sin-limb.cpp
   "${IMPL}/sin"
   "${IMPL}/sin/inria-sinbf16.c" "${IMPL}/sin/inria-sinbf16-limb.c")
 
+# Force the benchmark runs to happen one at a time.
+#
+# `make bench` builds the aggregate target with -j <ncpu>, and the five
+# run-bench-* targets are independent, so Make was starting all five at once and
+# every benchmark measured a machine running four other benchmarks. It showed up
+# as interquartile ranges as large as the medians (4.4 ns IQR on a 16.0 ns
+# median) and controls at roughly twice their uncontended cost.
+#
+# USES_TERMINAL would serialise these under Ninja via the console job pool, but
+# this project configures with Unix Makefiles, where it does not. An explicit
+# chain is the portable way to say "never run these concurrently"; each target
+# is still individually invokable.
+add_dependencies(run-bench-inria     run-bench-home)
+add_dependencies(run-bench-log-limb  run-bench-inria)
+add_dependencies(run-bench-exp-limb  run-bench-log-limb)
+add_dependencies(run-bench-sin-limb  run-bench-exp-limb)
+
+# Unit tests for the shared measurement core. Pure computation apart from one
+# short self-timing check, so it runs in a second and belongs in CTest proper
+# rather than alongside the timing targets.
+add_executable(bench-harness-test harness-test.cpp)
+target_compile_options(bench-harness-test PRIVATE ${BENCH_FLAGS})
+set_target_properties(bench-harness-test PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${BENCH_OUT}")
+add_test(NAME bench-harness-test COMMAND bench-harness-test
+  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
 # The limb benchmarks end with an exhaustive agreement check against the
 # float32 tables and exit nonzero if it fails, so they double as regression
 # tests. They are fast enough to run in CTest; the timing loops dominate, so

@@ -1,40 +1,32 @@
 /* Benchmark: bf16-only limb tables vs CORE-MATH's float32 tables for exp().
 
-   Companion to benchmark-limb.cpp, which does the same for ln(). All three
-   implementations are correctly rounded on every bfloat16 input -- verified
-   exhaustively against MPFR by cross-eval/verify-limb.c -- so this measures
-   cost, not accuracy.
+   Three variants, all correctly rounded on every bfloat16 input (verified
+   exhaustively against MPFR by cross-eval/verify-limb.c), so this measures
+   cost, not accuracy:
 
-   What differs. cr_exp_bf16 reads two float32 entries and multiplies them.
-   The limb variants read bf16 limbs, sum each factor in float32, and then do
-   the same single multiply. The product is never expanded into cross terms,
-   so the cost is n+m adds regardless of limb count -- the point that makes
-   exp tractable at all (see table-gen/exp/exp-limb-gen.c).
+     cr_exp_bf16           2 float32 loads, 1 multiply
+     cr_exp_bf16_limb      3x3 limbs: 6 bf16 loads, 4 adds, 1 multiply
+     cr_exp_bf16_limb_min  2x2 limbs: 4 bf16 loads, 2 adds, 1 multiply
 
-     exact (3x3)   6 bf16 loads, 4 adds, 1 multiply.  Bit-identical to
-                   CORE-MATH by construction: 3 bf16 limbs carry 24
-                   significand bits, exactly float32's.
-     min   (2x2)   4 bf16 loads, 2 adds, 1 multiply.  Neither factor is exact
-                   at two limbs, so three entries (T1[16], T2[105], T2[182])
-                   carry a one- or two-ULP adjustment to stay correctly
-                   rounded.
+   Measurement lives in bench-harness.hpp and the input ranges in
+   bench-clusters.hpp. Two things there matter for reading these numbers:
 
-   Table sizes are reported alongside. The 3x3 table is larger than the float32
-   tables; the 2x2 table is exactly the same size, so on exp the scheme buys
-   bf16-only storage for free. It targets hardware with bf16 storage or bf16
-   MACs and no float32 table path.
+     - The sweep clusters stay inside the table path, 2^-9 < |x| < 93. Outside
+       it exp returns a constant without a lookup, and roughly 15000 codepoints
+       per sign sit below 2^-9 alone -- sweeping "every finite bf16" would have
+       measured mostly early exits.
 
-   Build (from implementations/). The implementations must be compiled as C --
-   under g++ they would get C++ linkage and fail to match the extern "C"
-   declarations below.
-     cc -O3 -march=native -std=c11 -c inria-expbf16.c      -o output/inria-expbf16.o
-     cc -O3 -march=native -std=c11 -c inria-expbf16-limb.c -o output/inria-expbf16-limb.o
-     c++ -O3 -march=native -std=c++20 benchmark-exp-limb.cpp \
-         output/inria-expbf16.o output/inria-expbf16-limb.o -o output/bench_exp_limb
-*/
+     - The outer unit of replication is a process, not a rep. Code layout is
+       fixed within a process and re-drawn by ASLR across them, and it moves
+       these ratios further than anything else does.
 
-#include <chrono>
-#include <cstdarg>
+   As with ln, the storage saving itself is invisible here: every table under
+   comparison fits in L1 many times over. What this measures is the arithmetic
+   the limb scheme costs to buy it. */
+
+#include "bench-clusters.hpp"
+#include "bench-harness.hpp"
+
 #include <cstdint>
 #include <cstdio>
 #include <random>
@@ -46,160 +38,129 @@ __bf16 cr_exp_bf16_limb (__bf16 x);
 __bf16 cr_exp_bf16_limb_min (__bf16 x);
 }
 
-using Clock = std::chrono::high_resolution_clock;
-
-static FILE* g_log = nullptr;
-
-__attribute__((format(printf, 1, 2)))
-static void lprintf(const char* fmt, ...) {
-    va_list ap;
-    va_start(ap, fmt);
-    std::vprintf(fmt, ap);
-    va_end(ap);
-    if (g_log) {
-        va_start(ap, fmt);
-        std::vfprintf(g_log, fmt, ap);
-        va_end(ap);
-    }
-}
-
-static volatile double sink_d = 0.0;
-
-static constexpr int BENCH_ITERS  = 20'000'000;
+static constexpr int BENCH_ITERS  = 10'000'000;
 static constexpr int WARMUP_ITERS =  1'000'000;
-static constexpr int ACC_SAMPLES  =    500'000;
+static constexpr int REPS         = bench::DEFAULT_REPS;
+static constexpr int EPOCHS       = bench::DEFAULT_EPOCHS;
+static constexpr std::size_t MIN_BUFFER = 4096;
 
-struct BenchResult { double ns_per_call, total_ms; };
-
-// Best of REPEATS. A single timed run of this loop is noisy enough to swing a
-// ratio by ~0.4x -- visible directly in the no-table control cluster, whose
-// variants execute identical code yet measured 0.54x to 1.06x across runs.
-// The minimum is the run least contaminated by scheduling and frequency
-// drift, so it is what the table paths are compared on.
-static constexpr int REPEATS = 3;
-
-template<typename Fn, typename T>
-static BenchResult run_bench(Fn fn, const std::vector<T>& inputs) {
-    double acc = 0.0;
-    for (int i = 0; i < WARMUP_ITERS; ++i) acc += fn(inputs[i % inputs.size()]);
-    sink_d = acc;
-
-    double best_ms = 0.0;
-    for (int rep = 0; rep < REPEATS; ++rep) {
-        auto t0 = Clock::now();
-        acc = 0.0;
-        for (int i = 0; i < BENCH_ITERS; ++i) acc += fn(inputs[i % inputs.size()]);
-        auto t1 = Clock::now();
-        sink_d = acc;
-        double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
-        if (rep == 0 || ms < best_ms) best_ms = ms;
+static int run_epoch() {
+    std::mt19937 rng(42);
+    int ci = 0;
+    for (const auto& cl : bench::EXP_CLUSTERS) {
+        const auto cps = bench::enumerate_bf16_in_range(cl.lo, cl.hi);
+        const auto buf = bench::make_bf16_cycle_buffer(cps, rng, MIN_BUFFER);
+        auto series = bench::run_interleaved(
+            buf, BENCH_ITERS, REPS, WARMUP_ITERS,
+            [](__bf16 x) { return (double)(float)x; },                 // control
+            [](__bf16 x) { return (double)cr_exp_bf16(x); },           // baseline
+            [](__bf16 x) { return (double)cr_exp_bf16_limb(x); },      // 3x3
+            [](__bf16 x) { return (double)cr_exp_bf16_limb_min(x); }); // 2x2
+        for (std::size_t v = 0; v < series.size(); ++v)
+            bench::emit_epoch_row(ci, (int)v, bench::median_of(series[v]));
+        ++ci;
     }
-    return { (best_ms * 1e6) / BENCH_ITERS, best_ms };
+    return 0;
 }
 
-typedef union { __bf16 f; uint16_t u; } b16u16_b;
+int main(int argc, char** argv) {
+    if (bench::is_epoch_child(argc, argv)) return run_epoch();
 
-static __bf16 bf16_from_float(float v) { b16u16_b t; t.f = (__bf16)v; return t.f; }
+    bench::open_log("output/bench_results_exp_limb.txt");
+    const auto wall_start = bench::Clock::now();
 
-int main() {
-    g_log = std::fopen("output/bench_results_exp_limb.txt", "w");
-    if (!g_log)
-        std::fprintf(stderr, "warning: could not open output/bench_results_exp_limb.txt\n");
+    bench::logf("\n");
+    bench::logf("==================================================================\n");
+    bench::logf("  bf16 exp() Benchmark -- limb tables vs CORE-MATH float32 tables\n");
+    bench::print_method_banner(BENCH_ITERS, REPS, WARMUP_ITERS,
+        "the distinct bf16 codepoints in each range, shuffled, "
+        "not repeated draws from a real interval");
+    bench::logf("  Epochs        : %d separate processes; medians taken across them\n", EPOCHS);
+    bench::logf("  All three variants are correctly rounded on all 65536 inputs.\n");
+    bench::logf("==================================================================\n");
 
-    auto wall_start = Clock::now();
-    std::mt19937 rng(42);
-
-    lprintf("\n");
-    lprintf("══════════════════════════════════════════════════════════════════\n");
-    lprintf("  bf16 exp() Benchmark — limb tables vs CORE-MATH float32 tables\n");
-    lprintf("  Iterations    : %d per variant per cluster\n", BENCH_ITERS);
-    lprintf("  Warmup        : %d iterations (not timed)\n",  WARMUP_ITERS);
-    lprintf("  Reported      : best of %d timed runs per measurement\n", REPEATS);
-    lprintf("  All three variants are correctly rounded on all 65536 inputs.\n");
-    lprintf("══════════════════════════════════════════════════════════════════\n");
-
-    // ── Table storage comparison ─────────────────────────────────────────────
+    // -- Table storage comparison --------------------------------------------
     // T1: 512 entries, T2: 256.
     const long f32_bytes   = (512L * 4) + (256L * 4);
     const long exact_bytes = (512L * 3 * 2) + (256L * 3 * 2);
     const long min_bytes   = (512L * 2 * 2) + (256L * 2 * 2);
 
-    lprintf("\n");
-    lprintf("┌────────────────────────────────────────────────────────────────┐\n");
-    lprintf("│  TABLE STORAGE                                                 │\n");
-    lprintf("└────────────────────────────────────────────────────────────────┘\n");
-    lprintf("  %-24s %10s %10s %10s\n", "table", "float32", "3x3 limb", "2x2 limb");
-    lprintf("  %-24s %9ldB %9ldB %9ldB\n", "T1 (512 entries)", 512L*4, 512L*3*2, 512L*2*2);
-    lprintf("  %-24s %9ldB %9ldB %9ldB\n", "T2 (256 entries)", 256L*4, 256L*3*2, 256L*2*2);
-    lprintf("  %-24s %9ldB %9ldB %9ldB\n", "total", f32_bytes, exact_bytes, min_bytes);
-    lprintf("  %-24s %10s %+9.1f%% %+9.1f%%\n", "vs float32", "",
-            100.0 * (double)(exact_bytes - f32_bytes) / (double)f32_bytes,
-            100.0 * (double)(min_bytes   - f32_bytes) / (double)f32_bytes);
+    bench::logf("\n");
+    bench::logf("+----------------------------------------------------------------+\n");
+    bench::logf("|  TABLE STORAGE                                                 |\n");
+    bench::logf("+----------------------------------------------------------------+\n");
+    bench::logf("  %-24s %10s %10s %10s\n", "table", "float32", "3x3 limb", "2x2 limb");
+    bench::logf("  %-24s %9ldB %9ldB %9ldB\n", "T1 (512 entries)", 512L*4, 512L*3*2, 512L*2*2);
+    bench::logf("  %-24s %9ldB %9ldB %9ldB\n", "T2 (256 entries)", 256L*4, 256L*3*2, 256L*2*2);
+    bench::logf("  %-24s %9ldB %9ldB %9ldB\n", "total", f32_bytes, exact_bytes, min_bytes);
+    bench::logf("  %-24s %10s %+9.1f%% %+9.1f%%\n", "vs float32", "",
+                100.0 * (double)(exact_bytes - f32_bytes) / (double)f32_bytes,
+                100.0 * (double)(min_bytes   - f32_bytes) / (double)f32_bytes);
 
-    // ── Value clusters, chosen to exercise each code path ────────────────────
-    struct Cluster { const char* label; double lo, hi; };
-    static constexpr Cluster CLUSTERS[] = {
-        { "x near 0.003  ",  0.0025,  0.0035 },  // just past the |x|<=2^-9 exit
-        { "x near 1      ",  0.9,     1.1    },  // mid-table
-        { "x near 80     ", 79.5,    80.5    },  // near the overflow edge
-        { "x near -80    ", -80.5,  -79.5    },  // the negative half of T1/T2
-        { "x near 2e-10  ",  1e-10,   3e-10  },  // below the table: rounds to 1
-    };
+    bench::logf("\n");
+    bench::logf("+----------------------------------------------------------------+\n");
+    bench::logf("|  BFLOAT16 -- cr_exp_bf16 (float32) vs _limb (3x3) vs _min (2x2)|\n");
+    bench::logf("|  inria : 2 float32 loads, 1 multiply                           |\n");
+    bench::logf("|  3x3   : 6 bf16 loads, 4 adds, 1 multiply                      |\n");
+    bench::logf("|  2x2   : 4 bf16 loads, 2 adds, 1 multiply                      |\n");
+    bench::logf("+----------------------------------------------------------------+\n");
 
-    lprintf("\n");
-    lprintf("┌────────────────────────────────────────────────────────────────┐\n");
-    lprintf("│  BFLOAT16 — cr_exp_bf16 (float32) vs _limb (3x3) vs _min (2x2) │\n");
-    lprintf("│  Inria : 2 float32 loads, 1 multiply                           │\n");
-    lprintf("│  3x3   : 6 bf16 loads, 4 adds, 1 multiply                      │\n");
-    lprintf("│  2x2   : 4 bf16 loads, 2 adds, 1 multiply                      │\n");
-    lprintf("└────────────────────────────────────────────────────────────────┘\n");
-    lprintf("  %-15s %11s %11s %11s %9s %9s\n",
-            "cluster", "inria ns", "3x3 ns", "2x2 ns", "3x3/f32", "2x2/f32");
+    const bench::EpochTable table = bench::gather_epochs(argv[0], EPOCHS);
 
-    double sum_x = 0.0, sum_m = 0.0; int nclusters = 0;
+    std::vector<double> r3_sweep, r2_sweep;
+    int ci = 0;
+    for (const auto& cl : bench::EXP_CLUSTERS) {
+        const auto cps = bench::enumerate_bf16_in_range(cl.lo, cl.hi);
+        auto at = [&](int v) {
+            auto it = table.find({ci, v});
+            return it == table.end() ? std::vector<double>{} : it->second;
+        };
+        const auto ctl = at(0), inria = at(1), x3 = at(2), x2 = at(3);
+        if (ctl.empty() || inria.empty() || x3.empty() || x2.empty()) {
+            bench::logf("\n  -- %-16s no epoch data (child failed)\n", cl.label);
+            ++ci;
+            continue;
+        }
 
-    for (const auto& cl : CLUSTERS) {
-        std::uniform_real_distribution<double> dist(cl.lo, cl.hi);
-        std::vector<__bf16> in(ACC_SAMPLES);
-        for (auto& v : in) v = bf16_from_float((float)dist(rng));
+        bench::report_cluster(cl.label, cps.size(), ctl,
+                              { { "inria (f32)", inria },
+                                { "3x3 limb",    x3 },
+                                { "2x2 limb",    x2 } },
+                              /*base_index=*/0);
 
-        auto r_inria = run_bench([](__bf16 x){ return (double)cr_exp_bf16(x); }, in);
-        auto r_exact = run_bench([](__bf16 x){ return (double)cr_exp_bf16_limb(x); }, in);
-        auto r_min   = run_bench([](__bf16 x){ return (double)cr_exp_bf16_limb_min(x); }, in);
-
-        double rx = r_exact.ns_per_call / r_inria.ns_per_call;
-        double rm = r_min.ns_per_call   / r_inria.ns_per_call;
-        sum_x += rx; sum_m += rm; nclusters++;
-        lprintf("  %-15s %11.4f %11.4f %11.4f %8.2fx %8.2fx\n",
-                cl.label, r_inria.ns_per_call, r_exact.ns_per_call,
-                r_min.ns_per_call, rx, rm);
+        if (cl.sweep) {
+            r3_sweep.push_back(bench::median_of(bench::paired_ratio(x3, inria)));
+            r2_sweep.push_back(bench::median_of(bench::paired_ratio(x2, inria)));
+        }
+        ++ci;
     }
 
-    lprintf("\n  mean throughput ratio vs float32 tables: 3x3 %.2fx, 2x2 %.2fx\n",
-            sum_x / nclusters, sum_m / nclusters);
+    bench::logf("\n  table-path sweep vs float32: 3x3 %.2fx, 2x2 %.2fx\n",
+                bench::median_of(r3_sweep), bench::median_of(r2_sweep));
+    bench::logf("  The sweep rows are the ones to quote; the narrow clusters above\n");
+    bench::logf("  keep one or two cache lines hot and measure a corner of the table.\n");
 
-    // ── Exhaustive agreement check ───────────────────────────────────────────
-    // Cheap here and worth doing: a benchmark that silently drifted from the
-    // verified build would report meaningless timings.
+    // -- Exhaustive agreement check -------------------------------------------
     long mism_x = 0, mism_m = 0;
-    for (uint32_t b = 0; b <= 0xFFFF; ++b) {
-        b16u16_b x; x.u = (uint16_t)b;
-        b16u16_b a; a.f = cr_exp_bf16(x.f);
-        b16u16_b e; e.f = cr_exp_bf16_limb(x.f);
-        b16u16_b m; m.f = cr_exp_bf16_limb_min(x.f);
-        bool a_nan = (a.u & 0x7fff) > 0x7f80;
-        if (!(a_nan && (e.u & 0x7fff) > 0x7f80) && a.u != e.u) mism_x++;
-        if (!(a_nan && (m.u & 0x7fff) > 0x7f80) && a.u != m.u) mism_m++;
+    for (std::uint32_t b = 0; b <= 0xFFFF; ++b) {
+        const __bf16 x = bench::bf16_from_bits((std::uint16_t)b);
+        const std::uint16_t a = bench::bf16_to_bits(cr_exp_bf16(x));
+        const std::uint16_t e = bench::bf16_to_bits(cr_exp_bf16_limb(x));
+        const std::uint16_t m = bench::bf16_to_bits(cr_exp_bf16_limb_min(x));
+        const bool a_nan = (a & 0x7fff) > 0x7f80;
+        if (!(a_nan && (e & 0x7fff) > 0x7f80) && a != e) mism_x++;
+        if (!(a_nan && (m & 0x7fff) > 0x7f80) && a != m) mism_m++;
     }
-    lprintf("\n  exhaustive agreement over 65536 inputs:\n");
-    lprintf("    3x3 exact vs CORE-MATH : %s (%ld mismatches)\n",
-            mism_x == 0 ? "IDENTICAL" : "DIFFER", mism_x);
-    lprintf("    2x2 min   vs CORE-MATH : %s (%ld mismatches)\n",
-            mism_m == 0 ? "IDENTICAL" : "DIFFER", mism_m);
+    bench::logf("\n  exhaustive agreement over 65536 inputs:\n");
+    bench::logf("    3x3 exact vs CORE-MATH : %s (%ld mismatches)\n",
+                mism_x == 0 ? "IDENTICAL" : "DIFFER", mism_x);
+    bench::logf("    2x2 min   vs CORE-MATH : %s (%ld mismatches)\n",
+                mism_m == 0 ? "IDENTICAL" : "DIFFER", mism_m);
 
-    double wall = std::chrono::duration<double>(Clock::now() - wall_start).count();
-    lprintf("\n  total wall time: %.1f s\n\n", wall);
+    const double wall =
+        std::chrono::duration<double>(bench::Clock::now() - wall_start).count();
+    bench::logf("\n  total wall time: %.1f s\n\n", wall);
 
-    if (g_log) std::fclose(g_log);
+    bench::close_log();
     return (mism_x == 0 && mism_m == 0) ? 0 : 1;
 }

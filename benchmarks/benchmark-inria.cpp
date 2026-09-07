@@ -2,281 +2,196 @@
  * @file  benchmark-inria.cpp
  * @brief Benchmark: Inria cr_exp (CORE-MATH) vs homemade fexp::exp vs std::exp.
  *
- * FLOAT64 only — cr_exp provides double precision only.
+ * FLOAT64 only -- cr_exp provides double precision only.
  *
- * Three input clusters, 100M iterations each:
- *   Cluster 1 — x near 1     : x ∈ [0.9,   1.1]
- *   Cluster 2 — x near 80    : x ∈ [79.5,  80.5]
- *   Cluster 3 — x near 2e-10 : x ∈ [1e-10, 3e-10]
+ * Two sections, both over the three clusters in bench-clusters.hpp:
+ *   1. Whole-call comparison of the three implementations.
+ *   2. The Inria path split into its three stages, with the inputs to each
+ *      stage precomputed so only that stage runs inside the timed loop.
  *
- * Compile (run from implementations/):
- *   g++ -O3 -march=native -mavx2 -mfma -std=c++20 benchmark-inria.cpp -o output/bench_inria
- * Run:
- *   ./output/bench_inria
- * Capture:
- *   ./output/bench_inria 2>&1 | tee output/bench_results_inria.txt
+ * Measurement lives in bench-harness.hpp. Unlike the bf16 benchmarks these
+ * inputs need no special handling -- 500k draws from [0.9, 1.1] land on ~500k
+ * distinct doubles, so sampling a real interval does not starve the way it does
+ * at 7 mantissa bits. What this file does share with them is the estimator:
+ * medians with an IQR taken across separate processes, because code layout is
+ * fixed within a process and re-drawn by ASLR across them.
  */
 
 #include "exp.hpp"
 #include "inria-exp-seg.hpp"
 
+#include "bench-clusters.hpp"
+#include "bench-harness.hpp"
+
 #include <algorithm>
-#include <chrono>
 #include <cmath>
-#include <cstdarg>
 #include <cstdio>
 #include <random>
 #include <vector>
 
-using Clock = std::chrono::high_resolution_clock;
+struct PolyIn   { double th, tl, dx; };
+struct StitchIn { double x, fh, fl; i64 ie; b64u64_u ix; };
 
-// ─── Dual-output helper ───────────────────────────────────────────────────────
+static constexpr int BENCH_ITERS  = 2'000'000;
+static constexpr int WARMUP_ITERS =   200'000;
+static constexpr int REPS         = bench::DEFAULT_REPS;
+static constexpr int EPOCHS       = bench::DEFAULT_EPOCHS;
+static constexpr std::size_t BUFFER_N = 16384;
 
-static FILE* g_log = nullptr;
-
-__attribute__((format(printf, 1, 2)))
-static void lprintf(const char* fmt, ...) {
-    va_list ap;
-    va_start(ap, fmt);
-    std::vprintf(fmt, ap);
-    va_end(ap);
-    if (g_log) {
-        va_start(ap, fmt);
-        std::vfprintf(g_log, fmt, ap);
-        va_end(ap);
-    }
-}
-
-// ─── Anti-optimisation sink ──────────────────────────────────────────────────
-
-static volatile double sink_d = 0.0;
-
-// ─── Error metrics ───────────────────────────────────────────────────────────
+// Cluster ids are offset so both sections share one epoch table.
+static constexpr int SEG_BASE = 10;
 
 static double rel_err(double fast, double ref) {
     if (ref == 0.0) return 0.0;
     return std::abs(fast - ref) / std::abs(ref);
 }
 
-// ─── Benchmark parameters ────────────────────────────────────────────────────
-
-static constexpr int BENCH_ITERS  = 100'000'000;
-static constexpr int WARMUP_ITERS =   1'000'000;
-static constexpr int ACC_SAMPLES  =     500'000;
-
-// ─── Timing helper ───────────────────────────────────────────────────────────
-
-struct BenchResult { double ns_per_call, total_ms; };
-
-template<typename Fn, typename T>
-static BenchResult run_bench(Fn fn, const std::vector<T>& inputs) {
-    double acc = 0.0;
-    for (int i = 0; i < WARMUP_ITERS; ++i) acc += fn(inputs[i % inputs.size()]);
-    sink_d = acc;
-
-    auto t0 = Clock::now();
-    acc = 0.0;
-    for (int i = 0; i < BENCH_ITERS; ++i) acc += fn(inputs[i % inputs.size()]);
-    auto t1 = Clock::now();
-    sink_d = acc;
-
-    double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
-    return { (ms * 1e6) / BENCH_ITERS, ms };
-}
-
-// ─── Pre-computed input types for segment benchmarks ─────────────────────────
-
-struct PolyIn   { double th, tl, dx; };
-struct StitchIn { double x, fh, fl; i64 ie; b64u64_u ix; };
-
-// ─── Main ─────────────────────────────────────────────────────────────────────
-
-int main() {
-    g_log = std::fopen("output/bench_results_inria.txt", "w");
-    if (!g_log)
-        std::fprintf(stderr, "warning: could not open output/bench_results_inria.txt\n");
-
-    auto wall_start = Clock::now();
-
+static int run_epoch() {
     std::mt19937 rng(42);
-
-    // ── Header ────────────────────────────────────────────────────────────────
-
-    lprintf("\n");
-    lprintf("══════════════════════════════════════════════════════════════════\n");
-    lprintf("  exp() Benchmark — Inria cr_exp vs homemade (exp.hpp) vs stdlib\n");
-    // Reported from what the compiler actually enabled, not from a fixed
-    // string: CMake probes -mavx2/-mfma and drops them on targets that
-    // reject them (Apple Silicon), so a literal here would misreport.
-    lprintf("  Compile flags : -O3 -march=native%s%s -std=c++20\n",
-#if defined(__AVX2__)
-            " -mavx2",
-#else
-            "",
-#endif
-#if defined(__FMA__)
-            " -mfma");
-#else
-            "");
-#endif
-    lprintf("  Iterations    : %'d per variant per cluster\n", BENCH_ITERS);
-    lprintf("  Warmup        : %'d iterations (not timed)\n",  WARMUP_ITERS);
-    lprintf("  Acc. samples  : %'d random draws per cluster\n", ACC_SAMPLES);
-    lprintf("══════════════════════════════════════════════════════════════════\n");
-
-    // ── Value clusters ────────────────────────────────────────────────────────
-
-    struct Cluster { const char* label; double lo, hi; };
-    static constexpr Cluster CLUSTERS[] = {
-        { "x near 1     ",  0.9,    1.1   },
-        { "x near 80    ", 79.5,   80.5   },
-        { "x near 2e-10 ", 1e-10,  3e-10  },
-    };
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    //  float64 (double) — three-way comparison
-    //  cr_exp:    CORE-MATH correctly rounded implementation, header-inlined.
-    //  fexp::exp: glibc-2.43 algorithm port, header-inlined, no errno.
-    //  std::exp:  glibc libm, called via PLT (shared-library ABI).
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    lprintf("\n");
-    lprintf("┌────────────────────────────────────────────────────────────────┐\n");
-    lprintf("│  FLOAT64 — cr_exp(x), fexp::exp(x), std::exp(x)               │\n");
-    lprintf("│  Inria    : CORE-MATH cr_exp, correctly rounded (≤0.5 ULP)    │\n");
-    lprintf("│  Homemade : glibc-2.43 algorithm, header-inlined, no errno    │\n");
-    lprintf("│  Stdlib   : glibc libm, called via PLT (shared-library ABI)   │\n");
-    lprintf("└────────────────────────────────────────────────────────────────┘\n");
-
-    for (const auto& cl : CLUSTERS) {
-        std::uniform_real_distribution<double> dist(cl.lo, cl.hi);
-        std::vector<double> in(ACC_SAMPLES);
-        for (auto& v : in) v = dist(rng);
-
-        double max_rel_fexp  = 0.0;
-        double max_rel_inria = 0.0;
-        for (auto v : in) {
-            max_rel_fexp  = std::max(max_rel_fexp,  rel_err(fexp::exp(v), std::exp(v)));
-            max_rel_inria = std::max(max_rel_inria, rel_err(cr_exp(v),    std::exp(v)));
-        }
-
-        auto r_std   = run_bench([](double x){ return std::exp(x);  }, in);
-        auto r_fexp  = run_bench([](double x){ return fexp::exp(x); }, in);
-        auto r_inria = run_bench([](double x){ return cr_exp(x);    }, in);
-
-        double su_fexp  = r_std.total_ms / r_fexp.total_ms;
-        double su_inria = r_std.total_ms / r_inria.total_ms;
-
-        lprintf("\n");
-        lprintf("  ── Cluster: %s  x ∈ [%.3g, %.3g]  (%d iters)\n",
-                cl.label, cl.lo, cl.hi, BENCH_ITERS);
-        lprintf("     Accuracy vs std::exp — homemade: %.2e  inria: %.2e%s\n",
-                max_rel_fexp, max_rel_inria,
-                max_rel_inria == 0.0 ? "  (bit-for-bit identical)" : "");
-        lprintf("\n");
-        lprintf("     %-42s %9s  %10s  %8s\n",
-                "Variant", "ns/call", "total (ms)", "speedup");
-        lprintf("     %-42s %9s  %10s  %8s\n",
-                "──────────────────────────────────────────",
-                "─────────", "──────────", "───────");
-        lprintf("     %-42s %9.2f  %10.2f\n",
-                "Stdlib   std::exp(x)  [glibc via PLT]",
-                r_std.ns_per_call, r_std.total_ms);
-        lprintf("     %-42s %9.2f  %10.2f  %7.2fx\n",
-                "Homemade fexp::exp(x) [exp.hpp inlined]",
-                r_fexp.ns_per_call, r_fexp.total_ms, su_fexp);
-        lprintf("     %-42s %9.2f  %10.2f  %7.2fx\n",
-                "Inria    cr_exp(x)    [inria-exp.hpp]",
-                r_inria.ns_per_call, r_inria.total_ms, su_inria);
+    int ci = 0;
+    for (const auto& cl : bench::REAL_CLUSTERS) {
+        auto buf = bench::make_real_cycle_buffer<double>(cl.lo, cl.hi, rng, BUFFER_N);
+        auto s = bench::run_interleaved(
+            buf, BENCH_ITERS, REPS, WARMUP_ITERS,
+            [](double x) { return x; },             // control
+            [](double x) { return std::exp(x); },
+            [](double x) { return fexp::exp(x); },
+            [](double x) { return cr_exp(x); });
+        for (std::size_t v = 0; v < s.size(); ++v)
+            bench::emit_epoch_row(ci, (int)v, bench::median_of(s[v]));
+        ++ci;
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    //  Segmented phase benchmarks — isolate each inria-exp-seg stage
-    //  Inputs for poly and stitch are pre-computed so only the target
-    //  stage runs inside the timed loop.
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    lprintf("\n");
-    lprintf("┌────────────────────────────────────────────────────────────────┐\n");
-    lprintf("│  FLOAT64 — Inria cr_exp segmented phases                       │\n");
-    lprintf("│  Range Reduce : exp_range_reduce()  (decompose x)              │\n");
-    lprintf("│  Poly Expand  : exp_poly_expand()   (evaluate polynomial)      │\n");
-    lprintf("│  Stitch       : exp_stitch()         (assemble IEEE result)     │\n");
-    lprintf("└────────────────────────────────────────────────────────────────┘\n");
 
     std::mt19937 rng2(42);
+    ci = SEG_BASE;
+    for (const auto& cl : bench::REAL_CLUSTERS) {
+        auto in = bench::make_real_cycle_buffer<double>(cl.lo, cl.hi, rng2, BUFFER_N);
 
-    for (const auto& cl : CLUSTERS) {
-        std::uniform_real_distribution<double> dist2(cl.lo, cl.hi);
-        std::vector<double> in2(ACC_SAMPLES);
-        for (auto& v : in2) v = dist2(rng2);
-
-        std::vector<PolyIn> poly_inputs(ACC_SAMPLES);
-        for (int i = 0; i < ACC_SAMPLES; ++i) {
+        auto poly = bench::make_generated_buffer<PolyIn>(BUFFER_N, [&](std::size_t i) {
             double th, tl, dx; i64 ie;
-            exp_range_reduce(in2[i], &th, &tl, &dx, &ie);
-            poly_inputs[i] = {th, tl, dx};
-        }
-
-        std::vector<StitchIn> stitch_inputs(ACC_SAMPLES);
-        for (int i = 0; i < ACC_SAMPLES; ++i) {
+            exp_range_reduce(in.storage[i], &th, &tl, &dx, &ie);
+            return PolyIn{th, tl, dx};
+        });
+        auto stitch = bench::make_generated_buffer<StitchIn>(BUFFER_N, [&](std::size_t i) {
             double th, tl, dx; i64 ie;
-            exp_range_reduce(in2[i], &th, &tl, &dx, &ie);
+            exp_range_reduce(in.storage[i], &th, &tl, &dx, &ie);
             double fh, fl;
             exp_poly_expand(th, tl, dx, &fh, &fl);
-            b64u64_u ix = {.f = in2[i]};
-            stitch_inputs[i] = {in2[i], fh, fl, ie, ix};
+            b64u64_u ix = {.f = in.storage[i]};
+            return StitchIn{in.storage[i], fh, fl, ie, ix};
+        });
+
+        auto s_rr = bench::run_interleaved(
+            in, BENCH_ITERS, REPS, WARMUP_ITERS,
+            [](double x) { return x; },
+            [](double x) { double th, tl, dx; i64 ie;
+                           exp_range_reduce(x, &th, &tl, &dx, &ie);
+                           return th + tl + dx; });
+        auto s_poly = bench::run_interleaved(
+            poly, BENCH_ITERS, REPS, WARMUP_ITERS,
+            [](const PolyIn& p) { return p.th; },
+            [](const PolyIn& p) { double fh, fl;
+                                  exp_poly_expand(p.th, p.tl, p.dx, &fh, &fl);
+                                  return fh + fl; });
+        auto s_st = bench::run_interleaved(
+            stitch, BENCH_ITERS, REPS, WARMUP_ITERS,
+            [](const StitchIn& s) { return s.x; },
+            [](const StitchIn& s) { return exp_stitch(s.x, s.fh, s.fl, s.ie, s.ix); });
+
+        // variant 0 is the control for the stage timings; 1..3 the stages.
+        bench::emit_epoch_row(ci, 0, bench::median_of(s_rr[0]));
+        bench::emit_epoch_row(ci, 1, bench::median_of(s_rr[1]));
+        bench::emit_epoch_row(ci, 2, bench::median_of(s_poly[1]));
+        bench::emit_epoch_row(ci, 3, bench::median_of(s_st[1]));
+        ++ci;
+    }
+    return 0;
+}
+
+int main(int argc, char** argv) {
+    if (bench::is_epoch_child(argc, argv)) return run_epoch();
+
+    bench::open_log("output/bench_results_inria.txt");
+    const auto wall_start = bench::Clock::now();
+
+    bench::logf("\n");
+    bench::logf("==================================================================\n");
+    bench::logf("  float64 exp() Benchmark -- Inria cr_exp vs fexp::exp vs stdlib\n");
+    bench::print_method_banner(BENCH_ITERS, REPS, WARMUP_ITERS,
+        "sampled from each real interval; float64 inputs do not "
+        "collapse onto a few values the way bf16 does");
+    bench::logf("  Epochs        : %d separate processes; medians taken across them\n", EPOCHS);
+    bench::logf("==================================================================\n");
+
+    const bench::EpochTable table = bench::gather_epochs(argv[0], EPOCHS);
+    auto at = [&](int c, int v) {
+        auto it = table.find({c, v});
+        return it == table.end() ? std::vector<double>{} : it->second;
+    };
+
+    bench::logf("\n");
+    bench::logf("+----------------------------------------------------------------+\n");
+    bench::logf("|  FLOAT64 -- cr_exp(x), fexp::exp(x), std::exp(x)               |\n");
+    bench::logf("|  Inria    : CORE-MATH cr_exp, correctly rounded (<=0.5 ULP)    |\n");
+    bench::logf("|  Homemade : glibc-2.43 algorithm, header-inlined, no errno     |\n");
+    bench::logf("|  Stdlib   : libm, called through the shared-library ABI        |\n");
+    bench::logf("+----------------------------------------------------------------+\n");
+
+    std::mt19937 rng(42);
+    int ci = 0;
+    for (const auto& cl : bench::REAL_CLUSTERS) {
+        // Accuracy is deterministic, so it is checked once here rather than in
+        // every epoch.
+        auto acc_in = bench::make_real_cycle_buffer<double>(cl.lo, cl.hi, rng, 4096);
+        double max_fexp = 0.0, max_inria = 0.0;
+        for (std::size_t i = 0; i < acc_in.n; ++i) {
+            const double v = acc_in.storage[i];
+            max_fexp  = std::max(max_fexp,  rel_err(fexp::exp(v), std::exp(v)));
+            max_inria = std::max(max_inria, rel_err(cr_exp(v),    std::exp(v)));
         }
+        bench::logf("\n     accuracy vs std::exp -- homemade %.2e  inria %.2e%s\n",
+                    max_fexp, max_inria,
+                    max_inria == 0.0 ? "  (bit-for-bit identical)" : "");
 
-        auto r_rr = run_bench([](const double& x) {
-            double th, tl, dx; i64 ie;
-            exp_range_reduce(x, &th, &tl, &dx, &ie);
-            return th + tl + dx;
-        }, in2);
-
-        auto r_poly = run_bench([](const PolyIn& p) {
-            double fh, fl;
-            exp_poly_expand(p.th, p.tl, p.dx, &fh, &fl);
-            return fh + fl;
-        }, poly_inputs);
-
-        auto r_stitch = run_bench([](const StitchIn& s) {
-            return exp_stitch(s.x, s.fh, s.fl, s.ie, s.ix);
-        }, stitch_inputs);
-
-        lprintf("\n");
-        lprintf("  ── Cluster: %s  x ∈ [%.3g, %.3g]  (%d iters)\n",
-                cl.label, cl.lo, cl.hi, BENCH_ITERS);
-        lprintf("\n");
-        lprintf("     %-42s %9s  %10s\n", "Phase", "ns/call", "total (ms)");
-        lprintf("     %-42s %9s  %10s\n",
-                "──────────────────────────────────────────",
-                "─────────", "──────────");
-        lprintf("     %-42s %9.2f  %10.2f\n",
-                "Range Reduce  exp_range_reduce()",
-                r_rr.ns_per_call, r_rr.total_ms);
-        lprintf("     %-42s %9.2f  %10.2f\n",
-                "Poly Expand   exp_poly_expand()",
-                r_poly.ns_per_call, r_poly.total_ms);
-        lprintf("     %-42s %9.2f  %10.2f\n",
-                "Stitch        exp_stitch()",
-                r_stitch.ns_per_call, r_stitch.total_ms);
+        const auto ctl = at(ci, 0), std_e = at(ci, 1), fx = at(ci, 2), cr = at(ci, 3);
+        if (ctl.empty() || std_e.empty() || fx.empty() || cr.empty()) {
+            bench::logf("  -- %s: incomplete epoch data\n", cl.label); ++ci; continue;
+        }
+        bench::report_cluster(cl.label, BUFFER_N, ctl,
+                              { { "std::exp",   std_e },
+                                { "fexp::exp",  fx },
+                                { "cr_exp",     cr } },
+                              /*base_index=*/0);
+        ++ci;
     }
 
-    // ── Wall time ─────────────────────────────────────────────────────────────
+    bench::logf("\n");
+    bench::logf("+----------------------------------------------------------------+\n");
+    bench::logf("|  FLOAT64 -- Inria cr_exp segmented phases                      |\n");
+    bench::logf("|  Range Reduce : exp_range_reduce()  (decompose x)              |\n");
+    bench::logf("|  Poly Expand  : exp_poly_expand()   (evaluate polynomial)      |\n");
+    bench::logf("|  Stitch       : exp_stitch()        (assemble IEEE result)     |\n");
+    bench::logf("|  Stage inputs are precomputed, so only the stage is timed.     |\n");
+    bench::logf("+----------------------------------------------------------------+\n");
 
-    auto wall_end = Clock::now();
-    double wall_s = std::chrono::duration<double>(wall_end - wall_start).count();
-
-    lprintf("\n\n");
-    lprintf("══════════════════════════════════════════════════════════════════\n");
-    lprintf("  Total benchmark wall time: %.3f s\n", wall_s);
-    lprintf("══════════════════════════════════════════════════════════════════\n\n");
-
-    if (g_log) {
-        std::fclose(g_log);
-        std::printf("Results saved to output/bench_results_inria.txt\n");
+    ci = SEG_BASE;
+    for (const auto& cl : bench::REAL_CLUSTERS) {
+        const auto ctl = at(ci, 0);
+        if (ctl.empty() || at(ci, 1).empty() || at(ci, 2).empty() || at(ci, 3).empty()) {
+            bench::logf("  -- %s: incomplete epoch data\n", cl.label); ++ci; continue;
+        }
+        bench::report_cluster(cl.label, BUFFER_N, ctl,
+                              { { "range reduce", at(ci, 1) },
+                                { "poly expand",  at(ci, 2) },
+                                { "stitch",       at(ci, 3) } },
+                              /*base_index=*/0);
+        ++ci;
     }
 
+    const double wall =
+        std::chrono::duration<double>(bench::Clock::now() - wall_start).count();
+    bench::logf("\n  total wall time: %.1f s\n\n", wall);
+
+    bench::close_log();
     return 0;
 }

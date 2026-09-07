@@ -239,17 +239,30 @@ optimisation.
 | `exp` | 3072 B | 4608 B (+50%) | **3072 B (+0%)** |
 | `sin` | 4056 B | 6084 B (+50%) | 5060 B (+25%) |
 
-Throughput, from `make bench` on an Apple M-series (best of 3 runs per
-measurement; ratios against the float32 tables, lower is better):
+Throughput, from `make bench` on an Apple M5 (ratios against the float32
+tables, lower is better). Each figure is the median of the per-epoch paired
+ratios over 7 processes, with the interquartile range beside it, and the row
+swept is the whole table path rather than a narrow cluster. See
+[BENCHMARKING.md](BENCHMARKING.md) for what that means.
 
-| function | path | exact | minimal |
-|---|---|---|---|
-| `exp` | table path | 1.31–1.35× | 1.07–1.11× |
-| `sin` | mid path | ~1.86× | ~1.70× |
-| `sin` | large path | ~1.14× | ~1.12× |
+| function | path | exact | IQR | minimal | IQR |
+|---|---|---|---|---|---|
+| `exp` | table path | 1.19× | 0.02 | **1.00×** | 0.03 |
+| `sin` | mid path | 1.94× | 0.04 | 1.83× | 0.01 |
+| `sin` | large path | 1.15× | 0.17 | 1.19× | 0.17 |
+| `ln` | all `x > 0` | 1.20× | 0.16 | — | — |
+
+These differ from the numbers this document carried previously (`exp`
+1.31–1.35× / 1.07–1.11×, `sin` mid ~1.86× / ~1.70×). Two measurement defects
+account for the change, both since fixed: the old input clusters resolved to as
+few as three distinct bf16 values, so they measured a couple of table entries
+rather than the table; and `make bench` ran all five benchmarks concurrently
+under `-j`, so each was timing a machine running four others. `exp`'s minimal
+2×2 configuration in particular is not 7–11% slower than the float32 tables —
+within the resolution of this benchmark it costs nothing.
 
 `exp` is the cheapest of the three — one multiply, and the limb sums pipeline
-alongside it — against roughly 2.2× for the `ln` limb tables. Dropping `T1` from
+alongside it — against 1.20× for the `ln` limb tables. Dropping `T1` from
 three limbs to two removes one dependent add from the critical path ahead of the
 multiply, which is where most of the remaining gap between 3×3 and 2×2 comes
 from. The compiler already vectorises the reconstruction: on AArch64 the five
@@ -262,8 +275,18 @@ already dominates.
 
 Both benchmarks include a no-table control cluster. Its variants execute
 identical code, so its ratio measures the harness noise floor rather than any
-cost of the scheme — a single timed run swung it between 0.54× and 1.06×,
-which is why the harness reports the best of three.
+cost of the scheme. Under the old harness a single timed run swung it between
+0.54× and 1.06×; it now reports 1.00×.
+
+Closing that gap took more than replicating runs. The dominant source of
+variation turned out to be per-process memory layout: eight runs of the same
+binary on an idle machine spanned 0.848×–1.235× on one cluster while the
+inlined control held to 0.4%. Repetition inside a process cannot average that
+out, so the outer unit of replication is now a separate process. The old input
+clusters were also far narrower than intended — `[79.5, 80.5]` contains exactly
+three distinct bf16 values, so 500,000 draws from it exercised three table
+entries. See [BENCHMARKING.md](BENCHMARKING.md) for the full methodology and
+the measurements behind each choice.
 
 ## Files
 
@@ -277,6 +300,9 @@ which is why the harness reports the best of three.
 | `../cross-eval/verify-limb.c` | exhaustive MPFR check, both functions, both variants |
 | `../benchmarks/benchmark-exp-limb.cpp` | throughput vs the float32 tables |
 | `../benchmarks/benchmark-sin-limb.cpp` | throughput vs the float32 tables |
+| `../benchmarks/bench-harness.hpp` | the shared measurement core — see [BENCHMARKING.md](BENCHMARKING.md) |
+| `../benchmarks/bench-clusters.hpp` | the input ranges, shared with the tests |
+| `../benchmarks/harness-test.cpp` | unit tests for the core and the cluster invariants |
 
 ```
 make limb-tables   # regenerate every bf16 limb table (ln, exp, sin)
