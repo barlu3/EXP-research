@@ -32,7 +32,7 @@ binaries through CTest with a pass/fail gate.
 | Target | Output |
 | --- | --- |
 | `make verify` | All three functions |
-| `cmake --build build --target verify-exp` | `cross-eval/MPFR-result16bitp.txt` |
+| `cmake --build build --target verify-exp` | `cross-eval/exp/MPFR-result16bitp.txt` |
 | `cmake --build build --target verify-sin` | `cross-eval/sin/MPFR-result16bitp-sin.txt` |
 | `cmake --build build --target verify-log` | `cross-eval/log/MPFR-result16bitp-log.txt` |
 
@@ -49,7 +49,7 @@ directly.
 
 | Target | Output |
 | --- | --- |
-| `cmake --build build --target verify-exp-limb-run` | `cross-eval/MPFR-result-limb-exp.txt` |
+| `cmake --build build --target verify-exp-limb-run` | `cross-eval/exp/MPFR-result-limb-exp.txt` |
 | `cmake --build build --target verify-sin-limb-run` | `cross-eval/sin/MPFR-result-limb-sin.txt` |
 | `cmake --build build --target verify-log-limb-run` | `cross-eval/log/MPFR-result-limb-log.txt` |
 | `cmake --build build --target verify-limb` | all three |
@@ -63,7 +63,7 @@ verifier is a separate, older file (`cross-eval/log/verify-limb.c`).
 | Target | Output |
 | --- | --- |
 | `make limb-tables` | all three headers below |
-| `cmake --build build --target exp-limb-tables` | `implementations/expbf16-limb.h` |
+| `cmake --build build --target exp-limb-tables` | `implementations/exp/expbf16-limb.h` |
 | `cmake --build build --target sin-limb-tables` | `implementations/sin/sinbf16-limb.h` |
 | `cmake --build build --target ln-limb-tables` | `implementations/log/logbf16-limb.h` |
 | `make limb-sweep` | the limb-configuration frontier, to stdout |
@@ -72,7 +72,7 @@ The exp and sin generators split the **shipped** CORE-MATH tables rather than
 recomputing ideals in MPFR, so they need no MPFR. That is deliberate: those
 tables carry manual ULP adjustments and an overflow cap, and splitting the
 shipped values is what makes the generated limb tables reproduce
-`cr_exp_bf16` / `cr_sin_bf16` exactly. `limb-gen.c` (ln) does use MPFR, because
+`cr_exp_bf16` / `cr_sin_bf16` exactly. `table-gen/log/limb-gen.c` (ln) does use MPFR, because
 CORE-MATH's ln tables are plain correctly-rounded values.
 
 Like `ln`, these write into the source tree and so are manual targets — nothing
@@ -89,7 +89,7 @@ AVX flags hard-error on ARM targets. `-march=native` makes binaries
 non-portable across machines; configure with
 `cmake -S . -B build -DEXP_NATIVE_ARCH=OFF` to drop the architecture flags.
 
-Executables land in `implementations/output/`.
+Benchmark sources live in `benchmarks/`; executables land in `benchmarks/output/`.
 
 | Benchmark | Compares |
 | --- | --- |
@@ -150,7 +150,9 @@ different (still deterministic) file.
 `log-research/milp-gen.cc` is C despite its extension and is compiled with
 `LANGUAGE C` to match; letting CMake infer C++ breaks the build. That file and
 `bound-calc.c` hardcode `log-research/`-prefixed output paths, so their targets
-run from the repo root while every other tool runs from its own directory.
+run from the repo root. So do the `table-gen/` generators, which read the
+shipped tables and write their headers by repo-root-relative path. The
+`cross-eval/` and `benchmarks/` tools run from their own directory instead.
 
 `make clean` removes build artifacts but leaves generated reports and the
 extracted glibc tree in place. `make distclean` deletes the `build/` tree.

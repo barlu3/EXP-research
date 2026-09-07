@@ -26,6 +26,27 @@ See [BUILD.md](BUILD.md) for the full target reference.
 | `make check-mpfr` | Confirm MPFR is installed and print its version |
 | `make test` | Run the verification suite through CTest |
 
+## Layout
+
+Every top-level directory answers one question, and the three functions —
+`exp`, `sin`, `log` — sit level with each other inside the ones that are
+per-function.
+
+```
+implementations/  the math kernels             exp/ sin/ log/
+cross-eval/       is it correct?               exp/ sin/ log/ + shared MPFR tools
+table-gen/        build the bf16 limb tables   exp/ sin/ log/ sweep/
+benchmarks/       is it fast?
+log-research/     does a correctly-rounded bf16 ln() exist?  (LP/MILP)
+docs/             research writeups
+cmake/            build support
+dependencies/     glibc reference fetch
+```
+
+`log-research/` is scoped to `ln` on purpose: it is the feasibility question for
+log's table layout, not shared tooling. The limb *generators* for all three
+functions live in `table-gen/`.
+
 ## bf16-only limb tables
 
 Alongside the CORE-MATH implementations, all three functions have variants
@@ -54,7 +75,7 @@ exhaustive check rather than by construction, and three entries carry a one- or
 two-ULP adjustment. That configuration is the same size as the float32 table it
 replaces, so on `exp` the scheme costs no storage at all.
 
-See [log-research/EXP-SIN-LIMB-RESULTS.md](log-research/EXP-SIN-LIMB-RESULTS.md).
+See [docs/EXP-SIN-LIMB-RESULTS.md](docs/EXP-SIN-LIMB-RESULTS.md).
 
 ## Cross-evaluation (exp / sin / log)
 
@@ -64,17 +85,17 @@ See [log-research/EXP-SIN-LIMB-RESULTS.md](log-research/EXP-SIN-LIMB-RESULTS.md)
 `verify_mpfr.c` compares all 65536 bfloat16 patterns against correctly-rounded
 MPFR and logs each discrepancy with the CORE-MATH lookup-table indices (T1/T2
 for exp, S1/C1/S2/C2 or S3/C3 for sin, T1/T2 or T3 for log). Reports land in
-`MPFR-result16bitp.txt`, `sin/MPFR-result16bitp-sin.txt`, and
+`exp/MPFR-result16bitp.txt`, `sin/MPFR-result16bitp-sin.txt`, and
 `log/MPFR-result16bitp-log.txt`.
 
 Each source `#include`s the 16-bit-rounded tables by default
-(`inria-exp16bitp.c`, `sin/inria-sin16bitp.c`, `log/inria-log16bitp.c`). To
+(`exp/inria-exp16bitp.c`, `sin/inria-sin16bitp.c`, `log/inria-log16bitp.c`). To
 check the unmodified 24-bit Inria tables, swap the `#include` (and matching
 `OUT_FILE`) at the top of the file.
 
 `round-16bitp.c` loads each binary32 table value exactly into MPFR, re-rounds to
 16-bit (RNDN), and emits a per-entry diff plus paste-ready C arrays into
-`round-16bitp.txt`, `sin/round-16bitp-sin.txt`, and `log/round-16bitp-log.txt`.
+`exp/round-16bitp.txt`, `sin/round-16bitp-sin.txt`, and `log/round-16bitp-log.txt`.
 
 ## Why the homemade version is faster (most inputs)
 

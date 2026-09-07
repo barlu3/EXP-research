@@ -20,7 +20,7 @@
 
    Build (from the repo root):
      gcc -O2 -std=c11 -I implementations cross-eval/verify-limb.c \
-         implementations/inria-expbf16-limb.c -lmpfr -lgmp -lm \
+         implementations/exp/inria-expbf16-limb.c -lmpfr -lgmp -lm \
          -o cross-eval/verify-exp-limb
 */
 
@@ -45,7 +45,7 @@ extern __bf16 cr_exp_bf16_limb_min (__bf16 x);
 #define FN_EXACT   cr_exp_bf16_limb
 #define FN_MIN     cr_exp_bf16_limb_min
 #define FN_NAME    "exp"
-#define OUT_FILE   "cross-eval/MPFR-result-limb-exp.txt"
+#define OUT_FILE   "cross-eval/exp/MPFR-result-limb-exp.txt"
 #define CONFIG_TXT "3 limbs on T1/T2 (exact), 2 on both (minimal)"
 
 /* The shape of the tables is part of the contract, not an implementation

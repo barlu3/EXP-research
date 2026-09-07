@@ -63,8 +63,8 @@ function(add_limb_verifier binname runtarget impl incdir comment)
 endfunction()
 
 add_limb_verifier(verify-exp-limb verify-exp-limb-run
-  "${CMAKE_SOURCE_DIR}/implementations/inria-expbf16-limb.c"
-  "${CMAKE_SOURCE_DIR}/implementations"
+  "${CMAKE_SOURCE_DIR}/implementations/exp/inria-expbf16-limb.c"
+  "${CMAKE_SOURCE_DIR}/implementations/exp"
   "Verifying exp limb tables: ${VERIFY_COMMENT}")
 
 add_limb_verifier(verify-sin-limb verify-sin-limb-run

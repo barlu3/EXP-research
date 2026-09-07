@@ -300,7 +300,7 @@ input. It cannot: every `T1` fragment is infeasible. The weaker question --
 can each entry be a SUM of bf16 limbs? -- is feasible, and the tables are
 generated and shipped.
 
-`limb-gen.c` emits `implementations/log/logbf16-limb.h`: 3 bf16 limbs per `T1`
+`table-gen/log/limb-gen.c` emits `implementations/log/logbf16-limb.h`: 3 bf16 limbs per `T1`
 entry, 2 per `T2`, 1 per `T3`. `inria-logbf16-limb.c` sums them in float32 and
 rounds once. `cross-eval/log/verify-limb.c` checks all 65536 bf16 inputs
 against MPFR and reports **0 discrepancies**.
@@ -358,7 +358,7 @@ The one place it fails is `sin`'s large path (`|x| >= 4096`), whose
 angle-addition chain reuses each entry across many inputs, so the errors
 compound and nothing decouples. `S3`/`C3` keep three limbs.
 
-See [EXP-SIN-LIMB-RESULTS.md](EXP-SIN-LIMB-RESULTS.md) for the full frontier,
+See [../docs/EXP-SIN-LIMB-RESULTS.md](../docs/EXP-SIN-LIMB-RESULTS.md) for the full frontier,
 the storage and throughput numbers, and what is still open.
 
 ## Files
@@ -372,12 +372,17 @@ the storage and throughput numbers, and what is still open.
 | `split-milp.py` | decomposition (`--blocks`, `--t2-blocks`, `--t1-range`, `--pin-t2`) |
 | `solve-fragments.sh` | run `glpsol` per fragment; nonzero exit if any is not OPTIMAL |
 | `check-solution.py` | exact re-validation of a composed assignment |
-| `limb-gen.c` | `ln` bf16 limb tables (3xT1, 2xT2, 1xT3) |
-| `exp-limb-gen.c` | `exp` bf16 limb tables (3x3 exact, 2x2 minimal) |
-| `sin-limb-gen.c` | `sin` bf16 limb tables (exact and minimal) |
-| `limb-config-sweep.c` | limb-configuration frontier + per-entry repair searches |
-| `EXP-SIN-LIMB-RESULTS.md` | the `exp`/`sin` limb result |
-| `EXP-LIMB-PLAN.md` | superseded; kept for the research trail |
+| `milp-limb-gen.cc` | per-limb MILP: proves a bf16 limb table can hit every interval |
+| `check-limb-solution.py` | exact re-validation of a per-limb assignment |
+
+The limb-table **generators** are not here. They cover all three functions, not
+just `ln`, so they live together under `table-gen/`: `table-gen/log/limb-gen.c`,
+`table-gen/exp/exp-limb-gen.c`, `table-gen/sin/sin-limb-gen.c`, and the
+`table-gen/sweep/limb-config-sweep.c` that justifies their limb counts. What
+stays here is the ln precision research those generators rest on.
+
+The `exp`/`sin` limb result (`../docs/EXP-SIN-LIMB-RESULTS.md`) and the
+superseded plan it replaced (`../docs/EXP-LIMB-PLAN.md`) live in `docs/`.
 
 `fragments/` and all `.lp` files are gitignored — regenerate with `build-lp.sh`.
 

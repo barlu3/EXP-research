@@ -19,8 +19,10 @@ option(EXP_NATIVE_ARCH "Build benchmarks with -march=native -mavx2 -mfma" ON)
 enable_testing()
 
 add_subdirectory(implementations)
+add_subdirectory(benchmarks)
 add_subdirectory(cross-eval)
 add_subdirectory(log-research)
+add_subdirectory(table-gen)
 
 # MPFR presence check — replaces the README's manual `cc -o version version.c`.
 add_executable(mpfr-version version.c)

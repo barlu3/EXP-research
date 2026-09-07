@@ -7,7 +7,7 @@ bench
 CLAUDE.local.md
 .claude/
 CLAUDE.md
-implementations/output/
+benchmarks/output/
 # verifying MPFR library is downloaded and installed correctly
 version
 # discrepancy checker for MPFR library
@@ -36,13 +36,14 @@ log-research/fragments/
 __pycache__/
 # bf16 limb-table tools: generators, sweeps, and MPFR verifiers.
 # CMake writes these into the source tree to match the other tools here.
-log-research/limb-gen
+table-gen/log/limb-gen
 log-research/milp-limb-gen
-log-research/exp-limb-gen
-log-research/sin-limb-gen
-log-research/limb-config-sweep
+table-gen/exp/exp-limb-gen
+table-gen/sin/sin-limb-gen
+table-gen/sweep/limb-config-sweep
 cross-eval/verify-exp-limb
 cross-eval/verify-sin-limb
 cross-eval/sin/verify-sin-limb
 cross-eval/log/verify-limb
 cross-eval/log/verify-log-limb
+.DS_Store

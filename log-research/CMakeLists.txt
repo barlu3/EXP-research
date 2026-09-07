@@ -9,7 +9,7 @@
 set_source_files_properties(milp-gen.cc PROPERTIES LANGUAGE C)
 set_source_files_properties(milp-limb-gen.cc PROPERTIES LANGUAGE C)
 
-foreach(tool precompute bound-calc limb-gen)
+foreach(tool precompute bound-calc)
   add_executable(${tool} ${tool}.c)
   target_compile_options(${tool} PRIVATE -O2)
   target_link_libraries(${tool} PRIVATE MPFR::MPFR)
@@ -22,24 +22,6 @@ foreach(gen milp-gen milp-limb-gen)
   target_compile_options(${gen} PRIVATE -O2)
   target_link_libraries(${gen} PRIVATE MPFR::MPFR)
   set_target_properties(${gen} PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
-endforeach()
-
-# The exp/sin limb generators and the configuration sweep read the shipped
-# CORE-MATH tables directly instead of recomputing ideals in MPFR, so they need
-# no MPFR at all. That is deliberate: the exp and sin tables carry manual ULP
-# adjustments and an overflow cap, and splitting the shipped values is what
-# makes the generated limb tables reproduce cr_exp_bf16 / cr_sin_bf16 exactly.
-foreach(tool exp-limb-gen sin-limb-gen limb-config-sweep)
-  add_executable(${tool} ${tool}.c)
-  target_compile_options(${tool} PRIVATE -O2)
-  target_include_directories(${tool} PRIVATE "${CMAKE_SOURCE_DIR}")
-  # isfinite/fabsf, plus the expf/sinf in the CORE-MATH sources these include.
-  # macOS carries libm in libSystem; glibc needs it named.
-  if(NOT APPLE)
-    target_link_libraries(${tool} PRIVATE m)
-  endif()
-  set_target_properties(${tool} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 endforeach()
 
@@ -91,48 +73,6 @@ add_custom_target(ln-t1-sweep
   DEPENDS t1-precision-sweep milp-gen
   WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
   COMMENT "Sweeping T1 significand width with T2 pinned"
-  USES_TERMINAL)
-
-# Regenerates implementations/log/logbf16-limb.h (3x bf16 limbs for T1, 2x for
-# T2, 1x for T3). Writes into the source tree, so it is a manual target.
-add_custom_target(ln-limb-tables
-  COMMAND limb-gen
-  DEPENDS limb-gen
-  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-  COMMENT "Generating bf16 limb tables for cr_log_bf16_limb"
-  USES_TERMINAL)
-
-# Regenerate implementations/expbf16-limb.h and sin/sinbf16-limb.h. Each emits
-# two configurations: an exact one (3 bf16 limbs carry float32's 24 significand
-# bits, so the reconstruction is bit-for-bit the shipped value) and a minimal
-# one with per-entry ULP adjustments. Both write into the source tree, so like
-# ln-limb-tables they are manual targets.
-add_custom_target(exp-limb-tables
-  COMMAND exp-limb-gen
-  DEPENDS exp-limb-gen
-  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-  COMMENT "Generating bf16 limb tables for cr_exp_bf16_limb"
-  USES_TERMINAL)
-
-add_custom_target(sin-limb-tables
-  COMMAND sin-limb-gen
-  DEPENDS sin-limb-gen
-  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-  COMMENT "Generating bf16 limb tables for cr_sin_bf16_limb"
-  USES_TERMINAL)
-
-add_custom_target(limb-tables
-  DEPENDS ln-limb-tables exp-limb-tables sin-limb-tables
-  COMMENT "Regenerating every bf16 limb table")
-
-# The evidence behind those configurations: every limb count measured against
-# the shipped float32 implementations, plus the per-entry repair searches.
-# Answers why exp is 3x3/3x2 and why sin's large path cannot drop to 2 limbs.
-add_custom_target(limb-sweep
-  COMMAND limb-config-sweep
-  DEPENDS limb-config-sweep
-  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-  COMMENT "Sweeping bf16 limb configurations for exp and sin"
   USES_TERMINAL)
 
 # Per-limb MILP: proves a bf16 limb table can hit every rounding interval.

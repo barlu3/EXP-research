@@ -47,12 +47,12 @@
 #else
 /* exp: the table source under test (16-bit rounded, or original 24-bit).
    Uncomment the original to verify the unmodified Inria tables instead. */
-#include "inria-exp16bitp.c"
-// #include "../implementations/inria-expbf16.c"
+#include "exp/inria-exp16bitp.c"
+// #include "../implementations/exp/inria-expbf16.c"
 #define CR_FUNC   cr_exp_bf16
 #define FUNC_NAME "exp"
-#define OUT_FILE  "MPFR-result16bitp.txt"
-// #define OUT_FILE "MPFR-result24bitp.txt"
+#define OUT_FILE  "exp/MPFR-result16bitp.txt"
+// #define OUT_FILE "exp/MPFR-result24bitp.txt"
 #endif
 
 /* ── helpers ───────────────────────────────────────────────────────── */

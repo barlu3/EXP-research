@@ -814,8 +814,8 @@ int main(void)
     return 0;
 
 #else /* ROUND_EXP */
-    FILE *out = fopen("round-16bitp.txt", "w");
-    if (!out) { perror("fopen round-16bitp.txt"); return 1; }
+    FILE *out = fopen("exp/round-16bitp.txt", "w");
+    if (!out) { perror("fopen exp/round-16bitp.txt"); return 1; }
 
     const size_t n_t1 = sizeof(T1) / sizeof(float);
     const size_t n_t2 = sizeof(T2) / sizeof(float);
@@ -856,7 +856,7 @@ int main(void)
     print_c_table(out, "T2", t2_comment, T2, n_t2);
 
     fclose(out);
-    printf("Done.  T1: %zu entries, T2: %zu entries.  See round-16bitp.txt\n",
+    printf("Done.  T1: %zu entries, T2: %zu entries.  See exp/round-16bitp.txt\n",
            n_t1, n_t2);
     return 0;
 #endif
