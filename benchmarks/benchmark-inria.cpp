@@ -105,7 +105,20 @@ int main() {
     lprintf("\n");
     lprintf("══════════════════════════════════════════════════════════════════\n");
     lprintf("  exp() Benchmark — Inria cr_exp vs homemade (exp.hpp) vs stdlib\n");
-    lprintf("  Compile flags : -O3 -march=native -mavx2 -mfma -std=c++20\n");
+    // Reported from what the compiler actually enabled, not from a fixed
+    // string: CMake probes -mavx2/-mfma and drops them on targets that
+    // reject them (Apple Silicon), so a literal here would misreport.
+    lprintf("  Compile flags : -O3 -march=native%s%s -std=c++20\n",
+#if defined(__AVX2__)
+            " -mavx2",
+#else
+            "",
+#endif
+#if defined(__FMA__)
+            " -mfma");
+#else
+            "");
+#endif
     lprintf("  Iterations    : %'d per variant per cluster\n", BENCH_ITERS);
     lprintf("  Warmup        : %'d iterations (not timed)\n",  WARMUP_ITERS);
     lprintf("  Acc. samples  : %'d random draws per cluster\n", ACC_SAMPLES);

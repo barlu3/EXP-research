@@ -17,7 +17,13 @@
 
 #pragma once
 
+// x86-only. Its sole users here are the AVX2 stubs at the bottom of this
+// file, which are themselves __AVX2__-guarded, so non-x86 targets (Apple
+// Silicon) skip both the header and the stubs and still get the full
+// scalar implementation.
+#if defined(__x86_64__) || defined(__i386__)
 #include <immintrin.h>
+#endif
 #include <bit>
 #include <cstdint>
 #include <cmath>
