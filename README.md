@@ -13,18 +13,57 @@ make            # build everything
 make help       # list every target
 ```
 
-See [BUILD.md](BUILD.md) for the full target reference.
+See [BUILD.md](BUILD.md) for the full target reference. Every target below is a
+thin wrapper over CMake; the build tree is configured on first use. Override
+`BUILD_DIR` (default `build`), `JOBS`, or `CMAKE` on the command line.
+
+**Build**
+
+| Target | Purpose |
+| --- | --- |
+| `make` / `make all` | Configure if needed, then build every target |
+| `make configure` | Create the CMake build tree without building |
+| `make clean` | Remove build artifacts; generated reports and the glibc tree stay |
+| `make distclean` | Delete the `build/` tree outright |
+| `make help` | List every available target |
+
+**Verify**
 
 | Target | Purpose |
 | --- | --- |
 | `make verify` | Exhaustive 65536-pattern check vs MPFR (exp, sin, log; float32 and bf16 limb tables) |
-| `make bench` | Build + run the throughput benchmarks |
-| `make round` | Regenerate the 16-bit-rounded table reports |
-| `make limb-tables` | Regenerate the bf16 limb tables (ln, exp, sin) |
-| `make limb-sweep` | Measure the bf16 limb-configuration frontier |
-| `make glibc` | Fetch + extract the glibc reference source |
-| `make check-mpfr` | Confirm MPFR is installed and print its version |
+| `make verify-limb` | The same check restricted to the bf16-only limb tables |
 | `make test` | Run the verification suite through CTest |
+
+**Generate**
+
+| Target | Purpose |
+| --- | --- |
+| `make limb-tables` | Regenerate the bf16 limb tables (ln, exp, sin) |
+| `make round` | Regenerate the 16-bit-rounded table reports |
+| `make tables` | Regenerate the T1/T2 lookup tables via SageMath |
+
+**Measure**
+
+| Target | Purpose |
+| --- | --- |
+| `make bench` | Build + run the throughput benchmarks |
+| `make limb-sweep` | Measure the bf16 limb-configuration frontier |
+
+**Environment**
+
+| Target | Purpose |
+| --- | --- |
+| `make check-mpfr` | Confirm MPFR is installed and print its version |
+| `make glibc` | Fetch + extract the glibc reference source |
+
+Two targets exit nonzero by design, not from build breakage:
+
+- `make test` — 6 of 9 tests pass. `verify-exp`, `verify-sin` and `verify-log`
+  report 7, 158 and 33 discrepancies against MPFR: open research findings in the
+  16-bit-rounded tables. The six bf16 limb tests pass with zero discrepancies.
+- `make tables` — requires SageMath on `PATH`; it reports that and stops if
+  absent. Lookup tables are never edited by hand.
 
 ## Layout
 
