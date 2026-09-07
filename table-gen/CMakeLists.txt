@@ -43,8 +43,9 @@ add_limb_tool(exp-limb-gen      exp/exp-limb-gen.c)
 add_limb_tool(sin-limb-gen      sin/sin-limb-gen.c)
 add_limb_tool(limb-config-sweep sweep/limb-config-sweep.c)
 
-# Regenerates implementations/log/logbf16-limb.h (3x bf16 limbs for T1, 2x for
-# T2, 1x for T3). Writes into the source tree, so it is a manual target.
+# Regenerates implementations/log/logbf16-limb.h (2x bf16 limbs for T1, 2x for
+# T2, 1x for T3, with 14 tuned entries -- see docs/LIMB-TUNING.md). Writes into
+# the source tree, so it is a manual target.
 add_custom_target(ln-limb-tables
   COMMAND limb-gen
   DEPENDS limb-gen

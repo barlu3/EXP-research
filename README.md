@@ -90,31 +90,33 @@ functions live in `table-gen/`.
 
 Alongside the CORE-MATH implementations, all three functions have variants
 whose lookup tables contain **no float32 at all**: each entry is stored as a
-sum of non-overlapping bf16 limbs, summed back in float32 at use. The target is
-hardware with bf16 storage or bf16 MACs and no float32 table path — the tables
-are larger, not smaller — except `exp`'s minimal variant, which is exactly the
-same size.
+sum of bf16 limbs, summed back in float32 at use. The target is hardware with
+bf16 storage or bf16 MACs and no float32 table path. At the minimal
+configuration `ln` is *smaller* than the float32 table it replaces and `exp` is
+exactly the same size; only `sin` still pays for the scheme.
 
-| function | reconstruction | minimal config | tuned entries | verified |
-|---|---|---|---|---|
-| `cr_log_bf16_limb` | `T1 + T2` | 3×2 | 0 | 0 discrepancies / 65536 |
-| `cr_exp_bf16_limb` | `T1 * T2` | 2×2 | 3 | 0 discrepancies / 65536 |
-| `cr_sin_bf16_limb` | `fma(S1, C2, C1*S2)` | 2×3 (mid path) | 0 | 0 discrepancies / 65536 |
+| function | reconstruction | minimal config | tuned entries | storage vs float32 | verified |
+|---|---|---|---|---|---|
+| `cr_log_bf16_limb` | `T1 + T2` | 2×2 | 14 | −12.5% | 0 discrepancies / 65536 |
+| `cr_exp_bf16_limb` | `T1 * T2` | 2×2 | 3 | ±0% | 0 discrepancies / 65536 |
+| `cr_sin_bf16_limb` | `fma(S1, C2, C1*S2)` | 2×3 (mid path) | 0 | +25% | 0 discrepancies / 65536 |
 
 A sum splits into limbs trivially; a product looks like it should not, since
 expanding `(a1+a2)(b1+b2)` gives `n·m` cross terms. It does not have to be
 expanded — rebuild each *factor* from its limbs first, then do the single
 multiply, for `n+m` adds at any limb count. Three bf16 limbs carry float32's
-24 significand bits exactly, so that variant is bit-identical to CORE-MATH by
-construction. The minimal variants give that up. `ln` and `sin` drop one limb
-from a single factor, keeping the other exact so the error stays on one side of
-the product; `sin` needs no tuning at all. `exp` goes further and drops **both**
-factors to two limbs — neither is exact, so correctness is established by the
-exhaustive check rather than by construction, and three entries carry a one- or
-two-ULP adjustment. That configuration is the same size as the float32 table it
-replaces, so on `exp` the scheme costs no storage at all.
+24 significand bits exactly, so a 3-limb variant is bit-identical to CORE-MATH
+by construction. The minimal variants give that up: `ln` and `exp` both drop to
+two limbs on both sides, where neither side is exact, so correctness rests on
+the exhaustive check rather than on a property of the split. Each needs a small
+number of entries whose last limb sits a few ULP off the canonical
+round-and-subtract value — 14 for `ln`, 3 for `exp`. `sin` keeps one factor
+exact and needs no tuning at all.
 
-See [docs/EXP-SIN-LIMB-RESULTS.md](docs/EXP-SIN-LIMB-RESULTS.md).
+Finding those entries is its own problem, and for `ln` a naive search reports
+the minimal configuration as infeasible when it is not. See
+[docs/LIMB-TUNING.md](docs/LIMB-TUNING.md) for the search, and
+[docs/EXP-SIN-LIMB-RESULTS.md](docs/EXP-SIN-LIMB-RESULTS.md) for the frontier.
 
 ## Cross-evaluation (exp / sin / log)
 

@@ -300,10 +300,16 @@ input. It cannot: every `T1` fragment is infeasible. The weaker question --
 can each entry be a SUM of bf16 limbs? -- is feasible, and the tables are
 generated and shipped.
 
-`table-gen/log/limb-gen.c` emits `implementations/log/logbf16-limb.h`: 3 bf16 limbs per `T1`
+`table-gen/log/limb-gen.c` emits `implementations/log/logbf16-limb.h`: 2 bf16 limbs per `T1`
 entry, 2 per `T2`, 1 per `T3`. `inria-logbf16-limb.c` sums them in float32 and
 rounds once. `cross-eval/log/verify-limb.c` checks all 65536 bf16 inputs
 against MPFR and reports **0 discrepancies**.
+
+The canonical round-and-subtract split does not reach that on its own at 2x2 --
+it misrounds 14 inputs -- so 14 entries carry a last limb a few ULP off
+canonical. The generator finds them by bounded coordinate descent plus a seeded
+retry, re-verifies all 32512 normal inputs against MPFR, and refuses to write a
+failing table. See [../docs/LIMB-TUNING.md](../docs/LIMB-TUNING.md).
 
 `milp-limb-gen.cc` emits the corresponding per-limb MILP, and
 `check-limb-solution.py` re-validates the emitted tables against all 65278
@@ -312,11 +318,21 @@ re-check, not any `glpsol` status, is what makes the feasibility claim safe:
 the rows are ~1e-9 wide, so a bare `Optimal` means nothing here, exactly as
 the section above warns.
 
-Storage is a regression, not a saving: 48 bits per `T1` entry against 32 for
-CORE-MATH's float32, +12.5% overall (`T3` halves, `T1` grows). The scheme is
-for targets with bf16 storage or bf16 MACs and no float32 table path. On the
-benchmark it runs ~2.2x slower than the float32 tables for normals and ~0.6x
-(faster) for subnormals, where it reads one bf16 instead of one float32.
+Storage is a saving: 32 bits per `T1` and `T2` entry, matching CORE-MATH's
+float32, and 16 per `T3` against 32 -- 1782 B against 2036 B, **-12.5%**
+overall. (At the earlier 3x2 configuration it was a +12.5% regression; the
+third `T1` limb was what cost the space.) The scheme's purpose is still targets
+with bf16 storage or bf16 MACs and no float32 table path; the saving is a
+bonus.
+
+Throughput: dropping the third `T1` limb removes one dependent float32 add from
+the normal path, and the benchmark shows 2x2 same-or-slightly-better than 3x2
+on every cluster (-5.6% on the `x near 80` cluster, within noise elsewhere,
+over 11 paired runs). That difference is smaller than this machine's run-to-run
+spread of roughly +/-15%, so the honest reading is **no regression**, not a
+speedup. Against CORE-MATH's float32 tables the limb variant remains close to
+parity overall, with the subnormal path favouring it (one bf16 load instead of
+one float32) and the normal path costing it two extra loads and two extra adds.
 
 ## The same trick for exp and sin
 
@@ -329,30 +345,29 @@ does, for n+m adds at any limb count.
 
 | function | reconstruction | minimal config | tuned entries | verified |
 |---|---|---|---|---|
-| `ln`  | `T1 + T2` | 3x2 | 0 | 0 discrepancies / 65536 |
+| `ln`  | `T1 + T2` | 2x2 | 14 | 0 discrepancies / 65536 |
 | `exp` | `T1 * T2` | 2x2 | 3 | 0 discrepancies / 65536 |
 | `sin` | `fma(S1, C2, C1*S2)` | 2x3 (mid path) | 0 | 0 discrepancies / 65536 |
 
-Three bf16 limbs carry 24 significand bits, exactly float32's, so a 3-limb
-reconstruction is *exact* and its output is bit-identical to the shipped
-implementation by construction. In the minimal configurations for `ln` and `sin` one
-factor is genuinely lossy, and correctness holds because the OTHER stays exact:
-that confines the error to one side of each product and turns the bilinear
-feasibility question into independent per-entry searches. `sin` needs no tuning
-at all.
+Three bf16 limbs carry 24 significand bits, exactly float32's, so where a
+generator splits a shipped float32 value, a 3-limb reconstruction is *exact*
+and bit-identical by construction. `sin`'s minimal configuration keeps one
+factor at three limbs for exactly that reason: the error stays on one side of
+the product, the bilinear feasibility question collapses into independent
+per-entry searches, and no tuning is needed at all. Which factor keeps the
+third limb is a storage question -- `sin` puts it on `S2`/`C2` (128 entries
+each) rather than `S1`/`C1` (256), which is 512 B cheaper.
 
-Which factor keeps the third limb is a storage question, not a correctness
-one. `sin` puts it on `S2`/`C2` (128 entries each) rather than `S1`/`C1` (256),
-which is 512 B cheaper and, as it happens, needs no tuning -- so `sin` is 2x3
-where `ln` is 3x2.
-
-`exp` is the exception: it drops BOTH factors to two limbs, so no exactness
-argument is available and the per-entry decoupling does not apply. It works
-anyway because the canonical 2x2 split misrounds only three inputs and those
-three read disjoint entries, so coordinate descent repairs them in one pass
-(T1[16] +1, T2[105] +2, T2[182] +1 ULP on the second limb). The result is a
-table the same size as the float32 one, verified exhaustively rather than by
-construction.
+`ln` and `exp` both go further and drop BOTH sides to two limbs, so no
+exactness argument is available and the per-entry decoupling does not apply.
+Each works anyway, for the same reason: very little is actually broken at the
+canonical split, and what is broken is repairable by moving individual last
+limbs a few ULP. `exp` misrounds three inputs reading disjoint entries, which
+coordinate descent repairs in one pass. `ln` misrounds 14 and needs one extra
+trick -- a seeded uphill move that plain descent will not take -- because its
+last failure is an exact rounding tie in the cancellation band below x = 1.
+Both results are verified exhaustively rather than established by construction.
+[../docs/LIMB-TUNING.md](../docs/LIMB-TUNING.md) covers both searches.
 
 The one place it fails is `sin`'s large path (`|x| >= 4096`), whose
 angle-addition chain reuses each entry across many inputs, so the errors

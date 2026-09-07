@@ -12,20 +12,25 @@ iterated round-and-subtract, rebuild each factor in float32, run the function's
 own arithmetic unchanged. The *configuration* is not: it lands wherever each
 function's table shapes put it.
 
-| function | reconstruction | minimal config | tuned entries | verified |
-|---|---|---|---|---|
-| `ln`  | `T1 + T2` | 3×2 | 0 | 0 discrepancies / 65536 |
-| `exp` | `T1 * T2` | 2×2 | 3 | 0 discrepancies / 65536 |
-| `sin` | `fma(S1, C2, C1*S2)` | 2×3 (mid path) | 0 | 0 discrepancies / 65536 |
+| function | reconstruction | minimal config | tuned entries | storage vs float32 | verified |
+|---|---|---|---|---|---|
+| `ln`  | `T1 + T2` | 2×2 | 14 | −12.5% | 0 discrepancies / 65536 |
+| `exp` | `T1 * T2` | 2×2 | 3 | ±0% | 0 discrepancies / 65536 |
+| `sin` | `fma(S1, C2, C1*S2)` | 2×3 (mid path) | 0 | +25% | 0 discrepancies / 65536 |
 
-`exp` goes furthest: two limbs on *both* factors is correctly rounded after
-three adjusted entries, which makes its table exactly the size of the float32
-table it replaces. `sin` cannot follow, because its two index families are
-different sizes: `S1`/`C1` hold 256 entries each against `S2`/`C2`'s 128, so
-the third limb is half the price on `S2`/`C2`. The mirror arrangement (3×2)
-also reaches zero, but costs 512 B more and needs three hand-adjusted index
-pairs to get there. Symmetry with the other two functions is not a reason to
-pay for it.
+`ln` goes furthest: two limbs on both sides makes its table *smaller* than the
+float32 one it replaces, because `T3` halves and nothing grows. `exp` reaches
+two limbs on both factors as well, landing exactly on the float32 table's size.
+`sin` cannot follow, because its two index families are different sizes:
+`S1`/`C1` hold 256 entries each against `S2`/`C2`'s 128, so the third limb is
+half the price on `S2`/`C2`. The mirror arrangement (3×2) also reaches zero,
+but costs 512 B more and needs three hand-adjusted index pairs to get there.
+Symmetry with the other two functions is not a reason to pay for it.
+
+`ln`'s 2×2 result is newer than the rest of this document and corrects it: the
+configuration sweep below reports 3×2 as `ln`'s minimum, which is true only for
+the *untuned* canonical split. Tuning 14 entries reaches zero at 2×2. See
+[LIMB-TUNING.md](LIMB-TUNING.md).
 
 ## What the plan got wrong
 

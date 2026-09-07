@@ -17,6 +17,12 @@
 #include <stdint.h>
 #include <mpfr.h>
 
+/* For LOGBF16_T1_LIMBS / LOGBF16_T2_LIMBS in the report header, so it tracks
+   the generated table rather than restating it. The tables themselves are
+   unused here -- this file checks cr_log_bf16_limb through its public entry
+   point, not the tables directly. */
+#include "logbf16-limb.h"
+
 typedef union { float f; uint32_t u; } f32u32;
 typedef union { __bf16 f; uint16_t u; } b16u16_v;
 
@@ -86,11 +92,11 @@ int main (void) {
 
   fprintf (out,
     "MPFR vs limb-table bfloat16 log() — exhaustive verification\n"
-    "Implementation: cr_log_bf16_limb (3x bf16 limbs for T1, 2x for T2,\n"
+    "Implementation: cr_log_bf16_limb (%dx bf16 limbs for T1, %dx for T2,\n"
     "                1x for T3; float32 accumulation, single final rounding)\n"
     "MPFR version: %s\n"
     "Checking all 65536 bfloat16 bit patterns (0x0000–0xFFFF)...\n\n",
-    mpfr_get_version ());
+    LOGBF16_T1_LIMBS, LOGBF16_T2_LIMBS, mpfr_get_version ());
 
   int discrepancies = 0, nan_pairs = 0;
 

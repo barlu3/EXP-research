@@ -5,13 +5,15 @@
    verify_mpfr.c), so this measures cost, not accuracy.
 
    What differs. cr_log_bf16 reads two float32 entries and adds them.
-   cr_log_bf16_limb reads three bf16 limbs for T1 and two for T2 and sums all
-   five in float32. It trades loads and adds for the ability to keep the whole
+   cr_log_bf16_limb reads two bf16 limbs for T1 and two for T2 and sums all
+   four in float32. It trades loads and adds for the ability to keep the whole
    table in bf16 storage -- the point of the scheme, since it targets hardware
    with bf16 storage or bf16 MACs and no float32 table path.
 
-   Table sizes are reported alongside: the limb scheme is LARGER for T1
-   (48 bits/entry vs 32) and smaller for T3 (16 vs 32).
+   Table sizes are reported alongside and are derived from LOGBF16_T*_LIMBS in
+   the generated header, so this report cannot drift from the shipped table:
+   the limb scheme matches float32 for T1 and T2 (32 bits/entry) and halves T3
+   (16 vs 32), for a 12.5% overall saving.
 
    Build (from implementations/). The two implementations must be compiled as
    C -- under g++ they would get C++ linkage and fail to match the extern "C"
@@ -30,6 +32,11 @@
 #include <cstdio>
 #include <random>
 #include <vector>
+
+// Pulled in for LOGBF16_T1_LIMBS / LOGBF16_T2_LIMBS so the storage report and
+// the operation-count banner below track the generated table automatically.
+// The tables themselves are unused in this translation unit.
+#include "logbf16-limb.h"
 
 extern "C" {
 __bf16 cr_log_bf16 (__bf16 x);
@@ -100,17 +107,20 @@ int main() {
 
     // ── Table storage comparison ─────────────────────────────────────────────
     // T1: 254 usable entries, T2: 128, T3: 127.
+    const long t1_limb_b = 254L * LOGBF16_T1_LIMBS * 2;
+    const long t2_limb_b = 128L * LOGBF16_T2_LIMBS * 2;
+    const long t3_limb_b = 127L * 1 * 2;
     const long f32_bytes  = (254L * 4) + (128L * 4) + (127L * 4);
-    const long limb_bytes = (254L * 3 * 2) + (128L * 2 * 2) + (127L * 1 * 2);
+    const long limb_bytes = t1_limb_b + t2_limb_b + t3_limb_b;
 
     lprintf("\n");
     lprintf("┌────────────────────────────────────────────────────────────────┐\n");
     lprintf("│  TABLE STORAGE                                                 │\n");
     lprintf("└────────────────────────────────────────────────────────────────┘\n");
     lprintf("  %-28s %10s %10s\n", "table", "float32", "bf16 limb");
-    lprintf("  %-28s %9ldB %9ldB\n", "T1 (254 entries)", 254L*4, 254L*3*2);
-    lprintf("  %-28s %9ldB %9ldB\n", "T2 (128 entries)", 128L*4, 128L*2*2);
-    lprintf("  %-28s %9ldB %9ldB\n", "T3 (127 entries)", 127L*4, 127L*1*2);
+    lprintf("  %-28s %9ldB %9ldB\n", "T1 (254 entries)", 254L*4, t1_limb_b);
+    lprintf("  %-28s %9ldB %9ldB\n", "T2 (128 entries)", 128L*4, t2_limb_b);
+    lprintf("  %-28s %9ldB %9ldB\n", "T3 (127 entries)", 127L*4, t3_limb_b);
     lprintf("  %-28s %9ldB %9ldB   (%+.1f%%)\n", "total", f32_bytes, limb_bytes,
             100.0 * (double)(limb_bytes - f32_bytes) / (double)f32_bytes);
 
@@ -127,7 +137,9 @@ int main() {
     lprintf("┌────────────────────────────────────────────────────────────────┐\n");
     lprintf("│  BFLOAT16 — cr_log_bf16 (float32 tables) vs _limb (bf16)       │\n");
     lprintf("│  Inria : 2 float32 loads, 1 add                                │\n");
-    lprintf("│  Limb  : 5 bf16 loads, 4 adds (float32 accumulation)           │\n");
+    lprintf("│  Limb  : %d bf16 loads, %d adds (float32 accumulation)%*s│\n",
+            LOGBF16_T1_LIMBS + LOGBF16_T2_LIMBS,
+            LOGBF16_T1_LIMBS + LOGBF16_T2_LIMBS - 1, 11, "");
     lprintf("└────────────────────────────────────────────────────────────────┘\n");
     lprintf("  %-15s %12s %12s %10s\n", "cluster", "inria ns", "limb ns", "ratio");
 
