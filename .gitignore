@@ -47,3 +47,10 @@ cross-eval/sin/verify-sin-limb
 cross-eval/log/verify-limb
 cross-eval/log/verify-log-limb
 .DS_Store
+
+# Diagnostics and the feasibility certificate's test binary. Same rule as the
+# generators above: tools land beside their source, so ignore them by path.
+table-gen/analysis/limb-diagnostics
+table-gen/analysis/limb-margins
+table-gen/analysis/limb-lp
+table-gen/tests/limb-cert-test

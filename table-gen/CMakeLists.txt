@@ -43,6 +43,15 @@ add_limb_tool(exp-limb-gen      exp/exp-limb-gen.c)
 add_limb_tool(sin-limb-gen      sin/sin-limb-gen.c)
 add_limb_tool(limb-config-sweep sweep/limb-config-sweep.c)
 
+# Diagnostics behind docs/limb-tuning.tex. These are replicas of the generators'
+# split/score/descent code with the reporting extended, so every figure the
+# report quotes is reproducible rather than asserted. limb-lp is not a replica:
+# it solves the same problem a different way (difference constraints), so it
+# doubles as an independent check on the descent's answer.
+add_limb_tool(limb-diagnostics analysis/limb-diagnostics.c MPFR)
+add_limb_tool(limb-margins     analysis/limb-margins.c     MPFR)
+add_limb_tool(limb-lp          analysis/limb-lp.c          MPFR)
+
 # Regenerates implementations/log/logbf16-limb.h (2x bf16 limbs for T1, 2x for
 # T2, 1x for T3, with 14 tuned entries -- see docs/LIMB-TUNING.md). Writes into
 # the source tree, so it is a manual target.
@@ -79,6 +88,34 @@ add_custom_target(limb-tables
 # The evidence behind those configurations: every limb count measured against
 # the shipped float32 implementations, plus the per-entry repair searches.
 # Answers why exp is 2x2 and why sin's large path cannot drop to 2 limbs.
+# Unit tests for the feasibility certificate: the difference-constraint solver
+# and the ln system built on it. Fast (one MPFR model build), so it runs in
+# CTest proper rather than as a manual target.
+add_limb_tool(limb-cert-test tests/limb-cert-test.c MPFR)
+add_test(NAME limb-cert-test COMMAND limb-cert-test
+  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+
+# The emitted table is the shipped artefact, so it is pinned by a test rather
+# than by convention: regenerate and byte-compare against what is committed.
+# Guards every change to the tuning search, including the certificate work.
+add_test(NAME limb-gen-golden
+  COMMAND "${CMAKE_COMMAND}"
+    -DGEN=$<TARGET_FILE:limb-gen>
+    -DREF=${CMAKE_SOURCE_DIR}/implementations/log/logbf16-limb.h
+    -DTMP=${CMAKE_CURRENT_BINARY_DIR}/logbf16-limb.golden.h
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/golden-header.cmake"
+  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+
+# Everything docs/limb-tuning.tex quotes that the generators do not print.
+add_custom_target(limb-analysis
+  COMMAND limb-diagnostics
+  COMMAND limb-margins
+  COMMAND limb-lp
+  DEPENDS limb-diagnostics limb-margins limb-lp
+  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+  COMMENT "Reproducing the limb-tuning report's measurements"
+  USES_TERMINAL)
+
 add_custom_target(limb-sweep
   COMMAND limb-config-sweep
   DEPENDS limb-config-sweep
