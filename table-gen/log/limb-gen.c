@@ -44,6 +44,8 @@
 #include <string.h>
 #include <mpfr.h>
 
+#include "table-gen/common/limb-certificate.h"
+
 #define WORK_PREC 300
 #define BF16_PREC 8
 #define T1_LIMBS 2
@@ -53,8 +55,17 @@
 #define T3_N 128
 
 /* Tuning window, in ULP of the limb being moved. The shipped solution needs
-   at most 12, so 16 leaves headroom without making the seeded retry slow. */
+   at most 12, so 16 leaves headroom without making the seeded retry slow.
+
+   Do NOT derive this from the certificate's minimal window. That number (2)
+   bounds the LINEAR PROGRAM's own solution, which is a different point in the
+   feasible set; the descent reaches zero by a different route and needs +4 ULP
+   on T2[77]. Narrowing TUNE_WIN to the certificate's W would change the emitted
+   table, which is the one thing this generator may not do. */
 #define TUNE_WIN 16
+_Static_assert (TUNE_WIN >= 4,
+  "the shipped solution displaces T2[77] by 4 ULP; a narrower window "
+  "cannot reach it and would emit a different table");
 
 typedef union { __bf16 f; uint16_t u; } b16u16_u;
 
@@ -268,6 +279,65 @@ int main (int argc, char **argv) {
   }
 
   int canonical = total_bad ();
+
+  /* Feasibility certificate, before any searching.
+
+     The descent below is a bounded neighbourhood search: when it stalls, that
+     is a fact about the search, not about the problem. ln shipped at 3x2 for
+     exactly that reason -- a single level of descent reports "2x2 is
+     infeasible, 1 input cannot be repaired", which looks like a structural
+     result and is not one. The certificate settles the question first, by
+     Bellman-Ford over the difference-constraint form of the same problem (see
+     table-gen/common/limb-certificate.h).
+
+     It runs on the CANONICAL tables, so it must come before descent mutates
+     them. It never writes to t1/t2: the emitted table is still the descent's,
+     because the LP returns a polytope vertex that moves 325 of 382 entries
+     against the descent's 14, and a header of hand-audited constants is worth
+     keeping sparse. */
+  {
+    limb_problem prob = {
+      .n1 = T1_N, .n2 = T2_N, .row_lo = 1, .row_hi = T1_N - 1,
+      .l1 = T1_LIMBS, .l2 = T2_LIMBS,
+      .c1 = (const double (*)[4]) t1, .c2 = (const double (*)[4]) t2,
+      .ref = &ref[0][0]
+    };
+    limb_cert cert;
+    limb_cert_verdict v = limb_certify (&prob, LIMB_CERT_WINDOW_NONE, &cert,
+                                        NULL, NULL);
+    switch (v) {
+    case LIMB_CERT_SAT:
+      printf ("limb-gen: certificate %dx%d -> SAT "
+              "(constructed and verified, 0 misrounds over %d inputs)\n"
+              "limb-gen:   smallest lattice-safe window %d ULP; a correct table "
+              "provably exists,\n"
+              "limb-gen:   so a stall below is a search failure, not infeasibility\n",
+              T1_LIMBS, T2_LIMBS, (T1_N - 2) * T2_N, cert.min_window);
+      break;
+    case LIMB_CERT_UNSAT:
+      fprintf (stderr,
+        "limb-gen: certificate %dx%d -> UNSAT\n"
+        "limb-gen:   the difference-constraint system has a negative cycle of "
+        "%d constraints,\n"
+        "limb-gen:   so no %dx%d table is correct even with real-valued "
+        "displacements.\n"
+        "limb-gen:   not searching; spend a limb instead.\n",
+        T1_LIMBS, T2_LIMBS, cert.cycle_len, T1_LIMBS, T2_LIMBS);
+      mpfr_clear (ln2); mpfr_clear (ideal); mpfr_clear (residual);
+      mpfr_clear (x); mpfr_clear (lg);
+      return 1;
+    case LIMB_CERT_UNKNOWN:
+    default:
+      printf ("limb-gen: certificate %dx%d -> UNKNOWN "
+              "(real system feasible; no lattice-safe solution found)\n"
+              "limb-gen:   %d interval(s) closed under the quantisation shrink"
+              "%s\n"
+              "limb-gen:   searching anyway -- neither outcome below is a proof\n",
+              T1_LIMBS, T2_LIMBS, cert.closed_intervals,
+              cert.safe_cycle_len ? ", witness cycle recorded" : "");
+      break;
+    }
+  }
 
   /* Pass 1 -- plain greedy descent. This clears 13 of the 14 canonical
      misrounds and stalls on x = 0.9921875, whose float32 reconstruction lands
