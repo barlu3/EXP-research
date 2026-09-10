@@ -119,6 +119,9 @@ the minimal configuration as infeasible when it is not. See
 [docs/EXP-SIN-LIMB-RESULTS.md](docs/EXP-SIN-LIMB-RESULTS.md) for the frontier.
 [docs/BENCHMARKING.md](docs/BENCHMARKING.md) covers how the throughput numbers
 are measured, and what they can and cannot show.
+[docs/MILP-GEN.md](docs/MILP-GEN.md) explains how `log-research/` answers the
+prior question --- whether such a table can exist at all --- by casting it as a
+mixed-integer program.
 
 ## Cross-evaluation (exp / sin / log)
 
