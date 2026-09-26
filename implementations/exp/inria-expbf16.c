@@ -222,7 +222,10 @@ __bf16 cr_exp_bf16 (__bf16 x){
 
   // for -0x1p-9 <= x <= 0x1.fep-9, exp(x) rounds to 1 to nearest
   if (au <= 0x3b00) { // |x| <= 0x1p-9
-    if (au == 0) return 1.0f16; // x = +0 or -0
+    // x = +0 or -0. A float literal, not 1.0f16: 1.0 is exact in every format,
+    // and returning a _Float16 as __bf16 here crashes the AArch64 backend of
+    // LLVM 19 (and so Apple clang 17) with "Unsupported library call operation".
+    if (au == 0) return 1.0f;
     return 1.0f + ((au == u) ? 0x1p-24f : -0x1p-25f);
   }
 

@@ -1,0 +1,70 @@
+{
+  "problemMatcher": [
+    {
+      "owner": "compiler",
+      "severity": "error",
+      "pattern": [
+        {
+          "regexp": "^(.+?):(\\d+):(\\d+):\\s+(?:fatal\\s+)?(error):\\s+(.+)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
+        }
+      ]
+    },
+    {
+      "owner": "compiler-driver",
+      "severity": "error",
+      "pattern": [
+        {
+          "regexp": "^((?:ld|/usr/bin/ld|clang|clang\\+\\+|c\\+\\+|g\\+\\+|gcc|cc|collect2): (?:fatal )?error: .+)$",
+          "message": 1
+        }
+      ]
+    },
+    {
+      "owner": "linker",
+      "severity": "error",
+      "pattern": [
+        {
+          "regexp": "^((?:/usr/bin/)?ld(?:\\.\\w+)?: (?!warning).+)$",
+          "message": 1
+        }
+      ]
+    },
+    {
+      "owner": "linker-undefined",
+      "severity": "error",
+      "pattern": [
+        {
+          "regexp": "^\\s+\"(_?\\w+)\", referenced from:$",
+          "message": 1
+        }
+      ]
+    },
+    {
+      "owner": "cmake",
+      "severity": "error",
+      "pattern": [
+        {
+          "regexp": "^CMake Error at (.+?):(\\d+) \\((.+)\\):$",
+          "file": 1,
+          "line": 2,
+          "message": 3
+        }
+      ]
+    },
+    {
+      "owner": "make",
+      "severity": "error",
+      "pattern": [
+        {
+          "regexp": "^(g?make(?:\\[\\d+\\])?: \\*\\*\\* .+)$",
+          "message": 1
+        }
+      ]
+    }
+  ]
+}

@@ -43,6 +43,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Report build errors as annotations
+        # Compiler, assembler, linker, CMake and make errors show up on the run
+        # page and in the checks API, not only in the raw log.
+        run: echo "::add-matcher::.github/problem-matchers/compiler.json"
+
       - name: Install MPFR and GMP (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libmpfr-dev libgmp-dev
@@ -85,9 +90,27 @@ jobs:
       - name: Committed outputs are reproducible
         # verify, round, limb-tables and the ln steps rewrite files that are
         # committed. Rebuilding them from source must give the same bytes, except
-        # for the stamp naming the MPFR version that produced them: runners do
-        # not all ship the same one (Ubuntu 24.04 has 4.2.1, Homebrew 4.2.2).
-        run: git diff --exit-code -I 'MPFR( version :)? [0-9]+\.[0-9]+\.[0-9]+'
+        # for the lines stamping the MPFR version that produced them -- "MPFR
+        # version: 4.2.1", "MPFR version  : 4.2.2", "(MPFR 4.2.1)" -- because
+        # runners do not all ship the same one (Ubuntu 24.04 has 4.2.1, Homebrew
+        # 4.2.2). Each file that really differs gets an annotation quoting its
+        # first differing lines.
+        #
+        # Only the full-diff and --numstat forms of `git diff` honour -I;
+        # --quiet and --name-only list stamp-only files as changed.
+        run: |
+          stamp='MPFR[^0-9]*[0-9]+\.[0-9]+\.[0-9]+'
+          if git diff --exit-code -I "$stamp" > /dev/null; then
+            echo "committed outputs reproduced (MPFR version stamps aside)"
+            exit 0
+          fi
+          git diff --numstat -I "$stamp" | while read -r added removed file; do
+            first=$( { git diff -U0 -I "$stamp" -- "$file" | grep -E '^[-+][^-+]' \
+                       | head -n 4 | tr '\n' ' ' | sed 's/%/%25/g'; } || true )
+            echo "::error file=$file::regenerated file differs from the committed copy (+$added -$removed): $first"
+          done
+          git diff -I "$stamp"
+          exit 1
 
       - name: Research targets
         run: |
@@ -122,6 +145,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+
+      - name: Report build errors as annotations
+        run: echo "::add-matcher::.github/problem-matchers/compiler.json"
 
       - name: Install MPFR, GMP and GLPK
         run: sudo apt-get update && sudo apt-get install -y libmpfr-dev libgmp-dev glpk-utils
