@@ -17,10 +17,14 @@ fetch() {
         return
     fi
     echo "fetching ${url}"
+    # ftp.gnu.org can stall mid-transfer and never close the connection. Treat
+    # under 1 KB/s for a minute as a failure, retry, and resume the partial file
+    # rather than restarting it.
     if command -v curl >/dev/null 2>&1; then
-        curl -fL --retry 3 -o "${out}.part" "$url"
+        curl -fL --retry 5 --retry-delay 5 --connect-timeout 30 \
+             --speed-limit 1024 --speed-time 60 -C - -o "${out}.part" "$url"
     elif command -v wget >/dev/null 2>&1; then
-        wget -O "${out}.part" "$url"
+        wget -c --tries=5 --timeout=60 -O "${out}.part" "$url"
     else
         echo "error: need curl or wget" >&2
         exit 1

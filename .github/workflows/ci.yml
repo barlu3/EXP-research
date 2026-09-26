@@ -1,0 +1,140 @@
+# Builds everything, runs every CTest test, and runs every Make/CMake target
+# that can run unattended, on Linux x86-64 and macOS arm64 (the ARM
+# estimate-instruction benchmarks exist only on Apple Silicon).
+#
+# Not run on every push, and why:
+#   ln-t1-sweep, ln-t2-sweep  need glpsol and solve the MILP pipeline once per
+#                             precision, so they are slow
+#   glibc                     downloads the glibc tarball from ftp.gnu.org, so it
+#                             tests the mirror as much as the code
+#   The `weekly` job runs these three every Monday and on demand.
+#
+# Not run at all:
+#   tables                    needs SageMath, which is several GB to install; the
+#                             target fails by design without it
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1"   # Mondays 06:00 UTC, for the `weekly` job
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86-64
+            os: ubuntu-24.04
+          - name: macOS arm64
+            os: macos-15
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install MPFR and GMP (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libmpfr-dev libgmp-dev
+
+      - name: Install MPFR and GMP (macOS)
+        if: runner.os == 'macOS'
+        run: brew install mpfr gmp
+
+      - name: Configure
+        run: make configure
+
+      - name: Build everything
+        run: make
+
+      - name: Tests
+        # Two labels are left out here (see the CMakeLists that set them):
+        #   research-finding  verify-exp/sin/log, known to fail -- next step
+        #   benchmark         the benchmark programs -- `make bench` runs them
+        working-directory: build
+        run: ctest --output-on-failure -LE "research-finding|benchmark"
+
+      - name: Known research findings (reported, not gating)
+        # These fail today by design: open discrepancies in the 16-bit-rounded
+        # tables, documented in cross-eval/CMakeLists.txt.
+        continue-on-error: true
+        working-directory: build
+        run: ctest --output-on-failure -L research-finding
+
+      - name: check-mpfr
+        run: make check-mpfr
+
+      - name: verify, verify-limb
+        run: make verify verify-limb
+
+      - name: Regenerate committed outputs
+        run: |
+          make round limb-tables
+          cmake --build build --target ln-precompute ln-bounds
+
+      - name: Committed outputs are reproducible
+        # verify, round, limb-tables and the ln steps rewrite files that are
+        # committed. Rebuilding them from source must give the same bytes, except
+        # for the stamp naming the MPFR version that produced them: runners do
+        # not all ship the same one (Ubuntu 24.04 has 4.2.1, Homebrew 4.2.2).
+        run: git diff --exit-code -I 'MPFR( version :)? [0-9]+\.[0-9]+\.[0-9]+'
+
+      - name: Research targets
+        run: |
+          cmake --build build --target ln-milp ln-limb-milp limb-analysis
+          make limb-sweep
+
+      - name: bench
+        # Each benchmark ends with an exhaustive accuracy check and exits
+        # non-zero on a mismatch, so this is a regression test. The timings
+        # themselves are not meaningful on a shared runner.
+        run: make bench
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports-${{ matrix.os }}
+          path: |
+            benchmarks/output/*.txt
+            ARM-approx-research/benchmarks/output/*.txt
+            ARM-approx-research/benchmarks/recip-sqrt/output/*.txt
+          if-no-files-found: ignore
+
+      - name: help, clean, distclean
+        run: make help && make clean && make distclean
+
+  weekly:
+    name: Slow and networked targets
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install MPFR, GMP and GLPK
+        run: sudo apt-get update && sudo apt-get install -y libmpfr-dev libgmp-dev glpk-utils
+
+      - name: Configure
+        run: make configure
+
+      - name: glibc
+        timeout-minutes: 20
+        run: make glibc
+
+      - name: ln-t2-sweep
+        run: cmake --build build --target ln-t2-sweep
+
+      - name: ln-t1-sweep
+        run: cmake --build build --target ln-t1-sweep

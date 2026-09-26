@@ -7,7 +7,7 @@ set(GLIBC_DIR "${CMAKE_SOURCE_DIR}/dependencies/glibc-${GLIBC_VERSION}")
 set(GLIBC_TARBALL "${CMAKE_SOURCE_DIR}/dependencies/glibc-${GLIBC_VERSION}.tar.xz")
 
 add_custom_command(OUTPUT "${GLIBC_TARBALL}"
-  COMMAND "${CMAKE_SOURCE_DIR}/dependencies/fethc-glibc.sh"
+  COMMAND "${CMAKE_SOURCE_DIR}/dependencies/fetch-glibc.sh"
   COMMENT "Fetching glibc-${GLIBC_VERSION} source tarball"
   VERBATIM)
 

@@ -25,4 +25,4 @@ add_custom_target(run-bench-rsqrt
 add_dependencies(run-bench-rsqrt run-bench-recip)
 
 add_test(NAME bench-rsqrt COMMAND bench-rsqrt WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
-set_tests_properties(bench-rsqrt PROPERTIES TIMEOUT 900)
+set_tests_properties(bench-rsqrt PROPERTIES TIMEOUT 900 LABELS benchmark)

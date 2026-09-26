@@ -108,9 +108,10 @@ add_test(NAME bench-harness-test COMMAND bench-harness-test
 # The limb benchmarks end with an exhaustive agreement check against the
 # float32 tables and exit nonzero if it fails, so they double as regression
 # tests. They are fast enough to run in CTest; the timing loops dominate, so
-# each is given room.
+# each is given room. The benchmark label lets CI skip them in CTest when it
+# runs the same programs through `make bench` instead.
 add_test(NAME bench-log-limb COMMAND bench-log-limb WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 add_test(NAME bench-exp-limb COMMAND bench-exp-limb WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 add_test(NAME bench-sin-limb COMMAND bench-sin-limb WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 set_tests_properties(bench-log-limb bench-exp-limb bench-sin-limb
-  PROPERTIES TIMEOUT 900)
+  PROPERTIES TIMEOUT 900 LABELS benchmark)

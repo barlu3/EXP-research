@@ -46,7 +46,7 @@ if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
   add_dependencies(run-bench-recip run-bench-sin-limb)
 
   add_test(NAME bench-recip COMMAND bench-recip WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
-  set_tests_properties(bench-recip PROPERTIES TIMEOUT 900)
+  set_tests_properties(bench-recip PROPERTIES TIMEOUT 900 LABELS benchmark)
 
   add_subdirectory(recip-sqrt)
 endif()

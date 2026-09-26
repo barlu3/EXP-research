@@ -96,13 +96,16 @@ add_custom_target(verify-limb
 # CTest wires the same binaries up as a pass/fail suite. The tools always exit
 # 0, so the pass condition comes from the report text: zero discrepancies.
 # These currently FAIL (exp 7, sin 158, log 33) — those are open research
-# findings in the 16-bit-rounded tables, not build breakage.
+# findings in the 16-bit-rounded tables, not build breakage. The
+# research-finding label lets CI run them without gating on them
+# (ctest -LE research-finding / -L research-finding).
 add_test(NAME verify-exp COMMAND verify_mpfr WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 add_test(NAME verify-sin COMMAND verify_sin  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 add_test(NAME verify-log COMMAND verify_log  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 
 set_tests_properties(verify-exp verify-sin verify-log PROPERTIES
-  FAIL_REGULAR_EXPRESSION "Discrepancies: *[1-9]")
+  FAIL_REGULAR_EXPRESSION "Discrepancies: *[1-9]"
+  LABELS research-finding)
 
 # The limb verifiers exit nonzero on any discrepancy, so CTest can use the exit
 # status directly. Unlike the three above, these are expected to PASS: the
