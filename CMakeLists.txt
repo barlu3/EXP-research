@@ -23,6 +23,7 @@ add_subdirectory(benchmarks)
 add_subdirectory(cross-eval)
 add_subdirectory(log-research)
 add_subdirectory(table-gen)
+add_subdirectory(ARM-approx-research)
 
 # MPFR presence check — replaces the README's manual `cc -o version version.c`.
 add_executable(mpfr-version version.c)
@@ -44,6 +45,10 @@ add_custom_target(bench
   DEPENDS run-bench-home run-bench-inria
           run-bench-log-limb run-bench-exp-limb run-bench-sin-limb
   COMMENT "Running throughput benchmarks")
+# Apple Silicon only; see ARM-approx-research/benchmarks/CMakeLists.txt.
+if(TARGET run-bench-recip)
+  add_dependencies(bench run-bench-recip run-bench-rsqrt)
+endif()
 
 message(STATUS "")
 message(STATUS "exp-research configured (${CMAKE_BUILD_TYPE})")
