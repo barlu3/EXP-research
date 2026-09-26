@@ -7,7 +7,9 @@
 #                             precision, so they are slow
 #   glibc                     downloads the glibc tarball from ftp.gnu.org, so it
 #                             tests the mirror as much as the code
-#   The `weekly` job runs these three every Monday and on demand.
+#   bench on Linux            the timing loops take ~30 minutes on the hosted
+#                             runner; macOS still runs bench on every push
+#   The `weekly` job runs these every Monday and on demand.
 #
 # Not run at all:
 #   tables                    needs SageMath, which is several GB to install; the
@@ -57,7 +59,15 @@ jobs:
         run: brew install mpfr gmp
 
       - name: Configure
-        run: make configure
+        # Portable code generation (EXP_NATIVE_ARCH=OFF). With -march=native the
+        # compiler targets whatever CPU it detects, and on the macos-15 runner
+        # that included instructions the VM cannot execute: the native build of
+        # the bf16 benchmarks contains BFCVT, which needs FEAT_BF16, and the
+        # benchmarks died with SIGILL. Timings on a shared runner are not
+        # measurements anyway.
+        run: |
+          make configure
+          cmake -B build -DEXP_NATIVE_ARCH=OFF
 
       - name: Build everything
         run: make
@@ -120,7 +130,11 @@ jobs:
       - name: bench
         # Each benchmark ends with an exhaustive accuracy check and exits
         # non-zero on a mismatch, so this is a regression test. The timings
-        # themselves are not meaningful on a shared runner.
+        # themselves are not meaningful on a shared runner. macOS only here:
+        # it is the only platform with the ARM benchmarks, and on the Linux
+        # runner the timing loops alone take ~30 minutes, so Linux runs `bench`
+        # in the weekly job instead.
+        if: runner.os == 'macOS'
         run: make bench
 
       - name: Upload reports
@@ -153,7 +167,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libmpfr-dev libgmp-dev glpk-utils
 
       - name: Configure
-        run: make configure
+        # Portable code generation, as in build-test.
+        run: |
+          make configure
+          cmake -B build -DEXP_NATIVE_ARCH=OFF
 
       - name: glibc
         timeout-minutes: 20
@@ -164,3 +181,14 @@ jobs:
 
       - name: ln-t1-sweep
         run: cmake --build build --target ln-t1-sweep
+
+      - name: bench
+        run: make bench
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports-weekly-linux
+          path: benchmarks/output/*.txt
+          if-no-files-found: ignore
