@@ -20,8 +20,6 @@ memory), we **deliberately make a few entries slightly less accurate**, chosen
 so that the *final answers* come out right. A search finds which entries to
 nudge and by how much.
 
-That sounds like cheating. It isn't, and the rest of this document explains why.
-
 ## Background: what the tables are for
 
 ### bf16

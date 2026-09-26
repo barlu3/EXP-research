@@ -10,6 +10,10 @@ variant, a **median ns/call with an interquartile range**, taken across
 each cluster carries a **control kernel** so the loop's own cost can be
 subtracted rather than blamed on the function under test.
 
+Two more benchmarks live in `ARM-approx-research/benchmarks/`. They time
+hand-written AArch64 in **cycles** instead of C in ns, and ask whether ARM's
+estimate instructions beat exact division and square root. §10 covers them.
+
 ---
 
 ## 1. What is being measured
@@ -57,12 +61,13 @@ match the benchmarks' `extern "C"` declarations.
 ## 3. Running them
 
 ```sh
-make bench                 # build + run all five, regenerating every report
+make bench                 # build + run all of them, regenerating every report
 cd build && ctest -R bench # the same programs as pass/fail tests
 ```
 
 Individual targets are `run-bench-home`, `run-bench-inria`, `run-bench-log-limb`,
-`run-bench-exp-limb`, `run-bench-sin-limb`. Each program writes its report to
+`run-bench-exp-limb`, `run-bench-sin-limb`, and on Apple Silicon
+`run-bench-recip` and `run-bench-rsqrt` (§10). Each program writes its report to
 `benchmarks/output/` *and* to stdout, so `make bench` output and the committed
 file are the same text.
 
@@ -341,7 +346,172 @@ reps: epochs sample the axis that actually dominates (§4.6).
 
 ---
 
-## 10. Reference
+## 10. The ARM estimate-instruction benchmarks
+
+Two benchmarks in `ARM-approx-research/benchmarks/` ask a different question
+from the ones above: on Apple Silicon, is one of ARM's **estimate
+instructions plus Newton steps** cheaper than the **exact instruction
+sequence**, and how accurate is it?
+
+| Program | Compares | Report |
+|---|---|---|
+| `benchmark-recip.cpp` | `FRECPE` + Newton steps vs `FDIV` (1/x) | `output/bench_results_recip.txt` |
+| `recip-sqrt/benchmark-rsqrt.cpp` | `FRSQRTE` + Newton steps vs `FSQRT` + `FDIV` (1/√x) | `recip-sqrt/output/bench_results_rsqrt.txt` |
+
+Each times the exact sequence, the same sequence behind a function call, the
+bare estimate, and the estimate plus one or two Newton steps. Some variants
+also run in 12-bit mode (§10.5). Every variant runs over four input ranges.
+
+### 10.1 What is different
+
+- **The timed code is assembly, and the unit is cycles.** The instructions
+  under test cost a few cycles each, and a C loop around them would cost about
+  as much as they do. So each whole timed loop is hand-written in a `.S` file.
+  C calls it once per 4096-element pass.
+- **Two loop shapes.** In *latency* loops each input waits for the previous
+  result: that is the cost of one result on a critical path. In *throughput*
+  loops the inputs are independent: that is the cost of a loop of them. The
+  two can rank the variants differently.
+- **Cycles come from the hardware counters when run with `sudo`.** Otherwise
+  they are estimated from the timer, and the report's banner says so
+  (`bench-cycles.hpp`).
+- **Every run ends with an exhaustive accuracy check.** All 4,278,190,080
+  finite floats go through the timed kernels and are compared with a
+  correctly rounded reference.
+
+Everything in §4 still applies: the control kernel, interleaving with rotation,
+prewarm, discarded reps, epochs. These benchmarks reuse the harness for all of
+it.
+
+### 10.2 Layout
+
+```
+ARM-approx-research/benchmarks/
+  approx-bench.hpp       shared driver: timing loop, epochs, report, accuracy check
+  approx-kernels.inc     shared assembler macros: the loop scaffolding
+  approx-common.S        shared kernels: the control loops, the cycle calibration
+  bench-cycles.hpp       cycle counting: hardware counters or calibrated timer
+  benchmark-recip.cpp    1/x: its variants, input ranges and reference
+  recip-kernels.S        1/x: its kernels
+  recip-sqrt/
+    benchmark-rsqrt.cpp  1/sqrt(x): its variants, input ranges and reference
+    rsqrt-kernels.S      1/sqrt(x): its kernels
+```
+
+### 10.3 Why a shared driver
+
+The two benchmarks ask the same question of two functions. The timing, the
+epochs, the report and the accuracy check are identical. Only three things
+differ:
+
+1. which kernels to time,
+2. which inputs to time them on,
+3. how to compute the correct answer for the accuracy check.
+
+So those three things are all a benchmark file contains. It fills in a `Spec`
+and hands it to `approx::run_main` in `approx-bench.hpp`, which does the rest.
+Each variant is one row:
+
+```cpp
+//  report name        column     max ulp  12-bit  throughput kernel  latency kernel
+{ "frecpe8 + 2 NR",   "fe8+2NR",  1,       false,  recip_tput_est2,   recip_lat_est2 },
+```
+
+With one driver, the two benchmarks cannot measure things in different ways,
+and a fix to the timing or the report reaches both at once. The main harness
+exists for the same reason: its timing loop was once copied into five
+benchmarks and drifted into three different behaviours.
+
+### 10.4 Why the assembler macros
+
+One kernel's cycle count can only be compared with another's if **everything
+except the instructions under test is the same**. The macros in
+`approx-kernels.inc` are that shared scaffolding:
+
+- **`LOAD8` / `STORE8`** form the throughput loop. Load 8 inputs, run the
+  instructions under test, store 8 results.
+- **`LINK`** forms the latency chain. Each input has to wait for the previous
+  result without its value changing. `LINK` ANDs the previous result with
+  zero, then ORs that into the next input. The value stays the same, but the
+  core cannot start until the previous result exists.
+
+The control kernels in `approx-common.S` are these same macros with nothing in
+between. They measure the scaffolding alone: about 3.9 cycles for `LINK`. The
+report subtracts that from the latency rows. The subtraction is only fair if
+every kernel uses exactly the same scaffolding, and the macros guarantee that
+it does.
+
+The estimate sequences are macros too (`RECIP_EST2`, `RSQRT_STEP` and so on).
+That way the latency kernel, the throughput kernel and the accuracy check all
+run the same instructions.
+
+### 10.5 12-bit mode
+
+With the `FPCR.AH` bit set, single-precision `FRECPE` and `FRSQRTE` return a
+12-bit estimate instead of an 8-bit one. This needs a core with both
+`FEAT_AFP` and `FEAT_RPRES`; the M5 has both, and the banner prints them.
+Variants marked 12-bit run with the bit set. Two things to know:
+
+- **The driver sets it once around each timed run**, not inside the kernels.
+  Switching it costs about 75 cycles, which would add about 2% to every
+  4096-element pass.
+- **It also flushes subnormal inputs to zero** inside the estimate
+  instructions. So the 12-bit rows are wrong on subnormal inputs, and the
+  accuracy table shows it.
+
+### 10.6 Reading the reports
+
+The per-range blocks read like §6, in **cycles** (`cyc`) instead of ns. After
+them come:
+
+- **Summary.** One table per loop shape.
+  - Latency is shown **net of the control**. Latencies add up along a chain,
+    so subtracting the control is exact.
+  - Throughput is shown **gross**. There the control's loads and stores overlap
+    the arithmetic instead of adding to it, so subtracting would over-correct.
+- **Accuracy.** For each variant: how many inputs differ from the correctly
+  rounded result, the worst error in ulp (overall and on normal inputs), and
+  the worst relative error on normal inputs, as a power of two.
+- **accuracy: PASS / FAIL.** Each variant is held to the `max ulp` in its
+  `Spec` row: `0` must be exact, `1` or `2` must be within that many ulp, and
+  `UNCHECKED` is only reported. The report lists which rows were held to what,
+  and the program exits non-zero on a FAIL. That makes both benchmarks
+  regression tests too.
+
+### 10.7 Running and extending
+
+```sh
+make bench                                    # runs both, on Apple Silicon
+cd build && ctest -R "bench-recip|bench-rsqrt"
+
+cd ARM-approx-research/benchmarks             # hardware cycle counts:
+sudo output/bench-recip                       # run each from its own directory,
+cd recip-sqrt && sudo output/bench-rsqrt      # since report paths are relative
+```
+
+- **A new variant:** write its throughput and latency kernels in the `.S` file
+  using the shared macros, declare them in the benchmark file, and add a row to
+  its `Spec`.
+- **A new function:** copy the shape of `recip-sqrt/`. It needs three files:
+  - a kernels `.S` that includes `approx-kernels.inc`,
+  - a benchmark `.cpp` that fills in a `Spec` (variants, input ranges, a
+    correctly rounded reference),
+  - a `CMakeLists.txt` that links `approx-common`.
+
+### 10.8 Known limits
+
+- **Apple Silicon only.** The kernels use Mach-O symbol names, and hardware
+  cycle counts use Apple's private kperf framework.
+- **Without `sudo`, cycles are estimates.** The timer is converted using a
+  chain of 1-cycle ADDs, so clock changes within a rep are not corrected. The
+  ratios between variants do not depend on that conversion.
+- **The 12-bit rows mean something only if `FEAT_AFP` and `FEAT_RPRES` are
+  both 1.** Otherwise they silently measure the 8-bit estimate. The banner and
+  the accuracy table's relative-error column show which one happened.
+
+---
+
+## 11. Reference
 
 | Constant | Where | Value | Meaning |
 |---|---|---|---|
@@ -353,6 +523,9 @@ reps: epochs sample the axis that actually dominates (§4.6).
 | `MIN_DISTINCT_INPUTS` | harness | 100 | floor enforced on every cluster |
 | `BENCH_ITERS` | per benchmark | 10M (bf16), 2M (float64) | iterations per timed run |
 | `MIN_BUFFER` / `BUFFER_N` | per benchmark | 4096 / 16384 | input window, rounded to a power of two |
+| `BUF_N` | approx-bench | 4096 | elements per kernel call; inputs and outputs stay in L1 |
+| `TPUT_ELEMS` / `LAT_ELEMS` | approx-bench | 2^22 / 2^20 | elements per timed run, throughput / latency |
+| `CALIB_ITERS` | bench-cycles | 2^20 | iterations of the ADD chain per calibration |
 
 Related: [EXP-SIN-LIMB-RESULTS.md](EXP-SIN-LIMB-RESULTS.md) for what the limb
 tables are and what they cost, [LIMB-TUNING.md](LIMB-TUNING.md) for how they are
