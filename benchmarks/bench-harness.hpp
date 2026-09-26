@@ -488,7 +488,7 @@ inline void logf(const char* fmt, ...) {
 
 struct VariantSeries {
     const char*         name;
-    std::vector<double> ns;   // per-rep ns/call, as returned by run_interleaved
+    std::vector<double> ns;   // per-rep cost per call (ns, or report_cluster's unit)
 };
 
 // One block per cluster, one row per variant. A block rather than a single wide
@@ -499,15 +499,22 @@ struct VariantSeries {
 // kernels' relative cost rather than the relative cost of (kernel + loop).
 // Both are printed: the gross ratio is what a caller in this loop shape would
 // see, the net ratio is what the arithmetic actually costs.
+//
+// `unit` labels the cost columns. Every benchmark but one reports ns; the
+// cycle-counted reciprocal benchmark passes "cyc" and puts cycles in `ns`.
 inline void report_cluster(const char* label, std::size_t distinct,
                            const std::vector<double>& ctl,
                            const std::vector<VariantSeries>& vs,
-                           std::size_t base_index) {
+                           std::size_t base_index,
+                           const char* unit = "ns") {
     const Stats c = summarize(ctl);
-    logf("\n  -- %-16s %6zu distinct inputs   control %.4f ns/call\n",
-         label, distinct, c.median);
+    char med_h[16], iqr_h[16];
+    std::snprintf(med_h, sizeof med_h, "%s med", unit);
+    std::snprintf(iqr_h, sizeof iqr_h, "%s IQR", unit);
+    logf("\n  -- %-16s %6zu distinct inputs   control %.4f %s/call\n",
+         label, distinct, c.median, unit);
     logf("     %-14s %9s %8s %8s %8s %8s\n",
-         "variant", "ns med", "ns IQR", "ratio", "IQR", "net");
+         "variant", med_h, iqr_h, "ratio", "IQR", "net");
     logf("     %-14s %9s %8s %8s %8s %8s\n",
          "--------------", "---------", "--------", "--------", "--------", "--------");
 
