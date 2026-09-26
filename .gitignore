@@ -8,6 +8,8 @@ CLAUDE.local.md
 .claude/
 CLAUDE.md
 benchmarks/output/
+ARM-approx-research/benchmarks/output/
+ARM-approx-research/benchmarks/recip-sqrt/output/
 # verifying MPFR library is downloaded and installed correctly
 version
 # discrepancy checker for MPFR library
