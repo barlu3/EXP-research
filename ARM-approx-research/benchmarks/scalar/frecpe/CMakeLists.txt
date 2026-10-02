@@ -2,10 +2,9 @@
 # defines approx-common, the shared driver and kernels. recip-ref.hpp holds the
 # input clusters and reference, which ../../vector/vrecpe/ reuses.
 #
-# The binary and its report land here. Run it from ARM-approx-research/benchmarks
-# (APPROX_DIR), which the report path is relative to; as root for hardware
-# cycle counts:
-#   cd ARM-approx-research/benchmarks && sudo scalar/frecpe/bench-recip
+# The binary and its report land here; the report is written beside the binary
+# whatever the working directory. Run it as root for hardware cycle counts:
+#   cd ARM-approx-research/benchmarks/scalar/frecpe && sudo ./bench-recip
 add_executable(bench-recip benchmark-recip.cpp recip-kernels.S)
 target_link_libraries(bench-recip PRIVATE approx-common)
 target_compile_options(bench-recip PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-O3>)

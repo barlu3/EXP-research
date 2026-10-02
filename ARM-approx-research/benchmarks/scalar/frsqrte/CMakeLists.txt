@@ -5,10 +5,9 @@
 # inputs where the accuracy pass's double-precision reference sits too close to
 # a float rounding boundary to call.
 #
-# The binary and its report land here. Run it from ARM-approx-research/benchmarks
-# (APPROX_DIR), which the report path is relative to; as root for hardware
-# cycle counts:
-#   cd ARM-approx-research/benchmarks && sudo scalar/frsqrte/bench-rsqrt
+# The binary and its report land here; the report is written beside the binary
+# whatever the working directory. Run it as root for hardware cycle counts:
+#   cd ARM-approx-research/benchmarks/scalar/frsqrte && sudo ./bench-rsqrt
 add_executable(bench-rsqrt benchmark-rsqrt.cpp rsqrt-kernels.S)
 target_link_libraries(bench-rsqrt PRIVATE approx-common MPFR::MPFR)
 target_compile_options(bench-rsqrt PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-O3>)

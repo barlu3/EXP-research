@@ -56,7 +56,7 @@ using approx::UNCHECKED;
 const approx::Spec SPEC = {
     .title       = "float32 1/sqrt(x) on AArch64 -- FSQRT+FDIV vs FRSQRTE (8-, 12-bit)",
     .kernels     = "ARM-approx-research/benchmarks/scalar/frsqrte/rsqrt-kernels.S",
-    .report_path = "scalar/frsqrte/bench_results_rsqrt.txt",
+    .report_name = "bench_results_rsqrt.txt",
     // Index 0 is the control, 1 the baseline every ratio divides by.
     .variants = {
         approx::CONTROL,
