@@ -47,7 +47,7 @@ using approx::UNCHECKED;
 const approx::Spec SPEC = {
     .title       = "float32x4 1/x on AArch64 -- FDIV vs FRECPE (8-, 12-bit), .4s",
     .kernels     = "ARM-approx-research/benchmarks/vector/vrecpe/recip-vec-kernels.S",
-    .report_path = "vector/vrecpe/bench_results_recip_vec.txt",
+    .report_name = "bench_results_vrecpe.txt",
     // Index 0 is the control, 1 the baseline every ratio divides by.
     .variants = {
         { "control",        "ctrl",     UNCHECKED, false, vec_tput_ctrl,    vec_lat_ctrl    },

@@ -5,7 +5,7 @@
 #   scalar/frsqrte/  bench-rsqrt       FRSQRTE against FSQRT + FDIV
 #   vector/vrecpe/   bench-recip-vec   bench-recip on 4-lane .4s vectors
 #   vector/vrsqrts/  bench-rsqrt-vec   bench-rsqrt on 4-lane .4s vectors
-# All four run from this directory, which the report paths are relative to.
+# Each writes its report beside its binary, whatever the working directory.
 #
 # The kernels are hand-written AArch64 (Mach-O symbol names), so these exist
 # only on Apple Silicon. Everything the benchmarks share lives here: the driver
@@ -18,7 +18,7 @@
 # -march=native probing in CORE-research/benchmarks/CMakeLists.txt would change nothing here.
 #
 # They count cycles with the kperf fixed counters when run as root, e.g.
-#   cd ARM-approx-research/benchmarks && sudo scalar/frecpe/bench-recip
+#   cd ARM-approx-research/benchmarks/scalar/frecpe && sudo ./bench-recip
 # Without root, the run-bench-* targets and CTest fall back to a calibrated
 # timer and say so in the report. Each ends with an exhaustive accuracy check
 # over every finite float32 and exits nonzero if a kernel is wrong, so each is a
@@ -31,7 +31,8 @@ if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
     "${CMAKE_CURRENT_SOURCE_DIR}"          # approx-bench.hpp, bench-cycles.hpp, approx-kernels.inc
     "${CMAKE_SOURCE_DIR}/CORE-research/benchmarks")  # bench-harness.hpp
 
-  # The working directory of every run; Spec::report_path is relative to it.
+  # The working directory of the run-bench-* targets and CTest. Reports do not
+  # depend on it: each is written beside its binary (approx-bench.hpp).
   set(APPROX_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
   # Timing runs must never overlap, so each run-bench-* target depends on the

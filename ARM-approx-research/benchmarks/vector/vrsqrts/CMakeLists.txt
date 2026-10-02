@@ -2,10 +2,9 @@
 # rsqrt-ref.hpp supplies the input clusters and reference. ../CMakeLists.txt
 # defines approx-vec-common (vector loop macros and control loops).
 #
-# The binary and its report land here. Run it from ARM-approx-research/benchmarks
-# (APPROX_DIR), which the report path is relative to; as root for hardware
-# cycle counts:
-#   cd ARM-approx-research/benchmarks && sudo vector/vrsqrts/bench-rsqrt-vec
+# The binary and its report land here; the report is written beside the binary
+# whatever the working directory. Run it as root for hardware cycle counts:
+#   cd ARM-approx-research/benchmarks/vector/vrsqrts && sudo ./bench-rsqrt-vec
 add_executable(bench-rsqrt-vec benchmark-rsqrt-vec.cpp rsqrt-vec-kernels.S)
 target_link_libraries(bench-rsqrt-vec PRIVATE approx-common approx-vec-common MPFR::MPFR)
 target_compile_options(bench-rsqrt-vec PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-O3>)

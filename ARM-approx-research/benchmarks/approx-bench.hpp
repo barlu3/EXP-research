@@ -33,7 +33,11 @@
 #include <thread>
 #include <vector>
 
+#include <climits>
+#include <cstdlib>
+#include <mach-o/dyld.h>
 #include <sys/sysctl.h>
+#include <unistd.h>
 
 // approx-common.S: each loop shape with the arithmetic removed, and the
 // cycle-counter calibration chain.
@@ -87,8 +91,8 @@ struct Cluster {
 struct Spec {
     const char* title;         // banner headline
     const char* kernels;       // where the timed code lives, for the banner
-    const char* report_path;   // relative to the working directory, which is
-                               // ARM-approx-research/benchmarks for every run
+    const char* report_name;   // file name only; written beside the binary,
+                               // which CMake builds into the benchmark's directory
     std::vector<Variant> variants;   // [0] is CONTROL, [1] the ratio baseline
     std::vector<Cluster> clusters;
 
@@ -354,10 +358,35 @@ inline std::vector<Accuracy> exhaustive_accuracy(const Spec& s) {
 
 // ─── The program ────────────────────────────────────────────────────────────
 
+// The report goes beside the executable, which CMake builds into the
+// benchmark's own source directory. A path relative to the working directory
+// broke every run started anywhere else -- `sudo ./bench-recip` from
+// scalar/frecpe/ could not open its report.
+inline std::string report_path(const char* name) {
+    char exe[PATH_MAX], real[PATH_MAX];
+    std::uint32_t sz = sizeof exe;
+    if (_NSGetExecutablePath(exe, &sz) != 0 || !realpath(exe, real)) return name;
+    std::string path = real;
+    return path.substr(0, path.rfind('/') + 1) + name;
+}
+
+// Under sudo the report is created owned by root, and a later run without sudo
+// could not overwrite it. Hand it back to the user who ran sudo.
+inline void give_to_sudo_user(const std::string& path) {
+    const char* uid = std::getenv("SUDO_UID");
+    const char* gid = std::getenv("SUDO_GID");
+    if (geteuid() != 0 || !uid || !gid) return;
+    if (chown(path.c_str(), (uid_t)std::strtoul(uid, nullptr, 10),
+              (gid_t)std::strtoul(gid, nullptr, 10)) != 0)
+        std::fprintf(stderr, "warning: could not chown %s\n", path.c_str());
+}
+
 inline int run_main(const Spec& s, int argc, char** argv) {
     if (bench::is_epoch_child(argc, argv)) return run_epoch(s);
 
-    bench::open_log(s.report_path);
+    const std::string report = report_path(s.report_name);
+    bench::open_log(report.c_str());
+    give_to_sudo_user(report);
     const auto wall_start = bench::Clock::now();
     const int nv  = (int)s.variants.size();
     const int ncl = (int)s.clusters.size();

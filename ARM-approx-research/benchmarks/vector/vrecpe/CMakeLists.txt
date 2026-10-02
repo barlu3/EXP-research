@@ -2,10 +2,9 @@
 # recip-ref.hpp supplies the input clusters and reference. ../CMakeLists.txt
 # defines approx-vec-common (vector loop macros and control loops).
 #
-# The binary and its report land here. Run it from ARM-approx-research/benchmarks
-# (APPROX_DIR), which the report path is relative to; as root for hardware
-# cycle counts:
-#   cd ARM-approx-research/benchmarks && sudo vector/vrecpe/bench-recip-vec
+# The binary and its report land here; the report is written beside the binary
+# whatever the working directory. Run it as root for hardware cycle counts:
+#   cd ARM-approx-research/benchmarks/vector/vrecpe && sudo ./bench-recip-vec
 add_executable(bench-recip-vec benchmark-recip-vec.cpp recip-vec-kernels.S)
 target_link_libraries(bench-recip-vec PRIVATE approx-common approx-vec-common)
 target_compile_options(bench-recip-vec PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-O3>)

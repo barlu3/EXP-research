@@ -39,7 +39,7 @@ using approx::UNCHECKED;
 const approx::Spec SPEC = {
     .title       = "float32x4 1/sqrt(x) on AArch64 -- FSQRT+FDIV vs FRSQRTE, .4s",
     .kernels     = "ARM-approx-research/benchmarks/vector/vrsqrts/rsqrt-vec-kernels.S",
-    .report_path = "vector/vrsqrts/bench_results_rsqrt_vec.txt",
+    .report_name = "bench_results_vrsqrts.txt",
     // Index 0 is the control, 1 the baseline every ratio divides by.
     .variants = {
         { "control",        "ctrl",     UNCHECKED, false, vec_tput_ctrl,     vec_lat_ctrl     },
