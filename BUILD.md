@@ -32,9 +32,9 @@ binaries through CTest with a pass/fail gate.
 | Target | Output |
 | --- | --- |
 | `make verify` | All three functions |
-| `cmake --build build --target verify-exp` | `cross-eval/exp/MPFR-result16bitp.txt` |
-| `cmake --build build --target verify-sin` | `cross-eval/sin/MPFR-result16bitp-sin.txt` |
-| `cmake --build build --target verify-log` | `cross-eval/log/MPFR-result16bitp-log.txt` |
+| `cmake --build build --target verify-exp` | `CORE-research/cross-eval/exp/MPFR-result16bitp.txt` |
+| `cmake --build build --target verify-sin` | `CORE-research/cross-eval/sin/MPFR-result16bitp-sin.txt` |
+| `cmake --build build --target verify-log` | `CORE-research/cross-eval/log/MPFR-result16bitp-log.txt` |
 
 The pass condition is zero discrepancies across all 65536 bfloat16 patterns.
 The checkers always exit 0, so CTest derives pass/fail from the reported
@@ -49,30 +49,30 @@ directly.
 
 | Target | Output |
 | --- | --- |
-| `cmake --build build --target verify-exp-limb-run` | `cross-eval/exp/MPFR-result-limb-exp.txt` |
-| `cmake --build build --target verify-sin-limb-run` | `cross-eval/sin/MPFR-result-limb-sin.txt` |
-| `cmake --build build --target verify-log-limb-run` | `cross-eval/log/MPFR-result-limb-log.txt` |
+| `cmake --build build --target verify-exp-limb-run` | `CORE-research/cross-eval/exp/MPFR-result-limb-exp.txt` |
+| `cmake --build build --target verify-sin-limb-run` | `CORE-research/cross-eval/sin/MPFR-result-limb-sin.txt` |
+| `cmake --build build --target verify-log-limb-run` | `CORE-research/cross-eval/log/MPFR-result-limb-log.txt` |
 | `cmake --build build --target verify-limb` | all three |
 
 `verify-limb.c` selects its function at compile time (`-DVERIFY_SIN_LIMB`) and
 checks both variants — exact and minimal — of that function in one run. The ln
-verifier is a separate, older file (`cross-eval/log/verify-limb.c`).
+verifier is a separate, older file (`CORE-research/cross-eval/log/verify-limb.c`).
 
 ### bf16 limb tables
 
 | Target | Output |
 | --- | --- |
 | `make limb-tables` | all three headers below |
-| `cmake --build build --target exp-limb-tables` | `implementations/exp/expbf16-limb.h` |
-| `cmake --build build --target sin-limb-tables` | `implementations/sin/sinbf16-limb.h` |
-| `cmake --build build --target ln-limb-tables` | `implementations/log/logbf16-limb.h` |
+| `cmake --build build --target exp-limb-tables` | `CORE-research/implementations/exp/expbf16-limb.h` |
+| `cmake --build build --target sin-limb-tables` | `CORE-research/implementations/sin/sinbf16-limb.h` |
+| `cmake --build build --target ln-limb-tables` | `CORE-research/implementations/log/logbf16-limb.h` |
 | `make limb-sweep` | the limb-configuration frontier, to stdout |
 
 The exp and sin generators split the **shipped** CORE-MATH tables rather than
 recomputing ideals in MPFR, so they need no MPFR. That is deliberate: those
 tables carry manual ULP adjustments and an overflow cap, and splitting the
 shipped values is what makes the generated limb tables reproduce
-`cr_exp_bf16` / `cr_sin_bf16` exactly. `table-gen/log/limb-gen.c` (ln) does use MPFR, because
+`cr_exp_bf16` / `cr_sin_bf16` exactly. `CORE-research/table-gen/log/limb-gen.c` (ln) does use MPFR, because
 CORE-MATH's ln tables are plain correctly-rounded values.
 
 Like `ln`, these write into the source tree and so are manual targets — nothing
@@ -89,7 +89,7 @@ AVX flags hard-error on ARM targets. `-march=native` makes binaries
 non-portable across machines; configure with
 `cmake -S . -B build -DEXP_NATIVE_ARCH=OFF` to drop the architecture flags.
 
-Benchmark sources live in `benchmarks/`; executables land in `benchmarks/output/`.
+Benchmark sources live in `CORE-research/benchmarks/`; executables land in `CORE-research/benchmarks/output/`.
 
 | Benchmark | Compares |
 | --- | --- |
@@ -129,30 +129,31 @@ Three sequential steps, each depending on the previous step's output:
 
 | Step | Target | Output |
 | --- | --- | --- |
-| 1 | `ln-precompute` | `log-research/ln-precompute.txt` |
-| 2 | `ln-bounds` | `log-research/ln-bounds.txt`, `lp-constraints.txt` |
-| 3 | `ln-milp` | `log-research/milp-constraints.lp` |
+| 1 | `ln-precompute` | `CORE-research/log-research/ln-precompute.txt` |
+| 2 | `ln-bounds` | `CORE-research/log-research/ln-bounds.txt`, `lp-constraints.txt` |
+| 3 | `ln-milp` | `CORE-research/log-research/milp-constraints.lp` |
 
 Run them with `cmake --build build --target <name>`. Step 3 emits a CPLEX-format
 MILP; solve it for feasibility with:
 
 ```
-glpsol --lp log-research/milp-constraints.lp    # "OPTIMAL" => table exists
-highs log-research/milp-constraints.lp          # "Optimal" => table exists
+glpsol --lp CORE-research/log-research/milp-constraints.lp    # "OPTIMAL" => table exists
+highs CORE-research/log-research/milp-constraints.lp          # "Optimal" => table exists
 ```
 
 Regenerating these overwrites large committed research artifacts. The output
-depends on `CAND_ULP` in `log-research/milp-gen.cc`, so a changed value yields a
+depends on `CAND_ULP` in `CORE-research/log-research/milp-gen.cc`, so a changed value yields a
 different (still deterministic) file.
 
 ## Notes
 
-`log-research/milp-gen.cc` is C despite its extension and is compiled with
+`CORE-research/log-research/milp-gen.cc` is C despite its extension and is compiled with
 `LANGUAGE C` to match; letting CMake infer C++ breaks the build. That file and
 `bound-calc.c` hardcode `log-research/`-prefixed output paths, so their targets
-run from the repo root. So do the `table-gen/` generators, which read the
-shipped tables and write their headers by repo-root-relative path. The
-`cross-eval/` and `benchmarks/` tools run from their own directory instead.
+run from `CORE-research/`. So do the `CORE-research/table-gen/` generators,
+which read the shipped tables and write their headers by path relative to
+`CORE-research/`. The `CORE-research/cross-eval/` and `CORE-research/benchmarks/`
+tools run from their own directory instead.
 
 `make clean` removes build artifacts but leaves generated reports and the
 extracted glibc tree in place. `make distclean` deletes the `build/` tree.

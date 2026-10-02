@@ -1,10 +1,10 @@
 # Benchmarking
 
-How the throughput benchmarks in `benchmarks/` work, what their numbers mean,
+How the throughput benchmarks in `CORE-research/benchmarks/` work, what their numbers mean,
 and — as importantly — what they cannot tell you.
 
 The short version: five benchmark programs share one measurement core
-(`benchmarks/bench-harness.hpp`). Each reports, per input cluster and per
+(`CORE-research/benchmarks/bench-harness.hpp`). Each reports, per input cluster and per
 variant, a **median ns/call with an interquartile range**, taken across
 **separate processes**. Ratios are medians of per-epoch *paired* ratios, and
 each cluster carries a **control kernel** so the loop's own cost can be
@@ -45,7 +45,7 @@ co-running workload, or the constrained target hardware itself.
 ## 2. Layout
 
 ```
-benchmarks/
+CORE-research/benchmarks/
   bench-harness.hpp     the measurement core — statistics, timing, epochs, reporting
   bench-clusters.hpp    the input ranges, shared with the tests
   harness-test.cpp      unit tests for the core and the cluster invariants
@@ -53,7 +53,7 @@ benchmarks/
   output/               binaries and the generated reports
 ```
 
-The kernels being measured live in `implementations/`; `benchmarks/CMakeLists.txt`
+The kernels being measured live in `CORE-research/implementations/`; `CORE-research/benchmarks/CMakeLists.txt`
 is the single place that coupling is spelled out. The CORE-MATH sources must be
 compiled as C — under a C++ compiler they would get C++ linkage and fail to
 match the benchmarks' `extern "C"` declarations.
@@ -68,10 +68,10 @@ cd build && ctest -R bench # the same programs as pass/fail tests
 Individual targets are `run-bench-home`, `run-bench-inria`, `run-bench-log-limb`,
 `run-bench-exp-limb`, `run-bench-sin-limb`, and on Apple Silicon
 `run-bench-recip` and `run-bench-rsqrt` (§10). Each program writes its report to
-`benchmarks/output/` *and* to stdout, so `make bench` output and the committed
+`CORE-research/benchmarks/output/` *and* to stdout, so `make bench` output and the committed
 file are the same text.
 
-Compile flags come from `BENCH_FLAGS` in `benchmarks/CMakeLists.txt`: `-O3` plus
+Compile flags come from `BENCH_FLAGS` in `CORE-research/benchmarks/CMakeLists.txt`: `-O3` plus
 `-march=native -mavx2 -mfma`, each **probed** rather than assumed, because the
 x86 flags hard-error on Apple Silicon. `-DEXP_NATIVE_ARCH=OFF` drops all of
 them. The banner prints the flags actually used, read from `__AVX2__` /
@@ -336,7 +336,7 @@ series for emptiness before reporting.
 **A new benchmark** — follow `benchmark-limb.cpp`: a `run_epoch()` that measures
 and calls `emit_epoch_row`, a `main` that dispatches on `is_epoch_child` and
 otherwise calls `gather_epochs` and reports. Register it in
-`benchmarks/CMakeLists.txt` via `add_limb_bench` and add it to the `bench` target
+`CORE-research/benchmarks/CMakeLists.txt` via `add_limb_bench` and add it to the `bench` target
 in the root `CMakeLists.txt`.
 
 **Tuning cost vs precision** — `DEFAULT_EPOCHS` (7), `DEFAULT_REPS` (5),

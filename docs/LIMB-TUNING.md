@@ -1,6 +1,6 @@
 # Finding the entries that need tuning
 
-How `table-gen/log/limb-gen.c` and `table-gen/exp/exp-limb-gen.c` decide which
+How `CORE-research/table-gen/log/limb-gen.c` and `CORE-research/table-gen/exp/exp-limb-gen.c` decide which
 bf16 table entries to nudge off their "correct" values, and why nudging them is
 the right thing to do.
 
@@ -301,7 +301,7 @@ the table is self-evident any more. Correctness comes from checking:
    re-scores every input against a high-precision MPFR reference. Nonzero
    failures → print "refusing to write" and exit. Every limitation of the search
    *fails closed* this way.
-2. **An independent exhaustive check.** `cross-eval/` tests all **65536** bf16
+2. **An independent exhaustive check.** `CORE-research/cross-eval/` tests all **65536** bf16
    bit patterns against MPFR and reports 0 discrepancies. It calls the shipped
    function through its public entry point and doesn't share the
    index-computing code with the generator, so a bug in one wouldn't hide a bug
@@ -465,15 +465,15 @@ obligations, which is why both generators keep them around.
 ## Reproducing
 
 ```bash
-cmake --build build --target limb-gen exp-limb-gen sin-limb-gen
+cmake --build build --target limb-gen exp-limb-gen sin-limb-gen limb-config-sweep limb-analysis
+cd CORE-research                # the tools read and write CORE-research/-relative paths
 ./table-gen/log/limb-gen        # certificate, frontier, seed, every tuned entry
 ./table-gen/exp/exp-limb-gen    # its 3 tuned entries
 ./table-gen/sweep/limb-config-sweep   # the exp/sin configuration frontier
 
-cmake --build build --target limb-analysis
 ./table-gen/analysis/limb-lp           # every configuration, decided
 ./table-gen/analysis/limb-diagnostics  # the score table, seed enumeration
 ./table-gen/analysis/limb-margins      # how thin the margins actually are
 
-ctest -R 'limb-cert-test|limb-gen-golden|verify-.*-limb'
+ctest --test-dir ../build -R 'limb-cert-test|limb-gen-golden|verify-.*-limb'
 ```

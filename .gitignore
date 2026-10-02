@@ -7,7 +7,7 @@ bench
 CLAUDE.local.md
 .claude/
 CLAUDE.md
-benchmarks/output/
+CORE-research/benchmarks/output/
 ARM-approx-research/benchmarks/output/
 ARM-approx-research/benchmarks/recip-sqrt/output/
 # verifying MPFR library is downloaded and installed correctly
@@ -17,42 +17,42 @@ verify_mpfr
 verify_sin
 verify_log
 # rounding binary compilation
-cross-eval/round-16bitp
-cross-eval/round-sin
-cross-eval/round-log
+CORE-research/cross-eval/round-16bitp
+CORE-research/cross-eval/round-sin
+CORE-research/cross-eval/round-log
 # cmake build tree
 build/
 # err files
 *.err 
 *.stderr
 # log computation compile files
-log-research/milp-gen
-log-research/precompute
-log-research/bound-calc
-log-research/t2-precision-sweep
-log-research/t1-precision-sweep
-log-research/sweep/
-log-research/sweep-t1/
+CORE-research/log-research/milp-gen
+CORE-research/log-research/precompute
+CORE-research/log-research/bound-calc
+CORE-research/log-research/t2-precision-sweep
+CORE-research/log-research/t1-precision-sweep
+CORE-research/log-research/sweep/
+CORE-research/log-research/sweep-t1/
 *.lp
-log-research/fragments/
+CORE-research/log-research/fragments/
 __pycache__/
 # bf16 limb-table tools: generators, sweeps, and MPFR verifiers.
 # CMake writes these into the source tree to match the other tools here.
-table-gen/log/limb-gen
-log-research/milp-limb-gen
-table-gen/exp/exp-limb-gen
-table-gen/sin/sin-limb-gen
-table-gen/sweep/limb-config-sweep
-cross-eval/verify-exp-limb
-cross-eval/verify-sin-limb
-cross-eval/sin/verify-sin-limb
-cross-eval/log/verify-limb
-cross-eval/log/verify-log-limb
+CORE-research/table-gen/log/limb-gen
+CORE-research/log-research/milp-limb-gen
+CORE-research/table-gen/exp/exp-limb-gen
+CORE-research/table-gen/sin/sin-limb-gen
+CORE-research/table-gen/sweep/limb-config-sweep
+CORE-research/cross-eval/verify-exp-limb
+CORE-research/cross-eval/verify-sin-limb
+CORE-research/cross-eval/sin/verify-sin-limb
+CORE-research/cross-eval/log/verify-limb
+CORE-research/cross-eval/log/verify-log-limb
 .DS_Store
 
 # Diagnostics and the feasibility certificate's test binary. Same rule as the
 # generators above: tools land beside their source, so ignore them by path.
-table-gen/analysis/limb-diagnostics
-table-gen/analysis/limb-margins
-table-gen/analysis/limb-lp
-table-gen/tests/limb-cert-test
+CORE-research/table-gen/analysis/limb-diagnostics
+CORE-research/table-gen/analysis/limb-margins
+CORE-research/table-gen/analysis/limb-lp
+CORE-research/table-gen/tests/limb-cert-test

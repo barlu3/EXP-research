@@ -8,10 +8,10 @@
 # (approx-bench.hpp), cycle counting (bench-cycles.hpp), the loop-shape macros
 # (approx-kernels.inc) and the control and calibration kernels (approx-common.S,
 # built once as the approx-common object library). Statistics, epochs and
-# reporting come from the main harness in benchmarks/.
+# reporting come from the main harness in CORE-research/benchmarks/.
 #
 # -O3 applies to the C++ drivers only. The timed code is assembly, so the
-# -march=native probing in benchmarks/CMakeLists.txt would change nothing here.
+# -march=native probing in CORE-research/benchmarks/CMakeLists.txt would change nothing here.
 #
 # They count cycles with the kperf fixed counters when run as root, e.g.
 #   cd ARM-approx-research/benchmarks && sudo output/bench-recip
@@ -25,7 +25,7 @@ if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
   add_library(approx-common OBJECT approx-common.S)
   target_include_directories(approx-common PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}"          # approx-bench.hpp, bench-cycles.hpp, approx-kernels.inc
-    "${CMAKE_SOURCE_DIR}/benchmarks")      # bench-harness.hpp
+    "${CMAKE_SOURCE_DIR}/CORE-research/benchmarks")  # bench-harness.hpp
 
   set(APPROX_OUT "${CMAKE_CURRENT_SOURCE_DIR}/output")
 

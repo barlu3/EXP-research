@@ -18,11 +18,7 @@ option(EXP_NATIVE_ARCH "Build benchmarks with -march=native -mavx2 -mfma" ON)
 
 enable_testing()
 
-add_subdirectory(implementations)
-add_subdirectory(benchmarks)
-add_subdirectory(cross-eval)
-add_subdirectory(log-research)
-add_subdirectory(table-gen)
+add_subdirectory(CORE-research)
 add_subdirectory(ARM-approx-research)
 
 # MPFR presence check — replaces the README's manual `cc -o version version.c`.
@@ -35,7 +31,7 @@ add_custom_target(check-mpfr
   COMMENT "Reporting MPFR library/header versions")
 
 # `verify` is the pass/fail gate: exhaustive 65536-pattern check, zero
-# discrepancies required. Each tool writes its report relative to cross-eval/.
+# discrepancies required. Each tool writes its report relative to CORE-research/cross-eval/.
 add_custom_target(verify
   DEPENDS verify-exp verify-sin verify-log
           verify-exp-limb-run verify-sin-limb-run verify-log-limb-run

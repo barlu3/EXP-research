@@ -35,7 +35,7 @@ that changes the problem enough that the `ln` result says nothing about it.
 return T1[i1] + T2[i2];              // ln
 ```
 
-`cr_exp_bf16` ends in a **product** (`implementations/exp/inria-expbf16.c:250`):
+`cr_exp_bf16` ends in a **product** (`CORE-research/implementations/exp/inria-expbf16.c:250`):
 
 ```c
 return T1[i1] * T2[i2];              // exp
@@ -98,14 +98,14 @@ wants a different remedy than "more limbs".
 
 | # | Task | Output |
 |---|---|---|
-| 1 | Exact per-table probe: read the shipped `T1`/`T2`, split each entry, measure 1x1 / 2x2 / 3x2 / 2x3 over all table-path inputs | `log-research/exp-limb-probe.c` |
+| 1 | Exact per-table probe: read the shipped `T1`/`T2`, split each entry, measure 1x1 / 2x2 / 3x2 / 2x3 over all table-path inputs | `CORE-research/log-research/exp-limb-probe.c` |
 | 2 | Diagnose the residual failures — dump each with its ideal, cross-term sum, and distance to the rounding midpoint; classify structural vs representational | probe output |
 | 3 | **Decision gate.** If the residuals are representational, continue. If structural, stop and report — no limb count fixes them | — |
-| 4 | Limb table generator (mirrors `limb-gen.c`) | `table-gen/exp/exp-limb-gen.c` |
-| 5 | `cr_exp_bf16_limb` with explicit cross-term accumulation | `implementations/exp/inria-expbf16-limb.c` |
-| 6 | Exhaustive MPFR verifier, cross-eval log format | `cross-eval/verify-exp-limb.c` |
-| 7 | Per-limb MILP. **Needs new modelling** — the coupling rows become bilinear (`T1_a * T2_b`), which is not an LP. Either linearize over the fixed candidate set or accept a per-entry enumeration | `log-research/milp-exp-limb-gen.cc` |
-| 8 | Benchmark vs the float32 baseline | `benchmarks/benchmark-exp-limb.cpp` |
+| 4 | Limb table generator (mirrors `limb-gen.c`) | `CORE-research/table-gen/exp/exp-limb-gen.c` |
+| 5 | `cr_exp_bf16_limb` with explicit cross-term accumulation | `CORE-research/implementations/exp/inria-expbf16-limb.c` |
+| 6 | Exhaustive MPFR verifier, cross-eval log format | `CORE-research/cross-eval/verify-exp-limb.c` |
+| 7 | Per-limb MILP. **Needs new modelling** — the coupling rows become bilinear (`T1_a * T2_b`), which is not an LP. Either linearize over the fixed candidate set or accept a per-entry enumeration | `CORE-research/log-research/milp-exp-limb-gen.cc` |
+| 8 | Benchmark vs the float32 baseline | `CORE-research/benchmarks/benchmark-exp-limb.cpp` |
 
 ## Risks
 

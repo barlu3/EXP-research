@@ -13,7 +13,7 @@
    supplies the FPCR.AH scoping for the 12-bit estimates, the interleaved timing
    loop, epochs, the report and the exhaustive accuracy pass. Cycle counts come
    from bench-cycles.hpp; statistics, epochs and report_cluster from the main
-   harness, benchmarks/bench-harness.hpp. */
+   harness, CORE-research/benchmarks/bench-harness.hpp. */
 
 #ifndef APPROX_BENCH_HPP
 #define APPROX_BENCH_HPP

@@ -1,6 +1,6 @@
 # Turning "is this table possible?" into a solvable program
 
-How `log-research/` decides whether a correctly-rounded bf16 `ln` can be built
+How `CORE-research/log-research/` decides whether a correctly-rounded bf16 `ln` can be built
 from tables that are themselves bf16 — by rewriting an awkward question about
 rounding into a **mixed-integer linear program** and handing it to a solver.
 
@@ -294,7 +294,7 @@ and neither subsumes the other:
 
 - the MILP proves the **real-arithmetic model** feasible, in exact decimal
   arithmetic
-- `cross-eval/` proves the **floating-point implementation** correctly rounded,
+- `CORE-research/cross-eval/` proves the **floating-point implementation** correctly rounded,
   exhaustively over all 65,536 inputs against MPFR
 
 ## Where linearization stops: multiplication
@@ -461,24 +461,25 @@ cmake --build build --target ln-milp         # the MILP           -> milp-constr
 Then solve for feasibility with either solver:
 
 ```bash
-glpsol --lp log-research/milp-constraints.lp    # "OPTIMAL"  => a table exists
-highs log-research/milp-constraints.lp          # "Optimal"  => a table exists
+glpsol --lp CORE-research/log-research/milp-constraints.lp    # "OPTIMAL"  => a table exists
+highs CORE-research/log-research/milp-constraints.lp          # "Optimal"  => a table exists
 ```
 
 And — per the section above — **always re-check the result**:
 
 ```bash
+cd CORE-research                                # default paths are relative to it
 python3 log-research/check-solution.py          # exact decimal re-validation
 python3 log-research/check-limb-solution.py     # same, against the emitted header
 ```
 
 Useful knobs and notes:
 
-- `CAND_ULP` in `log-research/milp-gen.cc` sets the candidate window (default 3).
+- `CAND_ULP` in `CORE-research/log-research/milp-gen.cc` sets the candidate window (default 3).
   Changing it changes every verdict's meaning — see "Reading the verdicts".
-- `log-research/split-milp.py` splits the model into fragments; `--pin-t2`
+- `CORE-research/log-research/split-milp.py` splits the model into fragments; `--pin-t2`
   freezes `T2` to make the `T1` blocks genuinely independent.
 - Regenerating overwrites large committed research artifacts.
 - `milp-gen.cc` is C despite the extension, and CMake is told so explicitly.
-- `log-research/README.md` is the detailed run log, with the full record of
+- `CORE-research/log-research/README.md` is the detailed run log, with the full record of
   verdicts, timings and sweeps.

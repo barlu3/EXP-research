@@ -1,6 +1,6 @@
 /* Cycle counts for hand-written kernels.
 
-   benchmarks/bench-harness.hpp times in nanoseconds, which suits C kernels
+   CORE-research/benchmarks/bench-harness.hpp times in nanoseconds, which suits C kernels
    called through a loop the compiler owns. benchmark-recip times AArch64
    loops that cost a handful of cycles per element and asks a question stated
    in cycles, so it reads the core's own counters where it can.

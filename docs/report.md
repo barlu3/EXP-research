@@ -554,15 +554,15 @@ The handful of problematic table indices are then corrected by one ULP.
 
 | File | Purpose |
 |---|---|
-| `implementations/exp/exp.hpp` | Faithful glibc-2.43 port — baseline implementation |
-| `benchmarks/benchmark-home.cpp` | Throughput + accuracy benchmark for glibc port |
-| `benchmarks/benchmark-inria.cpp` | Throughput benchmark for Inria CORE-MATH implementations |
-| `implementations/exp/inria-exp.hpp` | Inria CORE-MATH implementations (include wrapper) |
-| `implementations/exp/inria-exp-seg.hpp` | Segmented / annotated version of Inria implementations |
-| `implementations/exp/inria-expf16.c` | Inria CORE-MATH float16 exp — `cr_expf16()` |
-| `implementations/exp/inria-expbf16.c` | Inria CORE-MATH bfloat16 exp — `cr_exp_bf16()` |
-| `implementations/exp/inria-expf16.sage` | SageMath script that generates T1[] and T2[] for float16 |
-| `implementations/exp/inria-expbf16.sage` | SageMath script that generates T1[] and T2[] for bfloat16 |
-| `benchmarks/output/bench_results*.txt` | Last run output |
+| `CORE-research/implementations/exp/exp.hpp` | Faithful glibc-2.43 port — baseline implementation |
+| `CORE-research/benchmarks/benchmark-home.cpp` | Throughput + accuracy benchmark for glibc port |
+| `CORE-research/benchmarks/benchmark-inria.cpp` | Throughput benchmark for Inria CORE-MATH implementations |
+| `CORE-research/implementations/exp/inria-exp.hpp` | Inria CORE-MATH implementations (include wrapper) |
+| `CORE-research/implementations/exp/inria-exp-seg.hpp` | Segmented / annotated version of Inria implementations |
+| `CORE-research/implementations/exp/inria-expf16.c` | Inria CORE-MATH float16 exp — `cr_expf16()` |
+| `CORE-research/implementations/exp/inria-expbf16.c` | Inria CORE-MATH bfloat16 exp — `cr_exp_bf16()` |
+| `CORE-research/implementations/exp/inria-expf16.sage` | SageMath script that generates T1[] and T2[] for float16 |
+| `CORE-research/implementations/exp/inria-expbf16.sage` | SageMath script that generates T1[] and T2[] for bfloat16 |
+| `CORE-research/benchmarks/output/bench_results*.txt` | Last run output |
 | `glibc-2.43/` | Reference source (not modified) |
 | `docs/report.md` | This file |

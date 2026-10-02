@@ -67,24 +67,30 @@ Two targets exit nonzero by design, not from build breakage:
 
 ## Layout
 
-Every top-level directory answers one question, and the three functions —
-`exp`, `sin`, `log` — sit level with each other inside the ones that are
-per-function.
+The CORE-MATH work lives under `CORE-research/`. Every directory in it answers
+one question, and the three functions — `exp`, `sin`, `log` — sit level with
+each other inside the ones that are per-function.
 
 ```
-implementations/  the math kernels             exp/ sin/ log/
-cross-eval/       is it correct?               exp/ sin/ log/ + shared MPFR tools
-table-gen/        build the bf16 limb tables   exp/ sin/ log/ sweep/
-benchmarks/       is it fast?
-log-research/     does a correctly-rounded bf16 ln() exist?  (LP/MILP)
-docs/             research writeups
-cmake/            build support
-dependencies/     glibc reference fetch
+CORE-research/
+  implementations/  the math kernels             exp/ sin/ log/
+  cross-eval/       is it correct?               exp/ sin/ log/ + shared MPFR tools
+  table-gen/        build the bf16 limb tables   exp/ sin/ log/ sweep/
+  benchmarks/       is it fast?
+  log-research/     does a correctly-rounded bf16 ln() exist?  (LP/MILP)
+ARM-approx-research/  ARM estimate instructions (FRECPE, FRSQRTE) vs exact ops
+docs/                 research writeups
+cmake/                build support
+dependencies/         glibc reference fetch
 ```
 
-`log-research/` is scoped to `ln` on purpose: it is the feasibility question for
+The tools under `CORE-research/` name each other and their outputs by path
+relative to `CORE-research/`, so run them from there; the CMake targets already
+do.
+
+`CORE-research/log-research/` is scoped to `ln` on purpose: it is the feasibility question for
 log's table layout, not shared tooling. The limb *generators* for all three
-functions live in `table-gen/`.
+functions live in `CORE-research/table-gen/`.
 
 ## bf16-only limb tables
 
@@ -119,13 +125,13 @@ the minimal configuration as infeasible when it is not. See
 [docs/EXP-SIN-LIMB-RESULTS.md](docs/EXP-SIN-LIMB-RESULTS.md) for the frontier.
 [docs/BENCHMARKING.md](docs/BENCHMARKING.md) covers how the throughput numbers
 are measured, and what they can and cannot show.
-[docs/MILP-GEN.md](docs/MILP-GEN.md) explains how `log-research/` answers the
+[docs/MILP-GEN.md](docs/MILP-GEN.md) explains how `CORE-research/log-research/` answers the
 prior question --- whether such a table can exist at all --- by casting it as a
 mixed-integer program.
 
 ## Cross-evaluation (exp / sin / log)
 
-`cross-eval/` holds two MPFR-driven tools. Both select the target function at
+`CORE-research/cross-eval/` holds two MPFR-driven tools. Both select the target function at
 **compile time**, so the build produces one executable per function.
 
 `verify_mpfr.c` compares all 65536 bfloat16 patterns against correctly-rounded

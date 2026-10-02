@@ -81,7 +81,7 @@ jobs:
 
       - name: Known research findings (reported, not gating)
         # These fail today by design: open discrepancies in the 16-bit-rounded
-        # tables, documented in cross-eval/CMakeLists.txt.
+        # tables, documented in CORE-research/cross-eval/CMakeLists.txt.
         continue-on-error: true
         working-directory: build
         run: ctest --output-on-failure -L research-finding
@@ -143,7 +143,7 @@ jobs:
         with:
           name: reports-${{ matrix.os }}
           path: |
-            benchmarks/output/*.txt
+            CORE-research/benchmarks/output/*.txt
             ARM-approx-research/benchmarks/output/*.txt
             ARM-approx-research/benchmarks/recip-sqrt/output/*.txt
           if-no-files-found: ignore
@@ -190,5 +190,5 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: reports-weekly-linux
-          path: benchmarks/output/*.txt
+          path: CORE-research/benchmarks/output/*.txt
           if-no-files-found: ignore

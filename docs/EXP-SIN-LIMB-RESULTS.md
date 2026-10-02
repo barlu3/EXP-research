@@ -178,7 +178,7 @@ theorem about significand widths. At 2×2 neither factor is exact, so there is n
 such theorem — correctness rests entirely on the exhaustive MPFR run over all
 65536 inputs. For a 16-bit domain that is complete, so the result is not weaker;
 but it does not transfer, and a regenerated table has to re-run the search
-rather than just re-split. `table-gen/exp/exp-limb-gen.c` re-scores every table-path input
+rather than just re-split. `CORE-research/table-gen/exp/exp-limb-gen.c` re-scores every table-path input
 against the values it is about to emit and refuses to write a table that
 misrounds anything.
 
@@ -292,17 +292,17 @@ the measurements behind each choice.
 
 | File | Role |
 |---|---|
-| `table-gen/exp/exp-limb-gen.c` | emits `implementations/exp/expbf16-limb.h` (3×3 and 2×2) |
-| `table-gen/sin/sin-limb-gen.c` | emits `implementations/sin/sinbf16-limb.h` (exact and minimal) |
-| `table-gen/sweep/limb-config-sweep.c` | the frontier above, plus both repair searches |
-| `../implementations/exp/inria-expbf16-limb.c` | `cr_exp_bf16_limb`, `cr_exp_bf16_limb_min` |
-| `../implementations/sin/inria-sinbf16-limb.c` | `cr_sin_bf16_limb`, `cr_sin_bf16_limb_min` |
-| `../cross-eval/verify-limb.c` | exhaustive MPFR check, both functions, both variants |
-| `../benchmarks/benchmark-exp-limb.cpp` | throughput vs the float32 tables |
-| `../benchmarks/benchmark-sin-limb.cpp` | throughput vs the float32 tables |
-| `../benchmarks/bench-harness.hpp` | the shared measurement core — see [BENCHMARKING.md](BENCHMARKING.md) |
-| `../benchmarks/bench-clusters.hpp` | the input ranges, shared with the tests |
-| `../benchmarks/harness-test.cpp` | unit tests for the core and the cluster invariants |
+| `CORE-research/table-gen/exp/exp-limb-gen.c` | emits `CORE-research/implementations/exp/expbf16-limb.h` (3×3 and 2×2) |
+| `CORE-research/table-gen/sin/sin-limb-gen.c` | emits `CORE-research/implementations/sin/sinbf16-limb.h` (exact and minimal) |
+| `CORE-research/table-gen/sweep/limb-config-sweep.c` | the frontier above, plus both repair searches |
+| `CORE-research/implementations/exp/inria-expbf16-limb.c` | `cr_exp_bf16_limb`, `cr_exp_bf16_limb_min` |
+| `CORE-research/implementations/sin/inria-sinbf16-limb.c` | `cr_sin_bf16_limb`, `cr_sin_bf16_limb_min` |
+| `CORE-research/cross-eval/verify-limb.c` | exhaustive MPFR check, both functions, both variants |
+| `CORE-research/benchmarks/benchmark-exp-limb.cpp` | throughput vs the float32 tables |
+| `CORE-research/benchmarks/benchmark-sin-limb.cpp` | throughput vs the float32 tables |
+| `CORE-research/benchmarks/bench-harness.hpp` | the shared measurement core — see [BENCHMARKING.md](BENCHMARKING.md) |
+| `CORE-research/benchmarks/bench-clusters.hpp` | the input ranges, shared with the tests |
+| `CORE-research/benchmarks/harness-test.cpp` | unit tests for the core and the cluster invariants |
 
 ```
 make limb-tables   # regenerate every bf16 limb table (ln, exp, sin)
