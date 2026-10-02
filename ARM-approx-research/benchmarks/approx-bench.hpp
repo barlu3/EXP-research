@@ -1,6 +1,7 @@
 /* Shared driver for the cycle-counted benchmarks of ARM's estimate
-   instructions: benchmark-recip.cpp (FRECPE against FDIV) and
-   recip-sqrt/benchmark-rsqrt.cpp (FRSQRTE against FSQRT + FDIV).
+   instructions: scalar/frecpe/ (FRECPE against FDIV), scalar/frsqrte/
+   (FRSQRTE against FSQRT + FDIV), and the 4-lane vector versions of both in
+   vector/vrecpe/ and vector/vrsqrts/.
 
    Both put one question to a different function -- does an estimate
    instruction plus Newton steps beat the exact instruction sequence, and at
@@ -54,6 +55,11 @@ inline constexpr std::uint64_t LAT_ELEMS  = 1u << 20;
 inline constexpr int REPS   = bench::DEFAULT_REPS;
 inline constexpr int EPOCHS = bench::DEFAULT_EPOCHS;
 
+// Elements per step of the throughput loop shape: every tput kernel must accept
+// any positive multiple of this. The scalar kernels step by 8, the vector ones
+// by 32 (eight 4-lane registers).
+inline constexpr std::uint64_t TPUT_STEP = 32;
+
 // Variant::max_ulp for rows the accuracy pass reports but holds to nothing:
 // they are not meant to be float32 results.
 inline constexpr int UNCHECKED = -1;
@@ -81,7 +87,8 @@ struct Cluster {
 struct Spec {
     const char* title;         // banner headline
     const char* kernels;       // where the timed code lives, for the banner
-    const char* report_path;   // relative to the working directory
+    const char* report_path;   // relative to the working directory, which is
+                               // ARM-approx-research/benchmarks for every run
     std::vector<Variant> variants;   // [0] is CONTROL, [1] the ratio baseline
     std::vector<Cluster> clusters;
 
@@ -97,6 +104,12 @@ struct Spec {
     const char* normal_note;
     // |y / f(x) - 1| for finite nonzero y, accurate far below 2^-24.
     double (*rel_error)(float x, float y);
+
+    // Inputs consumed per link of the latency chain. 1 for the scalar kernels;
+    // 4 for the vector ones, whose links are one 4-lane op each. Latency is
+    // reported per link -- the cost of one call on a critical path -- so a
+    // vector row reads directly against the scalar report's.
+    int lat_lanes = 1;
 };
 
 // FPCR.AH set for the scope's lifetime when `on`, then restored. With FEAT_AFP
@@ -185,6 +198,8 @@ inline Series measure(const Spec& s, const bench::CycleSource& cs, Mode m,
     const int nv = (int)s.variants.size();
     Series r{ std::vector<std::vector<double>>(nv), std::vector<std::vector<double>>(nv) };
     const std::uint64_t elems = m == THROUGHPUT ? TPUT_ELEMS : LAT_ELEMS;
+    // Throughput is per result; latency per chain link (Spec::lat_lanes).
+    const double per = m == THROUGHPUT ? (double)elems : (double)(elems / s.lat_lanes);
     for (const auto& v : s.variants) run(m, v, in, out, elems / 8);
     for (int rep = 0; rep < REPS + bench::DISCARD_REPS; ++rep) {
         // Timer mode converts with a factor taken in the same rep, so a clock
@@ -199,9 +214,9 @@ inline Series measure(const Spec& s, const bench::CycleSource& cs, Mode m,
             const bench::CounterReading b = cs.read();
             const double cyc = cs.hardware() ? (double)(b.cycles - a.cycles)
                                              : (b.ns - a.ns) / ns_per_cyc;
-            r.cyc[vi].push_back(cyc / (double)elems);
+            r.cyc[vi].push_back(cyc / per);
             if (cs.hardware())
-                r.ins[vi].push_back((double)(b.instructions - a.instructions) / (double)elems);
+                r.ins[vi].push_back((double)(b.instructions - a.instructions) / per);
         }
         if (rep == bench::DISCARD_REPS - 1) {
             for (auto& x : r.cyc) x.clear();
@@ -365,6 +380,12 @@ inline int run_main(const Spec& s, int argc, char** argv) {
     bench::logf("                  ratios are medians of per-epoch paired ratios vs %s\n",
                 s.variants[1].short_);
     bench::logf("  Control       : the same loop with the arithmetic removed\n");
+    if (s.lat_lanes > 1) {
+        bench::logf("  Vector width  : %d lanes. Throughput is cycles per result (per lane);\n",
+                    s.lat_lanes);
+        bench::logf("                  latency is cycles per chain link, one %d-lane op\n",
+                    s.lat_lanes);
+    }
     if (std::any_of(s.variants.begin(), s.variants.end(), [](const Variant& v) { return v.alt_fp; })) {
         bench::logf("  12-bit rows   : FPCR.AH set around each whole run; this core reports\n");
         bench::logf("                  FEAT_AFP=%d FEAT_RPRES=%d (both 1 for a real 12-bit estimate)\n",
@@ -403,6 +424,10 @@ inline int run_main(const Spec& s, int argc, char** argv) {
     for (int m = 0; m < NMODES; ++m) {
         box(MODE_TITLE[m]);
         bench::logf("%s", MODE_NOTE[m]);
+        if (m == LATENCY && s.lat_lanes > 1)
+            bench::logf("  Each link is one %d-lane op, so these are cycles per call, not per\n"
+                        "  result; divide by %d for the latency share of one lane.\n",
+                        s.lat_lanes, s.lat_lanes);
         for (int c = 0; c < ncl; ++c) {
             const int id = row_id(s, m, c);
             std::vector<bench::VariantSeries> vs;
@@ -420,7 +445,8 @@ inline int run_main(const Spec& s, int argc, char** argv) {
         }
     }
 
-    box("SUMMARY -- cycles per result, median across epochs");
+    box(s.lat_lanes > 1 ? "SUMMARY -- cycles per link (latency) / result (tput)"
+                        : "SUMMARY -- cycles per result, median across epochs");
     // One table per shape, one column per non-control variant. Latency is net
     // of the control, because latencies add along the chain; throughput is
     // gross, because there the control's work overlaps the arithmetic.
@@ -470,12 +496,12 @@ inline int run_main(const Spec& s, int argc, char** argv) {
                     (unsigned long long)a.mismatches, ulp, ulpn, rel);
         if (a.mismatches) {
             const float x = from_bits(a.worst);
-            std::vector<float> in8(8, x), out8(8), ref8(8);
+            std::vector<float> in8(TPUT_STEP, x), out8(TPUT_STEP), ref8(TPUT_STEP);
             {
                 const AltFp fp(s.variants[v].alt_fp);
-                s.variants[v].tput(in8.data(), out8.data(), 8);
+                s.variants[v].tput(in8.data(), out8.data(), TPUT_STEP);
             }
-            s.reference(in8.data(), ref8.data(), 8);
+            s.reference(in8.data(), ref8.data(), TPUT_STEP);
             bench::logf("   %a -> %a (want %a)", x, out8[0], ref8[0]);
         }
         bench::logf("\n");

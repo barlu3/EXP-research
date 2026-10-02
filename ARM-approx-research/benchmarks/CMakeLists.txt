@@ -1,7 +1,11 @@
 # Cycle-counted benchmarks of ARM's estimate instructions against the exact
-# instruction sequences they stand in for:
-#   bench-recip   FRECPE against FDIV                 (this directory)
-#   bench-rsqrt   FRSQRTE against FSQRT + FDIV        (recip-sqrt/)
+# instruction sequences they stand in for. Each lives in its own directory,
+# with its sources, its binary and its report:
+#   scalar/frecpe/   bench-recip       FRECPE against FDIV
+#   scalar/frsqrte/  bench-rsqrt       FRSQRTE against FSQRT + FDIV
+#   vector/vrecpe/   bench-recip-vec   bench-recip on 4-lane .4s vectors
+#   vector/vrsqrts/  bench-rsqrt-vec   bench-rsqrt on 4-lane .4s vectors
+# All four run from this directory, which the report paths are relative to.
 #
 # The kernels are hand-written AArch64 (Mach-O symbol names), so these exist
 # only on Apple Silicon. Everything the benchmarks share lives here: the driver
@@ -14,7 +18,7 @@
 # -march=native probing in CORE-research/benchmarks/CMakeLists.txt would change nothing here.
 #
 # They count cycles with the kperf fixed counters when run as root, e.g.
-#   cd ARM-approx-research/benchmarks && sudo output/bench-recip
+#   cd ARM-approx-research/benchmarks && sudo scalar/frecpe/bench-recip
 # Without root, the run-bench-* targets and CTest fall back to a calibrated
 # timer and say so in the report. Each ends with an exhaustive accuracy check
 # over every finite float32 and exits nonzero if a kernel is wrong, so each is a
@@ -27,26 +31,12 @@ if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
     "${CMAKE_CURRENT_SOURCE_DIR}"          # approx-bench.hpp, bench-cycles.hpp, approx-kernels.inc
     "${CMAKE_SOURCE_DIR}/CORE-research/benchmarks")  # bench-harness.hpp
 
-  set(APPROX_OUT "${CMAKE_CURRENT_SOURCE_DIR}/output")
+  # The working directory of every run; Spec::report_path is relative to it.
+  set(APPROX_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
-  add_executable(bench-recip benchmark-recip.cpp recip-kernels.S)
-  target_link_libraries(bench-recip PRIVATE approx-common)
-  target_compile_options(bench-recip PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-O3>)
-  set_target_properties(bench-recip PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${APPROX_OUT}")
-
-  add_custom_target(run-bench-recip
-    COMMAND "${CMAKE_COMMAND}" -E make_directory "${APPROX_OUT}"
-    COMMAND bench-recip
-    DEPENDS bench-recip
-    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-    COMMENT "Running benchmark-recip.cpp"
-    USES_TERMINAL)
-  # Timing runs must never overlap; join the end of the main benchmarks' chain.
-  add_dependencies(run-bench-recip run-bench-sin-limb)
-
-  add_test(NAME bench-recip COMMAND bench-recip WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
-  set_tests_properties(bench-recip PROPERTIES TIMEOUT 900 LABELS benchmark)
-
-  add_subdirectory(recip-sqrt)
+  # Timing runs must never overlap, so each run-bench-* target depends on the
+  # one before: scalar/frecpe, scalar/frsqrte, vector/vrecpe, vector/vrsqrts.
+  add_subdirectory(scalar/frecpe)
+  add_subdirectory(scalar/frsqrte)
+  add_subdirectory(vector)
 endif()

@@ -73,10 +73,9 @@
    main harness's; see docs/BENCHMARKING.md for why each exists. */
 
 #include "approx-bench.hpp"
+#include "recip-ref.hpp"
 
-#include <cmath>
 #include <cstdint>
-#include <random>
 
 extern "C" {
 void  recip_tput_fdiv(const float* in, float* out, std::uint64_t n);
@@ -95,43 +94,10 @@ namespace {
 
 using approx::UNCHECKED;
 
-// Input regions whose handling differs inside the kernels: FRECPE saturates to
-// infinity below 2^-128 and produces subnormal estimates above 2^126 (under
-// FPCR.AH it flushes both regions instead), and FDIV latency may depend on its
-// operands. "any finite" draws every finite bit pattern with equal
-// probability -- the literal "all real inputs" -- and so spends ~99% of its
-// samples on normals.
-std::uint32_t any_finite(std::mt19937& r) {
-    for (;;) { const std::uint32_t b = (std::uint32_t)r(); if (((b >> 23) & 0xff) != 0xff) return b; }
-}
-std::uint32_t unit_binade(std::mt19937& r) {
-    return ((std::uint32_t)r() & 0x807fffffu) | 0x3f800000u;
-}
-std::uint32_t subnormal(std::mt19937& r) {
-    for (;;) { const std::uint32_t b = (std::uint32_t)r() & 0x807fffffu; if (b & 0x7fffffu) return b; }
-}
-std::uint32_t huge(std::mt19937& r) {   // exponent 253 or 254: 1/x is subnormal
-    return ((std::uint32_t)r() & 0x807fffffu) | ((253u + ((std::uint32_t)r() & 1u)) << 23);
-}
-
-// IEEE division is correctly rounded; no fast-math in the build.
-void reference(const float* in, float* out, std::size_t n) {
-    for (std::size_t i = 0; i < n; ++i) out[i] = 1.0f / in[i];
-}
-
-// x and 1/x both normal: exponent field 1..252, either sign.
-bool normal_block(std::uint32_t hi) {
-    const std::uint32_t e = (hi >> 7) & 0xff;
-    return e >= 1 && e <= 252;
-}
-
-// y*x is exact in double (24 x 24 bits), so this is the true relative error.
-double rel_error(float x, float y) { return std::fabs((double)y * (double)x - 1.0); }
-
 const approx::Spec SPEC = {
     .title       = "float32 1/x on AArch64 -- FDIV vs FRECPE (8- and 12-bit)",
-    .kernels     = "ARM-approx-research/benchmarks/recip-kernels.S",
-    .report_path = "output/bench_results_recip.txt",
+    .kernels     = "ARM-approx-research/benchmarks/scalar/frecpe/recip-kernels.S",
+    .report_path = "scalar/frecpe/bench_results_recip.txt",
     // Index 0 is the control, 1 the baseline every ratio divides by.
     .variants = {
         approx::CONTROL,
@@ -143,17 +109,12 @@ const approx::Spec SPEC = {
         { "frecpe12 only",  "fe12",     UNCHECKED, true,  recip_tput_est0, recip_lat_est0 },
         { "frecpe12+1 NR",  "fe12+1NR", UNCHECKED, true,  recip_tput_est1, recip_lat_est1 },
     },
-    .clusters = {
-        { "any finite",     any_finite  },
-        { "|x| in [1,2)",   unit_binade },
-        { "subnormal",      subnormal   },
-        { "|x| >= 2^126",   huge        },
-    },
-    .reference_note = "1.0f/x (IEEE division)",
-    .reference      = reference,
-    .normal_block   = normal_block,
-    .normal_note    = "x and 1/x both normal",
-    .rel_error      = rel_error,
+    .clusters       = recip_ref::CLUSTERS,
+    .reference_note = recip_ref::REFERENCE_NOTE,
+    .reference      = recip_ref::reference,
+    .normal_block   = recip_ref::normal_block,
+    .normal_note    = recip_ref::NORMAL_NOTE,
+    .rel_error      = recip_ref::rel_error,
 };
 
 }  // namespace
