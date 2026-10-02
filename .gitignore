@@ -8,8 +8,12 @@ CLAUDE.local.md
 .claude/
 CLAUDE.md
 CORE-research/benchmarks/output/
-ARM-approx-research/benchmarks/output/
-ARM-approx-research/benchmarks/recip-sqrt/output/
+# ARM estimate benchmarks: binaries and reports land beside their sources.
+ARM-approx-research/benchmarks/scalar/frecpe/bench-recip
+ARM-approx-research/benchmarks/scalar/frsqrte/bench-rsqrt
+ARM-approx-research/benchmarks/vector/vrecpe/bench-recip-vec
+ARM-approx-research/benchmarks/vector/vrsqrts/bench-rsqrt-vec
+ARM-approx-research/benchmarks/**/bench_results_*.txt
 # verifying MPFR library is downloaded and installed correctly
 version
 # discrepancy checker for MPFR library

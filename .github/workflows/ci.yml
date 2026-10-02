@@ -144,8 +144,8 @@ jobs:
           name: reports-${{ matrix.os }}
           path: |
             CORE-research/benchmarks/output/*.txt
-            ARM-approx-research/benchmarks/output/*.txt
-            ARM-approx-research/benchmarks/recip-sqrt/output/*.txt
+            ARM-approx-research/benchmarks/scalar/*/bench_results_*.txt
+            ARM-approx-research/benchmarks/vector/*/bench_results_*.txt
           if-no-files-found: ignore
 
       - name: help, clean, distclean

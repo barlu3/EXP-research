@@ -67,9 +67,10 @@ cd build && ctest -R bench # the same programs as pass/fail tests
 
 Individual targets are `run-bench-home`, `run-bench-inria`, `run-bench-log-limb`,
 `run-bench-exp-limb`, `run-bench-sin-limb`, and on Apple Silicon
-`run-bench-recip` and `run-bench-rsqrt` (§10). Each program writes its report to
-`CORE-research/benchmarks/output/` *and* to stdout, so `make bench` output and the committed
-file are the same text.
+`run-bench-recip`, `run-bench-rsqrt`, `run-bench-recip-vec` and `run-bench-rsqrt-vec` (§10). Each program writes its report to
+`CORE-research/benchmarks/output/` (the ARM ones to their own directories under
+`ARM-approx-research/benchmarks/scalar/` and `vector/`, §10) *and* to stdout, so
+`make bench` output and the report file are the same text.
 
 Compile flags come from `BENCH_FLAGS` in `CORE-research/benchmarks/CMakeLists.txt`: `-O3` plus
 `-march=native -mavx2 -mfma`, each **probed** rather than assumed, because the
@@ -355,8 +356,21 @@ sequence**, and how accurate is it?
 
 | Program | Compares | Report |
 |---|---|---|
-| `benchmark-recip.cpp` | `FRECPE` + Newton steps vs `FDIV` (1/x) | `output/bench_results_recip.txt` |
-| `recip-sqrt/benchmark-rsqrt.cpp` | `FRSQRTE` + Newton steps vs `FSQRT` + `FDIV` (1/√x) | `recip-sqrt/output/bench_results_rsqrt.txt` |
+| `scalar/frecpe/` | `FRECPE` + Newton steps vs `FDIV` (1/x) | `bench_results_recip.txt` |
+| `scalar/frsqrte/` | `FRSQRTE` + Newton steps vs `FSQRT` + `FDIV` (1/√x) | `bench_results_rsqrt.txt` |
+| `vector/vrecpe/` | the 1/x comparison on 4-lane `.4s` vectors | `bench_results_recip_vec.txt` |
+| `vector/vrsqrts/` | the 1/√x comparison on 4-lane `.4s` vectors | `bench_results_rsqrt_vec.txt` |
+
+Each directory holds everything for its function: the benchmark `.cpp`, its
+kernels `.S`, its `CMakeLists.txt`, and, once built and run, its binary and
+report. All four run from `ARM-approx-research/benchmarks/`, which the report
+paths are relative to.
+
+The vector programs reuse the scalar ones' variants, input ranges and
+reference (`scalar/frecpe/recip-ref.hpp`, `scalar/frsqrte/rsqrt-ref.hpp`), so their accuracy
+tables must match the scalar ones exactly. Throughput is reported per result
+(per lane). Latency is reported per chain link, which is one 4-lane call
+(`Spec::lat_lanes`), so it reads directly against the scalar latency of one call.
 
 Each times the exact sequence, the same sequence behind a function call, the
 bare estimate, and the estimate plus one or two Newton steps. Some variants
@@ -391,12 +405,29 @@ ARM-approx-research/benchmarks/
   approx-kernels.inc     shared assembler macros: the loop scaffolding
   approx-common.S        shared kernels: the control loops, the cycle calibration
   bench-cycles.hpp       cycle counting: hardware counters or calibrated timer
-  benchmark-recip.cpp    1/x: its variants, input ranges and reference
-  recip-kernels.S        1/x: its kernels
-  recip-sqrt/
-    benchmark-rsqrt.cpp  1/sqrt(x): its variants, input ranges and reference
-    rsqrt-kernels.S      1/sqrt(x): its kernels
+  scalar/
+    frecpe/                    1/x
+      benchmark-recip.cpp      its variants
+      recip-kernels.S          its kernels
+      recip-ref.hpp            input ranges and reference, shared with vector/vrecpe/
+      bench-recip, bench_results_recip.txt          generated
+    frsqrte/                   1/sqrt(x)
+      benchmark-rsqrt.cpp      its variants
+      rsqrt-kernels.S          its kernels
+      rsqrt-ref.hpp            input ranges and reference, shared with vector/vrsqrts/
+      bench-rsqrt, bench_results_rsqrt.txt          generated
+  vector/
+    vec-kernels.inc            vector loop scaffolding (q registers, 32 elements per step)
+    vec-common.S               vector control loops
+    vrecpe/                    1/x on .4s vectors
+      benchmark-recip-vec.cpp, recip-vec-kernels.S
+      bench-recip-vec, bench_results_recip_vec.txt  generated
+    vrsqrts/                   1/sqrt(x) on .4s vectors
+      benchmark-rsqrt-vec.cpp, rsqrt-vec-kernels.S
+      bench-rsqrt-vec, bench_results_rsqrt_vec.txt  generated
 ```
+
+Every directory with a benchmark also has its own `CMakeLists.txt`.
 
 ### 10.3 Why a shared driver
 
@@ -481,22 +512,26 @@ them come:
 ### 10.7 Running and extending
 
 ```sh
-make bench                                    # runs both, on Apple Silicon
-cd build && ctest -R "bench-recip|bench-rsqrt"
+make bench                                    # runs all four, on Apple Silicon
+cd build && ctest -R "bench-recip|bench-rsqrt"   # also matches the -vec ones
 
-cd ARM-approx-research/benchmarks             # hardware cycle counts:
-sudo output/bench-recip                       # run each from its own directory,
-cd recip-sqrt && sudo output/bench-rsqrt      # since report paths are relative
+cd ARM-approx-research/benchmarks             # hardware cycle counts; run all
+sudo scalar/frecpe/bench-recip                # four from here, since report
+sudo scalar/frsqrte/bench-rsqrt               # paths are relative to it
+sudo vector/vrecpe/bench-recip-vec
+sudo vector/vrsqrts/bench-rsqrt-vec
 ```
 
 - **A new variant:** write its throughput and latency kernels in the `.S` file
   using the shared macros, declare them in the benchmark file, and add a row to
   its `Spec`.
-- **A new function:** copy the shape of `recip-sqrt/`. It needs three files:
-  - a kernels `.S` that includes `approx-kernels.inc`,
+- **A new function:** copy the shape of `scalar/frsqrte/` into a new directory
+  under `scalar/` (or `vector/`, linking `approx-vec-common` as well) and add it
+  with `add_subdirectory`. It needs three files:
+  - a kernels `.S` that includes `approx-kernels.inc` (`vec-kernels.inc` for vector),
   - a benchmark `.cpp` that fills in a `Spec` (variants, input ranges, a
-    correctly rounded reference),
-  - a `CMakeLists.txt` that links `approx-common`.
+    correctly rounded reference), with `report_path` pointing into its directory,
+  - a `CMakeLists.txt` that links `approx-common` and outputs to its own directory.
 
 ### 10.8 Known limits
 
