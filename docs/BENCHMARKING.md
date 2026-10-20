@@ -358,19 +358,29 @@ sequence**, and how accurate is it?
 |---|---|---|
 | `scalar/frecpe/` | `FRECPE` + Newton steps vs `FDIV` (1/x) | `bench_results_recip.txt` |
 | `scalar/frsqrte/` | `FRSQRTE` + Newton steps vs `FSQRT` + `FDIV` (1/√x) | `bench_results_rsqrt.txt` |
-| `vector/vrecpe/` | the 1/x comparison on 4-lane `.4s` vectors | `bench_results_recip_vec.txt` |
-| `vector/vrsqrts/` | the 1/√x comparison on 4-lane `.4s` vectors | `bench_results_rsqrt_vec.txt` |
+| `vector/vrecpe/` | the 1/x comparison on 4-lane `.4s` vectors | `bench_results_vrecpe.txt` |
+| `vector/vrsqrts/` | the 1/√x comparison on 4-lane `.4s` vectors | `bench_results_vrsqrts.txt` |
+| `scalar/logf/` | `FRECPE` as log's range reduction vs a table of the same values vs libm `logf` | `bench_results_logf.txt` |
 
 Each directory holds everything for its function: the benchmark `.cpp`, its
 kernels `.S`, its `CMakeLists.txt`, and, once built and run, its binary and
-report. All four run from `ARM-approx-research/benchmarks/`, which the report
-paths are relative to.
+report. Each writes its report beside its binary, so it can be run from any
+directory, with or without `sudo`.
 
 The vector programs reuse the scalar ones' variants, input ranges and
 reference (`scalar/frecpe/recip-ref.hpp`, `scalar/frsqrte/rsqrt-ref.hpp`), so their accuracy
 tables must match the scalar ones exactly. Throughput is reported per result
 (per lane). Latency is reported per chain link, which is one 4-lane call
 (`Spec::lat_lanes`), so it reads directly against the scalar latency of one call.
+
+`scalar/logf/` asks a different question. On M5, `FDIV` already matches
+`FRECPE`'s throughput, so the estimate loses wherever it stands in for a
+division: tan, sec, tanh, the e^-x in sinh and cosh. In log it is not a
+division. It is the range reduction: for every normal x, `FRECPE(x)` is
+exactly 2^-k times one of 256 values picked by x's top fraction bits, and
+x·`FRECPE(x)` − 1 is exact. Its two hand kernels compute bit-identical
+results and differ only in whether that reciprocal comes from `FRECPE` or
+from a table load, so the timing difference is the fetch alone.
 
 Each times the exact sequence, the same sequence behind a function call, the
 bare estimate, and the estimate plus one or two Newton steps. Some variants
@@ -416,15 +426,19 @@ ARM-approx-research/benchmarks/
       rsqrt-kernels.S          its kernels
       rsqrt-ref.hpp            input ranges and reference, shared with vector/vrsqrts/
       bench-rsqrt, bench_results_rsqrt.txt          generated
+    logf/                      log(x): FRECPE as the range reduction
+      benchmark-logf.cpp       variants, tables, input ranges, reference
+      logf-kernels.S           its kernels
+      bench-logf, bench_results_logf.txt            generated
   vector/
     vec-kernels.inc            vector loop scaffolding (q registers, 32 elements per step)
     vec-common.S               vector control loops
     vrecpe/                    1/x on .4s vectors
       benchmark-recip-vec.cpp, recip-vec-kernels.S
-      bench-recip-vec, bench_results_recip_vec.txt  generated
+      bench-recip-vec, bench_results_vrecpe.txt     generated
     vrsqrts/                   1/sqrt(x) on .4s vectors
       benchmark-rsqrt-vec.cpp, rsqrt-vec-kernels.S
-      bench-rsqrt-vec, bench_results_rsqrt_vec.txt  generated
+      bench-rsqrt-vec, bench_results_vrsqrts.txt    generated
 ```
 
 Every directory with a benchmark also has its own `CMakeLists.txt`.
@@ -530,7 +544,8 @@ sudo vector/vrsqrts/bench-rsqrt-vec
   with `add_subdirectory`. It needs three files:
   - a kernels `.S` that includes `approx-kernels.inc` (`vec-kernels.inc` for vector),
   - a benchmark `.cpp` that fills in a `Spec` (variants, input ranges, a
-    correctly rounded reference), with `report_path` pointing into its directory,
+    correctly rounded reference), with `report_name` the report's file name (it
+    is written beside the binary),
   - a `CMakeLists.txt` that links `approx-common` and outputs to its own directory.
 
 ### 10.8 Known limits

@@ -13,6 +13,7 @@ ARM-approx-research/benchmarks/scalar/frecpe/bench-recip
 ARM-approx-research/benchmarks/scalar/frsqrte/bench-rsqrt
 ARM-approx-research/benchmarks/vector/vrecpe/bench-recip-vec
 ARM-approx-research/benchmarks/vector/vrsqrts/bench-rsqrt-vec
+ARM-approx-research/benchmarks/scalar/logf/bench-logf
 ARM-approx-research/benchmarks/**/bench_results_*.txt
 # verifying MPFR library is downloaded and installed correctly
 version
