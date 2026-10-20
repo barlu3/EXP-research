@@ -10,9 +10,11 @@ variant, a **median ns/call with an interquartile range**, taken across
 each cluster carries a **control kernel** so the loop's own cost can be
 subtracted rather than blamed on the function under test.
 
-Two more benchmarks live in `ARM-approx-research/benchmarks/`. They time
-hand-written AArch64 in **cycles** instead of C in ns, and ask whether ARM's
-estimate instructions beat exact division and square root. §10 covers them.
+Five more benchmark programs live in `ARM-approx-research/benchmarks/`. They
+time hand-written AArch64 in **cycles** instead of C in ns. Four ask whether
+ARM's estimate instructions beat exact division and square root; the fifth
+asks whether `FRECPE` can replace the table lookup inside `logf`. §10 covers
+them.
 
 ---
 
@@ -67,7 +69,8 @@ cd build && ctest -R bench # the same programs as pass/fail tests
 
 Individual targets are `run-bench-home`, `run-bench-inria`, `run-bench-log-limb`,
 `run-bench-exp-limb`, `run-bench-sin-limb`, and on Apple Silicon
-`run-bench-recip`, `run-bench-rsqrt`, `run-bench-recip-vec` and `run-bench-rsqrt-vec` (§10). Each program writes its report to
+`run-bench-recip`, `run-bench-rsqrt`, `run-bench-recip-vec`, `run-bench-rsqrt-vec`
+and `run-bench-logf` (§10). Each program writes its report to
 `CORE-research/benchmarks/output/` (the ARM ones to their own directories under
 `ARM-approx-research/benchmarks/scalar/` and `vector/`, §10) *and* to stdout, so
 `make bench` output and the report file are the same text.
@@ -349,10 +352,12 @@ reps: epochs sample the axis that actually dominates (§4.6).
 
 ## 10. The ARM estimate-instruction benchmarks
 
-Two benchmarks in `ARM-approx-research/benchmarks/` ask a different question
+The benchmarks in `ARM-approx-research/benchmarks/` ask a different question
 from the ones above: on Apple Silicon, is one of ARM's **estimate
-instructions plus Newton steps** cheaper than the **exact instruction
-sequence**, and how accurate is it?
+instructions** cheaper than what it would replace, and how accurate is the
+result? For 1/x and 1/√x the replaced code is the **exact instruction
+sequence**, and the estimate needs Newton steps to compete. For `logf` it is a
+**table lookup**, and the estimate is used as it comes.
 
 | Program | Compares | Report |
 |---|---|---|
@@ -373,18 +378,29 @@ tables must match the scalar ones exactly. Throughput is reported per result
 (per lane). Latency is reported per chain link, which is one 4-lane call
 (`Spec::lat_lanes`), so it reads directly against the scalar latency of one call.
 
+The 1/x and 1/√x programs each time the exact sequence, the same sequence
+behind a function call, the bare estimate, and the estimate plus one or two
+Newton steps. Some variants also run in 12-bit mode (§10.5). Every variant
+runs over four input ranges.
+
 `scalar/logf/` asks a different question. On M5, `FDIV` already matches
 `FRECPE`'s throughput, so the estimate loses wherever it stands in for a
 division: tan, sec, tanh, the e^-x in sinh and cosh. In log it is not a
 division. It is the range reduction: for every normal x, `FRECPE(x)` is
 exactly 2^-k times one of 256 values picked by x's top fraction bits, and
-x·`FRECPE(x)` − 1 is exact. Its two hand kernels compute bit-identical
-results and differ only in whether that reciprocal comes from `FRECPE` or
-from a table load, so the timing difference is the fetch alone.
+x·`FRECPE(x)` − 1 is exact. It times three variants:
 
-Each times the exact sequence, the same sequence behind a function call, the
-bare estimate, and the estimate plus one or two Newton steps. Some variants
-also run in 12-bit mode (§10.5). Every variant runs over four input ranges.
+| Variant | What it is |
+|---|---|
+| `logf (libm)` | the system `logf`, called normally: the baseline every ratio divides by |
+| `table + frecpx` | a table-driven log: the reciprocal is loaded from a 256-entry table |
+| `frecpe` | the same algorithm, with the reciprocal from `FRECPE` instead of the table |
+
+The table holds `FRECPE`'s own values, so the two hand kernels compute
+bit-identical results (the accuracy table must show identical rows) and
+differ only in how the reciprocal is fetched. All three are held to 1 ulp.
+The four input ranges are positive normals, [0.5, 2), [1, 1 + 2^-8) (where
+the hand kernels take a separate path that skips the lookup) and subnormals.
 
 ### 10.1 What is different
 
@@ -445,9 +461,8 @@ Every directory with a benchmark also has its own `CMakeLists.txt`.
 
 ### 10.3 Why a shared driver
 
-The two benchmarks ask the same question of two functions. The timing, the
-epochs, the report and the accuracy check are identical. Only three things
-differ:
+The benchmarks time different functions, but the timing, the epochs, the
+report and the accuracy check are identical. Only three things differ:
 
 1. which kernels to time,
 2. which inputs to time them on,
@@ -462,8 +477,8 @@ Each variant is one row:
 { "frecpe8 + 2 NR",   "fe8+2NR",  1,       false,  recip_tput_est2,   recip_lat_est2 },
 ```
 
-With one driver, the two benchmarks cannot measure things in different ways,
-and a fix to the timing or the report reaches both at once. The main harness
+With one driver, the benchmarks cannot measure things in different ways,
+and a fix to the timing or the report reaches all of them at once. The main harness
 exists for the same reason: its timing loop was once copied into five
 benchmarks and drifted into three different behaviours.
 
@@ -486,9 +501,9 @@ report subtracts that from the latency rows. The subtraction is only fair if
 every kernel uses exactly the same scaffolding, and the macros guarantee that
 it does.
 
-The estimate sequences are macros too (`RECIP_EST2`, `RSQRT_STEP` and so on).
-That way the latency kernel, the throughput kernel and the accuracy check all
-run the same instructions.
+The estimate sequences are macros too (`RECIP_EST2`, `RSQRT_STEP`, `LOGF` and
+so on). That way the latency kernel, the throughput kernel and the accuracy
+check all run the same instructions.
 
 ### 10.5 12-bit mode
 
@@ -520,21 +535,26 @@ them come:
 - **accuracy: PASS / FAIL.** Each variant is held to the `max ulp` in its
   `Spec` row: `0` must be exact, `1` or `2` must be within that many ulp, and
   `UNCHECKED` is only reported. The report lists which rows were held to what,
-  and the program exits non-zero on a FAIL. That makes both benchmarks
-  regression tests too.
+  and the program exits non-zero on a FAIL. That makes every one of them a
+  regression test too.
 
 ### 10.7 Running and extending
 
 ```sh
-make bench                                    # runs all four, on Apple Silicon
-cd build && ctest -R "bench-recip|bench-rsqrt"   # also matches the -vec ones
+make bench                    # runs all five, on Apple Silicon, after the others
+cd build && ctest -R "bench-(recip|rsqrt|logf)"   # also matches the -vec ones
 
-cd ARM-approx-research/benchmarks             # hardware cycle counts; run all
-sudo scalar/frecpe/bench-recip                # four from here, since report
-sudo scalar/frsqrte/bench-rsqrt               # paths are relative to it
+cd ARM-approx-research/benchmarks             # hardware cycle counts; any
+sudo scalar/frecpe/bench-recip                # directory works, since each
+sudo scalar/frsqrte/bench-rsqrt               # report lands beside its binary
+sudo scalar/logf/bench-logf
 sudo vector/vrecpe/bench-recip-vec
 sudo vector/vrsqrts/bench-rsqrt-vec
 ```
+
+`make bench` runs without `sudo`, so it regenerates every report with
+estimated cycles. That replaces any report a `sudo` run left there; rerun the
+program under `sudo` afterwards to get hardware counts back.
 
 - **A new variant:** write its throughput and latency kernels in the `.S` file
   using the shared macros, declare them in the benchmark file, and add a row to
@@ -548,6 +568,14 @@ sudo vector/vrsqrts/bench-rsqrt-vec
     is written beside the binary),
   - a `CMakeLists.txt` that links `approx-common` and outputs to its own directory.
 
+  Then add its `run-bench-*` target to `bench` in the top-level
+  `CMakeLists.txt`, and make it depend on the previous one (as
+  `scalar/logf/CMakeLists.txt` does) so that timing runs never overlap.
+- **Out-of-line code stays in the kernel's section.** Mach-O cannot relocate a
+  conditional branch into another section, so `.pushsection` stubs fail to
+  assemble. `logf-kernels.S` puts each special-case stub after its kernel's
+  `ret` and gives the stub labels it shares with the hot path.
+
 ### 10.8 Known limits
 
 - **Apple Silicon only.** The kernels use Mach-O symbol names, and hardware
@@ -558,6 +586,10 @@ sudo vector/vrsqrts/bench-rsqrt-vec
 - **The 12-bit rows mean something only if `FEAT_AFP` and `FEAT_RPRES` are
   both 1.** Otherwise they silently measure the 8-bit estimate. The banner and
   the accuracy table's relative-error column show which one happened.
+- **`logf`'s latency gap assumes varied inputs.** The input ranges are random,
+  which defeats the core's load prediction. When consecutive inputs share a
+  table row, the table load is predicted and the gap between `table + frecpx`
+  and `frecpe` roughly halves. Throughput is unaffected.
 
 ---
 
