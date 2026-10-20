@@ -6,6 +6,7 @@
 #   vector/vrecpe/   bench-recip-vec   bench-recip on 4-lane .4s vectors
 #   vector/vrsqrts/  bench-rsqrt-vec   bench-rsqrt on 4-lane .4s vectors
 #   scalar/logf/     bench-logf        FRECPE as log's range reduction vs a table
+#   scalar/acosf/    bench-acosf       FRSQRTE as acos's sqrt vs FSQRT
 # Each writes its report beside its binary, whatever the working directory.
 #
 # The kernels are hand-written AArch64 (Mach-O symbol names), so these exist
@@ -38,9 +39,10 @@ if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
 
   # Timing runs must never overlap, so each run-bench-* target depends on the
   # one before: scalar/frecpe, scalar/frsqrte, vector/vrecpe, vector/vrsqrts,
-  # scalar/logf.
+  # scalar/logf, scalar/acosf.
   add_subdirectory(scalar/frecpe)
   add_subdirectory(scalar/frsqrte)
   add_subdirectory(vector)
   add_subdirectory(scalar/logf)
+  add_subdirectory(scalar/acosf)
 endif()

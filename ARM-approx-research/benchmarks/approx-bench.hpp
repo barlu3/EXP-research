@@ -1,8 +1,9 @@
 /* Shared driver for the cycle-counted benchmarks of ARM's estimate
    instructions: scalar/frecpe/ (FRECPE against FDIV), scalar/frsqrte/
    (FRSQRTE against FSQRT + FDIV), the 4-lane vector versions of both in
-   vector/vrecpe/ and vector/vrsqrts/, and scalar/logf/ (FRECPE as the range
-   reduction inside log).
+   vector/vrecpe/ and vector/vrsqrts/, scalar/logf/ (FRECPE as the range
+   reduction inside log) and scalar/acosf/ (FRSQRTE as the square root inside
+   acos).
 
    Both put one question to a different function -- does an estimate
    instruction plus Newton steps beat the exact instruction sequence, and at
