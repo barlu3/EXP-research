@@ -357,7 +357,8 @@ from the ones above: on Apple Silicon, is one of ARM's **estimate
 instructions** cheaper than what it would replace, and how accurate is the
 result? For 1/x and 1/√x the replaced code is the **exact instruction
 sequence**, and the estimate needs Newton steps to compete. For `logf` it is a
-**table lookup**, and the estimate is used as it comes.
+**table lookup**, and the estimate is used as it comes. For `acosf` it is the
+`FSQRT` inside the function.
 
 | Program | Compares | Report |
 |---|---|---|
@@ -366,6 +367,7 @@ sequence**, and the estimate needs Newton steps to compete. For `logf` it is a
 | `vector/vrecpe/` | the 1/x comparison on 4-lane `.4s` vectors | `bench_results_vrecpe.txt` |
 | `vector/vrsqrts/` | the 1/√x comparison on 4-lane `.4s` vectors | `bench_results_vrsqrts.txt` |
 | `scalar/logf/` | `FRECPE` as log's range reduction vs a table of the same values vs libm `logf` | `bench_results_logf.txt` |
+| `scalar/acosf/` | `FRSQRTE` + Newton steps vs `FSQRT` as acos's square root vs libm `acosf` | `bench_results_acosf.txt` |
 
 Each directory holds everything for its function: the benchmark `.cpp`, its
 kernels `.S`, its `CMakeLists.txt`, and, once built and run, its binary and
@@ -401,6 +403,24 @@ bit-identical results (the accuracy table must show identical rows) and
 differ only in how the reciprocal is fetched. All three are held to 1 ulp.
 The four input ranges are positive normals, [0.5, 2), [1, 1 + 2^-8) (where
 the hand kernels take a separate path that skips the lookup) and subnormals.
+
+`scalar/acosf/` asks the same question of a square root. `FRSQRTE` plus two
+Newton steps beat `FSQRT` + `FDIV` for 1/√x, but acos needs √z itself:
+for |x| > 1/2 it is 2·asin(√z) with z = (1 − |x|)/2, and below that a
+polynomial alone. The hand kernel works in double and rounds once, and
+times two ways of getting √z:
+
+| Variant | What it is |
+|---|---|
+| `acosf (libm)` | the system `acosf`, called normally: the baseline every ratio divides by |
+| `fsqrt` | the hand kernel, √z from one double `FSQRT` |
+| `frsqrte + 2 NR` | the same kernel, √z = z·1/√z from `FRSQRTE`, two Newton steps and a multiply |
+
+The two hand kernels share everything but the square root, so the gap
+between them is the square root alone. All three are held to 1 ulp. The
+three input ranges are [−1, 1) (either path, at random), [−1/2, 1/2) (the
+polynomial alone, where the two hand kernels run the same instructions and
+must time the same) and 1/2 ≤ |x| < 1 (every input takes the square root).
 
 ### 10.1 What is different
 
@@ -446,6 +466,10 @@ ARM-approx-research/benchmarks/
       benchmark-logf.cpp       variants, tables, input ranges, reference
       logf-kernels.S           its kernels
       bench-logf, bench_results_logf.txt            generated
+    acosf/                     acos(x): FRSQRTE + Newton steps as the square root
+      benchmark-acosf.cpp      variants, input ranges, reference
+      acosf-kernels.S          its kernels
+      bench-acosf, bench_results_acosf.txt          generated
   vector/
     vec-kernels.inc            vector loop scaffolding (q registers, 32 elements per step)
     vec-common.S               vector control loops
@@ -541,13 +565,14 @@ them come:
 ### 10.7 Running and extending
 
 ```sh
-make bench                    # runs all five, on Apple Silicon, after the others
-cd build && ctest -R "bench-(recip|rsqrt|logf)"   # also matches the -vec ones
+make bench                    # runs all six, on Apple Silicon, after the others
+cd build && ctest -R "bench-(recip|rsqrt|logf|acosf)"   # also matches the -vec ones
 
 cd ARM-approx-research/benchmarks             # hardware cycle counts; any
 sudo scalar/frecpe/bench-recip                # directory works, since each
 sudo scalar/frsqrte/bench-rsqrt               # report lands beside its binary
 sudo scalar/logf/bench-logf
+sudo scalar/acosf/bench-acosf
 sudo vector/vrecpe/bench-recip-vec
 sudo vector/vrsqrts/bench-rsqrt-vec
 ```
@@ -590,6 +615,11 @@ program under `sudo` afterwards to get hardware counts back.
   which defeats the core's load prediction. When consecutive inputs share a
   table row, the table load is predicted and the gap between `table + frecpx`
   and `frecpe` roughly halves. Throughput is unaffected.
+- **`acosf`'s [−1, 1) range shows no branch mispredicts.** Its inputs take
+  either path at random, but the 4096-element buffer repeats and the branch
+  predictor learns it, so the range times at the average of the other two.
+  Over one pass of 16M fresh inputs the `fsqrt` kernel takes about 3× as long
+  per result (3.1 vs 1.0 ns). The single-path ranges time the same either way.
 
 ---
 
