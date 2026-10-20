@@ -1,7 +1,8 @@
 /* Shared driver for the cycle-counted benchmarks of ARM's estimate
    instructions: scalar/frecpe/ (FRECPE against FDIV), scalar/frsqrte/
-   (FRSQRTE against FSQRT + FDIV), and the 4-lane vector versions of both in
-   vector/vrecpe/ and vector/vrsqrts/.
+   (FRSQRTE against FSQRT + FDIV), the 4-lane vector versions of both in
+   vector/vrecpe/ and vector/vrsqrts/, and scalar/logf/ (FRECPE as the range
+   reduction inside log).
 
    Both put one question to a different function -- does an estimate
    instruction plus Newton steps beat the exact instruction sequence, and at
@@ -315,8 +316,10 @@ inline std::vector<Accuracy> exhaustive_accuracy(const Spec& s) {
                         ++a.n;
                         const float y = out[lo], w = ref[lo];
                         if (normal) {
-                            const double rel = (std::isfinite(y) && y != 0.0f)
-                                ? s.rel_error(in[lo], y) : INFINITY;
+                            // An exact zero (log(1)) is no error; any other zero is.
+                            const double rel = (y == 0.0f && w == 0.0f) ? 0.0
+                                : (std::isfinite(y) && y != 0.0f) ? s.rel_error(in[lo], y)
+                                : INFINITY;
                             a.max_rel_normal = std::max(a.max_rel_normal, rel);
                         }
                         if (std::isnan(y) && std::isnan(w)) continue;
