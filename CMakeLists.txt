@@ -44,7 +44,8 @@ add_custom_target(bench
 # Apple Silicon only; see ARM-approx-research/benchmarks/CMakeLists.txt.
 if(TARGET run-bench-recip)
   add_dependencies(bench run-bench-recip run-bench-rsqrt
-                         run-bench-recip-vec run-bench-rsqrt-vec)
+                         run-bench-recip-vec run-bench-rsqrt-vec
+                         run-bench-logf)
 endif()
 
 message(STATUS "")
