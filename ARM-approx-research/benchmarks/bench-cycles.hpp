@@ -13,7 +13,13 @@
        fight disappears. kperf refuses every call without root ("Operation not
        permitted" from kpc_set_counting), so this needs sudo.
 
-     - Timer (everything else). Nanoseconds from steady_clock, converted with a
+     - Hardware (Linux). perf_event_open on the generic cycles and
+       instructions events, read together as one group, user mode only, so no
+       root at the default perf_event_paranoid of 2. Works under WSL2, whose
+       Hyper-V guest exposes a virtual PMU; the calibration below is what
+       vouches for it there.
+
+     - Timer (everything else, or when the above are refused). Nanoseconds from steady_clock, converted with a
        ns-per-cycle figure the caller measures with the same calibration kernel.
        The macOS timer advances at 24 MHz -- CNTFRQ_EL0 reports 1 GHz, but the
        count moves in steps of ~42 -- so a timed run must last milliseconds for
@@ -40,9 +46,19 @@
 #if defined(__APPLE__)
 #include <dlfcn.h>
 #include <pthread.h>
+#elif defined(__linux__)
+#include <linux/perf_event.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 #endif
 
 namespace bench {
+
+#if defined(__APPLE__)
+inline constexpr const char* HW_COUNTER_NAME = "kperf fixed counter";
+#else
+inline constexpr const char* HW_COUNTER_NAME = "perf_event counter";
+#endif
 
 // The calibration kernel's contract: per iteration, an 8-cycle dependent chain
 // and 14 retired instructions.
@@ -71,7 +87,7 @@ public:
     // mode, with the reason written to *why.
     static CycleSource open(CalibFn calib, std::string* why);
 
-    bool hardware() const { return get_ != nullptr; }
+    bool hardware() const { return get_ != nullptr || fd_ >= 0; }
 
     // Exits the process if the counters fail mid-run: an epoch child with a hole
     // in its series must be discarded by the parent, not reported.
@@ -91,6 +107,7 @@ private:
     }
 
     GetFn   get_   = nullptr;
+    int     fd_    = -1;    // Linux: perf_event group leader (cycles, then instructions)
     CalibFn calib_ = nullptr;
     int     cyc_   = 0;
     int     ins_   = 1;
@@ -147,8 +164,47 @@ inline CycleSource CycleSource::open(CalibFn calib, std::string* why) {
         return cs;
     }
     cs.get_ = get_thread;
+#elif defined(__linux__)
+    auto open_event = [](std::uint64_t config, int group) {
+        perf_event_attr a{};
+        a.size           = sizeof a;
+        a.type           = PERF_TYPE_HARDWARE;
+        a.config         = config;
+        a.exclude_kernel = 1;
+        a.exclude_hv     = 1;
+        a.read_format    = PERF_FORMAT_GROUP;
+        return (int)syscall(SYS_perf_event_open, &a, 0, -1, group, PERF_FLAG_FD_CLOEXEC);
+    };
+    const int lead = open_event(PERF_COUNT_HW_CPU_CYCLES, -1);
+    if (lead < 0) {
+        *why = std::string("perf_event_open refused cycles (") + std::strerror(errno) + ")";
+        return cs;
+    }
+    if (open_event(PERF_COUNT_HW_INSTRUCTIONS, lead) < 0) {
+        *why = std::string("perf_event_open refused instructions (") + std::strerror(errno) + ")";
+        close(lead);
+        return cs;
+    }
+    cs.fd_ = lead;
+    calib(CALIB_ITERS / 8);
+    const CounterReading a = cs.read();
+    calib(CALIB_ITERS);
+    const CounterReading b = cs.read();
+    const double c = (double)(b.cycles - a.cycles) / (double)CALIB_ITERS;
+    const double i = (double)(b.instructions - a.instructions) / (double)CALIB_ITERS;
+    auto near = [](double x, double want) { return std::fabs(x - want) <= 0.05 * want; };
+    if (!near(c, CALIB_CYCLES_PER_ITER) || !near(i, CALIB_INSNS_PER_ITER)) {
+        char msg[200];
+        std::snprintf(msg, sizeof msg,
+                      "perf_event counters read %.2f cycles and %.2f instructions per "
+                      "calibration iteration, expected %.0f and %.0f",
+                      c, i, CALIB_CYCLES_PER_ITER, CALIB_INSNS_PER_ITER);
+        *why = msg;
+        close(lead);
+        cs.fd_ = -1;
+    }
 #else
-    *why = "hardware cycle counters are only wired up for macOS";
+    *why = "hardware cycle counters are only wired up for macOS and Linux";
 #endif
     return cs;
 }
@@ -164,6 +220,17 @@ inline CounterReading CycleSource::read() const {
         r.cycles       = buf[cyc_];
         r.instructions = buf[ins_];
     }
+#if defined(__linux__)
+    if (fd_ >= 0) {
+        std::uint64_t buf[3] = {};   // PERF_FORMAT_GROUP: count, cycles, instructions
+        if (::read(fd_, buf, sizeof buf) != (ssize_t)sizeof buf) {
+            std::fprintf(stderr, "error: perf_event group read failed mid-run\n");
+            std::exit(2);
+        }
+        r.cycles       = buf[1];
+        r.instructions = buf[2];
+    }
+#endif
     r.ns = now_ns();
     return r;
 }

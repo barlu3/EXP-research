@@ -459,7 +459,7 @@ inline int run_main(const Spec& s, int argc, char** argv) {
     };
     const bool hw = !at(row_id(s, 0, 0), nv).empty();
     if (hw) {
-        bench::logf("  Cycles        : hardware, kperf fixed counter (validated against a\n");
+        bench::logf("  Cycles        : hardware, %s (validated against a\n", bench::HW_COUNTER_NAME);
         bench::logf("                  dependent ADD chain: 8 cycles, 14 instructions/iter)\n");
     } else {
         bench::logf("  Cycles        : ESTIMATED -- ns / (ns per cycle of a dependent ADD\n");
