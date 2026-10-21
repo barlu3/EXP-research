@@ -45,7 +45,9 @@ add_custom_target(bench
 if(TARGET run-bench-recip)
   add_dependencies(bench run-bench-recip run-bench-rsqrt
                          run-bench-recip-vec run-bench-rsqrt-vec
-                         run-bench-logf run-bench-acosf)
+                         run-bench-logf run-bench-acosf run-bench-powf
+                         run-bench-log2f run-bench-log10f
+                         run-bench-asinhf run-bench-acoshf)
 endif()
 
 message(STATUS "")
