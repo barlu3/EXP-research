@@ -10,11 +10,13 @@ variant, a **median ns/call with an interquartile range**, taken across
 each cluster carries a **control kernel** so the loop's own cost can be
 subtracted rather than blamed on the function under test.
 
-Five more benchmark programs live in `ARM-approx-research/benchmarks/`. They
-time hand-written AArch64 in **cycles** instead of C in ns. Four ask whether
-ARM's estimate instructions beat exact division and square root; the fifth
-asks whether `FRECPE` can replace the table lookup inside `logf`. §10 covers
-them.
+Eleven more benchmark programs live in `ARM-approx-research/benchmarks/`.
+They time hand-written AArch64 in **cycles** instead of C in ns. Four ask
+whether ARM's estimate instructions beat exact division and square root; one
+asks the same of the square root inside `acosf`; six ask whether `FRECPE` can
+replace the table lookup inside `logf`, `log2f`, `log10f`, `powf`, `asinhf`
+and `acoshf`. §10 covers them; [FRECPE-RANGE-REDUCTION.md](FRECPE-RANGE-REDUCTION.md)
+explains the `FRECPE` method and its results for a general reader.
 
 ---
 
@@ -357,8 +359,9 @@ from the ones above: on Apple Silicon, is one of ARM's **estimate
 instructions** cheaper than what it would replace, and how accurate is the
 result? For 1/x and 1/√x the replaced code is the **exact instruction
 sequence**, and the estimate needs Newton steps to compete. For `logf` it is a
-**table lookup**, and the estimate is used as it comes. For `acosf` it is the
-`FSQRT` inside the function.
+**table lookup**, and the estimate is used as it comes; `log2f`, `log10f`,
+`powf`, `asinhf` and `acoshf` ask the same of the log inside them. For `acosf`
+it is the `FSQRT` inside the function.
 
 | Program | Compares | Report |
 |---|---|---|
@@ -367,7 +370,10 @@ sequence**, and the estimate needs Newton steps to compete. For `logf` it is a
 | `vector/vrecpe/` | the 1/x comparison on 4-lane `.4s` vectors | `bench_results_vrecpe.txt` |
 | `vector/vrsqrts/` | the 1/√x comparison on 4-lane `.4s` vectors | `bench_results_vrsqrts.txt` |
 | `scalar/logf/` | `FRECPE` as log's range reduction vs a table of the same values vs libm `logf` | `bench_results_logf.txt` |
+| `scalar/logf/` (`bench-log2f`, `bench-log10f`) | the same for `log2f` and `log10f` | `bench_results_log2f.txt`, `bench_results_log10f.txt` |
 | `scalar/acosf/` | `FRSQRTE` + Newton steps vs `FSQRT` as acos's square root vs libm `acosf` | `bench_results_acosf.txt` |
+| `scalar/powf/` | `FRECPE` as the range reduction of the log2 inside pow(x, y) vs a table vs libm `powf` | `bench_results_powf.txt` |
+| `scalar/asinhf-acoshf/` | `FRECPE` as the range reduction of the log inside asinh and acosh vs a table vs libm | `bench_results_asinhf.txt`, `bench_results_acoshf.txt` |
 
 Each directory holds everything for its function: the benchmark `.cpp`, its
 kernels `.S`, its `CMakeLists.txt`, and, once built and run, its binary and
@@ -404,6 +410,53 @@ differ only in how the reciprocal is fetched. All three are held to 1 ulp.
 The four input ranges are positive normals, [0.5, 2), [1, 1 + 2^-8) (where
 the hand kernels take a separate path that skips the lookup) and subnormals.
 
+The same sources build `bench-log2f` and `bench-log10f`, with `LOGF_BASE` set
+to 2 or 10. Only the table (−log_b of the estimate) and two constants change,
+and the last FADD becomes an FMADD by 1/ln b, so the three report on one
+reduction in three functions.
+
+The other functions with a log in them reuse the reduction. Each has the same
+three variants — libm, `table + frecpx`, `frecpe` — and the two hand kernels
+again share everything but the fetch and must show identical accuracy rows:
+
+- **`scalar/powf/`** computes pow(x, y) = exp2(y · log2 x) in double. pow
+  multiplies log2's error by |y · log2 x|, up to 150 for any result that is
+  neither 0 nor ∞, so log2 has to be good to about 2^-33 relative. FRECPE's
+  exact remainder makes that cheap: log2 is the table entry plus a degree-4
+  polynomial in r, and the only errors are its truncation and the table's
+  rounding. exp2 uses a 32-entry table and a degree-3 polynomial. Negative x
+  with an odd integer y runs a second copy of the hot path that negates its
+  result, so the hot path pays nothing for it.
+
+  pow has two arguments and the driver's `Spec` has one. The smallest change
+  that fits is a per-cluster hook, `Cluster::enter`, which fixes y (the
+  kernels read it from memory once per call). No kernel signature or loop
+  shape changes. It costs pow nothing it needs, because the reduction under
+  test depends on x alone and a constant exponent is the common case. The
+  four clusters are y = 2.2 over wide x > 0, y = −1/3 over [0.5, 2), y = 3
+  over x < 0 (every element takes the negating copy) and y = −20000 over
+  [1, 1 + 2^-8), the out-of-line path near 1 where neither hand kernel fetches
+  anything: a control, where the two must time the same.
+
+  The accuracy pass runs once per cluster with a hook: every finite x against
+  that cluster's y, so 4 × 4,278,190,080 pairs. y = −20000 near 1 drives
+  log2's worst relative error to the largest amplification a finite result
+  allows. Before timing, a pre-flight check runs y = ±0, ±∞, NaN, ±1, 0.5,
+  2^24, 2^24 − 1, −2^25, 2^-149 and −2^127 against every special x and 2^16
+  sampled bit patterns. These are the values no cluster can time. A failure
+  prints the first wrong result and exits non-zero before the report.
+- **`scalar/asinhf-acoshf/`** computes asinh(x) = sign(x) · log(|x| + √(x² + 1))
+  and acosh(x) = log(x + √(x² − 1)) in double. Here the log's argument w is
+  computed mid-function, behind a square root, so the reduction runs on a
+  double: double `FRECPE` uses the same 256 estimates, and w · `FRECPE`(w) − 1
+  is still exact. Both kernels move w to an integer register for the other
+  table; only `table + frecpx` also waits on that move for r. Out of line:
+  asinh for |x| < 2^-8 is x(1 − x²/6), and acosh with w within 2^-8 of 1 takes
+  r = (x − 1) + √(x² − 1) directly. Each has three ranges, the last a control
+  where neither hand kernel fetches anything: wide, [−2, 2) and |x| < 2^-8
+  for asinh; [1, 2^21), [1, 2) and [1, 1 + 2^-18) for acosh. One kernel file
+  holds both, and the driver is built twice (`AHYP_ACOSH` for acosh).
+
 `scalar/acosf/` asks the same question of a square root. `FRSQRTE` plus two
 Newton steps beat `FSQRT` + `FDIV` for 1/√x, but acos needs √z itself:
 for |x| > 1/2 it is 2·asin(√z) with z = (1 − |x|)/2, and below that a
@@ -437,7 +490,7 @@ must time the same) and 1/2 ≤ |x| < 1 (every input takes the square root).
   (`bench-cycles.hpp`).
 - **Every run ends with an exhaustive accuracy check.** All 4,278,190,080
   finite floats go through the timed kernels and are compared with a
-  correctly rounded reference.
+  correctly rounded reference. `powf` runs it once per fixed y.
 
 Everything in §4 still applies: the control kernel, interleaving with rotation,
 prewarm, discarded reps, epochs. These benchmarks reuse the harness for all of
@@ -462,14 +515,25 @@ ARM-approx-research/benchmarks/
       rsqrt-kernels.S          its kernels
       rsqrt-ref.hpp            input ranges and reference, shared with vector/vrsqrts/
       bench-rsqrt, bench_results_rsqrt.txt          generated
-    logf/                      log(x): FRECPE as the range reduction
-      benchmark-logf.cpp       variants, tables, input ranges, reference
-      logf-kernels.S           its kernels
+    logf/                      log(x), log2(x), log10(x): FRECPE as the range reduction
+      benchmark-logf.cpp       variants, tables, input ranges, reference (LOGF_BASE)
+      logf-kernels.S           its kernels, assembled once per base
       bench-logf, bench_results_logf.txt            generated
+      bench-log2f, bench_results_log2f.txt          generated
+      bench-log10f, bench_results_log10f.txt        generated
     acosf/                     acos(x): FRSQRTE + Newton steps as the square root
       benchmark-acosf.cpp      variants, input ranges, reference
       acosf-kernels.S          its kernels
       bench-acosf, bench_results_acosf.txt          generated
+    powf/                      pow(x, y): FRECPE as log2's range reduction
+      benchmark-powf.cpp       variants, tables, one y per input range, reference
+      powf-kernels.S           its kernels
+      bench-powf, bench_results_powf.txt            generated
+    asinhf-acoshf/             asinh(x), acosh(x): FRECPE as the log's range reduction
+      benchmark-asinhf-acoshf.cpp  variants, tables, input ranges, reference (AHYP_ACOSH)
+      asinhf-acoshf-kernels.S  both functions' kernels
+      bench-asinhf, bench_results_asinhf.txt        generated
+      bench-acoshf, bench_results_acoshf.txt        generated
   vector/
     vec-kernels.inc            vector loop scaffolding (q registers, 32 elements per step)
     vec-common.S               vector control loops
@@ -565,14 +629,19 @@ them come:
 ### 10.7 Running and extending
 
 ```sh
-make bench                    # runs all six, on Apple Silicon, after the others
-cd build && ctest -R "bench-(recip|rsqrt|logf|acosf)"   # also matches the -vec ones
+make bench                    # runs all eleven, on Apple Silicon, after the others
+cd build && ctest -R "bench-(recip|rsqrt|log(2|10)?f|acosf|powf|asinhf|acoshf)"   # also matches the -vec ones
 
 cd ARM-approx-research/benchmarks             # hardware cycle counts; any
 sudo scalar/frecpe/bench-recip                # directory works, since each
 sudo scalar/frsqrte/bench-rsqrt               # report lands beside its binary
 sudo scalar/logf/bench-logf
+sudo scalar/logf/bench-log2f
+sudo scalar/logf/bench-log10f
 sudo scalar/acosf/bench-acosf
+sudo scalar/powf/bench-powf
+sudo scalar/asinhf-acoshf/bench-asinhf
+sudo scalar/asinhf-acoshf/bench-acoshf
 sudo vector/vrecpe/bench-recip-vec
 sudo vector/vrsqrts/bench-rsqrt-vec
 ```
@@ -590,7 +659,8 @@ program under `sudo` afterwards to get hardware counts back.
   - a kernels `.S` that includes `approx-kernels.inc` (`vec-kernels.inc` for vector),
   - a benchmark `.cpp` that fills in a `Spec` (variants, input ranges, a
     correctly rounded reference), with `report_name` the report's file name (it
-    is written beside the binary),
+    is written beside the binary). A second argument is fixed per input range
+    with `Cluster::enter`, as `scalar/powf/` does,
   - a `CMakeLists.txt` that links `approx-common` and outputs to its own directory.
 
   Then add its `run-bench-*` target to `bench` in the top-level
@@ -599,7 +669,9 @@ program under `sudo` afterwards to get hardware counts back.
 - **Out-of-line code stays in the kernel's section.** Mach-O cannot relocate a
   conditional branch into another section, so `.pushsection` stubs fail to
   assemble. `logf-kernels.S` puts each special-case stub after its kernel's
-  `ret` and gives the stub labels it shares with the hot path.
+  `ret` and gives the stub labels it shares with the hot path. `powf-kernels.S`
+  also emits a second copy of the hot path among its stubs, for x < 0 with an
+  odd integer y.
 
 ### 10.8 Known limits
 
@@ -620,6 +692,16 @@ program under `sudo` afterwards to get hardware counts back.
   predictor learns it, so the range times at the average of the other two.
   Over one pass of 16M fresh inputs the `fsqrt` kernel takes about 3× as long
   per result (3.1 vs 1.0 ns). The single-path ranges time the same either way.
+- **`powf` covers y by sample, not exhaustively.** Its accuracy pass is every
+  finite x for each of four ys, plus the pre-flight check of the special and
+  integer-edge ys. A y outside that set is unchecked. For y = −20000 no
+  binade of x maps entirely to normal results, so that pass's 'normal' columns
+  read 0: they checked nothing, not nothing wrong.
+- **The `asinhf` and `acoshf` hand kernels lose latency to libm.** The double
+  `FSQRT` in front of the log costs more than libm's whole function on a
+  dependent chain; they still win throughput. The comparison that matters
+  here, `table + frecpx` against `frecpe`, shares that cost. `acoshf`'s near-1
+  range has only 32 distinct inputs.
 
 ---
 
