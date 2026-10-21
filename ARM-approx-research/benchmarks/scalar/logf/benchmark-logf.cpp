@@ -24,7 +24,12 @@
    All three are held to 1 ulp of the correctly rounded log over every finite
    float32. Timing, epochs, the report and the accuracy pass are the shared
    driver's, ../../approx-bench.hpp; this file describes the kernels, their
-   tables, the input clusters and the reference. */
+   tables, the input clusters and the reference.
+
+   CMakeLists.txt builds this file and logf-kernels.S three times: as they are
+   for log, and with LOGF_BASE=2 and 10 for log2 and log10 (bench-log2f,
+   bench-log10f), which the same reduction serves with a different table and
+   two constants. Below, log means log in the build's base. */
 
 #include "approx-bench.hpp"
 
@@ -36,10 +41,25 @@
 
 #include <mpfr.h>
 
+#if !defined(LOGF_BASE)
+#define LOGF_FN  "log"
+#define REF_LOG  std::log
+#define MPFR_LOG mpfr_log
+#elif LOGF_BASE == 2
+#define LOGF_FN  "log2"
+#define REF_LOG  std::log2
+#define MPFR_LOG mpfr_log2
+#else
+#define LOGF_FN  "log10"
+#define REF_LOG  std::log10
+#define MPFR_LOG mpfr_log10
+#endif
+
 extern "C" {
 // Read by logf-kernels.S; filled by build_tables() before any kernel runs.
 float  logf_recip[256];   // ehat(i)/2: the tab kernel's copy of FRECPE
 double logf_logc[256];    // -log(ehat(i)), correctly rounded to double
+double logf_base[2];      // log(2) and 1/ln(base), correctly rounded to double
 
 void  logf_tput_call(const float* in, float* out, std::uint64_t n);
 void  logf_tput_tab(const float* in, float* out, std::uint64_t n);
@@ -56,19 +76,27 @@ using approx::from_bits;
 // ehat(i) is FRECPE of 1 + i/256: the estimate, scaled by 2^-k, for every x
 // whose top fraction bits are i. Taken from the instruction itself, in the
 // default FP mode the kernels run in. ehat(255) = 1/2 exactly, so its -log is
-// ln2 rounded once -- the same double as the kernels' ln2, which is what makes
-// y0 exactly 0 just below 1.
+// log(2) rounded once -- the same double as logf_base[0], which is what makes
+// y0 exactly 0 just below 1. 1/ln(base) is log(e), from e to 200 bits.
 void build_tables() {
-    mpfr_t v;
+    mpfr_t v, e;
     mpfr_init2(v, 53);
+    mpfr_init2(e, 200);
     for (std::uint32_t i = 0; i < 256; ++i) {
         const float ehat = vrecpes_f32(from_bits(0x3f800000u | i << 15));
         logf_recip[i] = ehat * 0.5f;
         mpfr_set_flt(v, ehat, MPFR_RNDN);
-        mpfr_log(v, v, MPFR_RNDN);
+        MPFR_LOG(v, v, MPFR_RNDN);
         logf_logc[i] = -mpfr_get_d(v, MPFR_RNDN);
     }
-    mpfr_clear(v);
+    mpfr_set_ui(v, 2, MPFR_RNDN);
+    MPFR_LOG(v, v, MPFR_RNDN);
+    logf_base[0] = mpfr_get_d(v, MPFR_RNDN);
+    mpfr_set_ui(e, 1, MPFR_RNDN);
+    mpfr_exp(e, e, MPFR_RNDN);
+    MPFR_LOG(v, e, MPFR_RNDN);
+    logf_base[1] = mpfr_get_d(v, MPFR_RNDN);
+    mpfr_clears(v, e, (mpfr_ptr)nullptr);
 }
 
 // Regions whose handling differs inside the kernels. Wide exponents exercise
@@ -101,7 +129,7 @@ const std::vector<approx::Cluster> CLUSTERS = {
 // rounding is the float one. Special values follow C: +-0 -> -inf, x < 0 ->
 // NaN, +inf -> +inf.
 constexpr const char* REFERENCE_NOTE =
-    "correctly rounded log(x) (double, MPFR near rounding boundaries)";
+    "correctly rounded " LOGF_FN "(x) (double, MPFR near rounding boundaries)";
 void reference(const float* in, float* out, std::size_t n) {
     thread_local struct Mp {
         mpfr_t v;
@@ -113,14 +141,14 @@ void reference(const float* in, float* out, std::size_t n) {
         if (std::isnan(x) || x < 0.0f) { out[i] = NAN; continue; }
         if (x == 0.0f)                 { out[i] = -INFINITY; continue; }
         if (std::isinf(x))             { out[i] = INFINITY; continue; }
-        const double r = std::log((double)x);
+        const double r = REF_LOG((double)x);
         float y = (float)r;
         if ((double)y != r) {
             const float  nb  = std::nextafter(y, r > y ? INFINITY : -INFINITY);
             const double mid = ((double)y + (double)nb) * 0.5;
             if (std::fabs(r - mid) <= 0x1p-50 * std::fabs(r)) {
                 mpfr_set_flt(mp.v, x, MPFR_RNDN);
-                mpfr_log(mp.v, mp.v, MPFR_RNDN);
+                MPFR_LOG(mp.v, mp.v, MPFR_RNDN);
                 y = mpfr_get_flt(mp.v, MPFR_RNDN);
             }
         }
@@ -136,16 +164,16 @@ bool normal_block(std::uint32_t hi) {
 }
 
 // log in double is off by at most 2^-52 relative, far below anything reported.
-double rel_error(float x, float y) { return std::fabs((double)y / std::log((double)x) - 1.0); }
+double rel_error(float x, float y) { return std::fabs((double)y / REF_LOG((double)x) - 1.0); }
 
 const approx::Spec SPEC = {
-    .title       = "float32 log(x) on AArch64 -- FRECPE as the range reduction",
+    .title       = "float32 " LOGF_FN "(x) on AArch64 -- FRECPE as the range reduction",
     .kernels     = "ARM-approx-research/benchmarks/scalar/logf/logf-kernels.S",
-    .report_name = "bench_results_logf.txt",
+    .report_name = "bench_results_" LOGF_FN "f.txt",
     // Index 0 is the control, 1 the baseline every ratio divides by.
     .variants = {
         approx::CONTROL,
-        { "logf (libm)",    "libm",   1, false, logf_tput_call,   logf_lat_call   },
+        { LOGF_FN "f (libm)", "libm",   1, false, logf_tput_call,   logf_lat_call   },
         { "table + frecpx", "tab",    1, false, logf_tput_tab,    logf_lat_tab    },
         { "frecpe",         "frecpe", 1, false, logf_tput_frecpe, logf_lat_frecpe },
     },

@@ -32,14 +32,30 @@
 // the same section as the kernels because Mach-O cannot relocate a conditional
 // branch into another one.
 //
+// Assembled once per base. With LOGF_BASE (2 or 10) defined the same kernels
+// compute log2 or log10, under the same symbol names: the driver fills
+// logf_logc with -log_b(ehat(i)), d25 is log_b(2), and the last step is
+// y0 + log1p(r)/ln(b), one FMADD in place of the FADD. Every error bound above
+// is relative, so it holds in any base.
+//
 // Registers, on top of approx-kernels.inc's (v29 = 1.0f, v31 = 0, LINK's v2/v3):
 //   w5 = 0x7f000000   w6 = 0x3f800000 (1.0f)   w7 = 0x8000
 //   x3 = logf_logc    x4 = logf_recip (tab only)
-//   d25 = ln2         d26 = -1/2               d27 = 1/3
+//   d25 = log_b(2)    d26 = -1/2               d27 = 1/3     d28 = 1/ln(b)
 //   scratch: w9 (ix), w10, w12, w15 (i), w16 (k), d16-d20
 // Every element reuses the same scratch registers; renaming makes that free.
 
 #include "approx-kernels.inc"
+
+#if !defined(LOGF_BASE)
+#define LOGF_LIBM _logf
+#elif LOGF_BASE == 2
+#define LOGF_LIBM _log2f
+#elif LOGF_BASE == 10
+#define LOGF_LIBM _log10f
+#else
+#error "LOGF_BASE must be 2 or 10, or undefined for the natural log"
+#endif
 
     .text
 
@@ -56,11 +72,9 @@
     adrp    x4, _logf_recip@PAGE
     add     x4, x4, _logf_recip@PAGEOFF
 .endif
-    movz    x10, #0x39ef
-    movk    x10, #0xfefa, lsl #16
-    movk    x10, #0x2e42, lsl #32
-    movk    x10, #0x3fe6, lsl #48
-    fmov    d25, x10                        // ln2, rounded to double
+    adrp    x10, _logf_base@PAGE
+    add     x10, x10, _logf_base@PAGEOFF
+    ldp     d25, d28, [x10]                 // log_b(2), 1/ln(b); rounded to double
     movz    x10, #0x5555
     movk    x10, #0x5555, lsl #16
     movk    x10, #0x5555, lsl #32
@@ -100,7 +114,11 @@ Lpoly_\id:
     fmul    d20, d16, d16
     fmadd   d19, d27, d16, d26              // r/3 - 1/2
     fmadd   d20, d19, d20, d16              // log1p(r) ~ r + r^2*(r/3 - 1/2)
+#if defined(LOGF_BASE)
+    fmadd   d20, d20, d28, d18              // y0 + log1p(r)/ln(b)
+#else
     fadd    d20, d20, d18
+#endif
     fcvt    s\x, d20
 Ldone_\id:
 .endm
@@ -202,8 +220,9 @@ _logf_lat_\kind:
     LOGF_LAT  frecpe, lf
     LOGF_LAT  tab,    lt
 
-// The libm baseline, shaped like recip-kernels.S's _call pair: loop state in
-// callee-saved registers, because logf may clobber every caller-saved one.
+// The libm baseline (logf, log2f or log10f), shaped like recip-kernels.S's
+// _call pair: loop state in callee-saved registers, because the call may
+// clobber every caller-saved one.
     .globl  _logf_tput_call
     .p2align 4
 _logf_tput_call:
@@ -218,7 +237,7 @@ _logf_tput_call:
 1:
     .rept 8
     ldr     s0, [x19], #4
-    bl      _logf
+    bl      LOGF_LIBM
     str     s0, [x20], #4
     .endr
     subs    x21, x21, #8
@@ -243,7 +262,7 @@ _logf_lat_call:
 1:
     .rept 4
     LINK    0, 0, 8, x19                    // operand straight into s0, the argument
-    bl      _logf                           // result back in s0, feeding the next LINK
+    bl      LOGF_LIBM                       // result back in s0, feeding the next LINK
     .endr
     subs    x20, x20, #4
     b.ne    1b

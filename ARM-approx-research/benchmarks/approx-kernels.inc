@@ -1,7 +1,8 @@
 // Assembler macros shared by every kernel file in ARM-approx-research/benchmarks.
 // Included (through the C preprocessor) by approx-common.S,
 // scalar/frecpe/recip-kernels.S, scalar/frsqrte/rsqrt-kernels.S,
-// scalar/logf/logf-kernels.S and scalar/acosf/acosf-kernels.S.
+// scalar/logf/logf-kernels.S, scalar/acosf/acosf-kernels.S,
+// scalar/powf/powf-kernels.S and scalar/asinhf-acoshf/asinhf-acoshf-kernels.S.
 //
 // Every kernel file uses the same two loop shapes:
 //

@@ -2,8 +2,9 @@
    instructions: scalar/frecpe/ (FRECPE against FDIV), scalar/frsqrte/
    (FRSQRTE against FSQRT + FDIV), the 4-lane vector versions of both in
    vector/vrecpe/ and vector/vrsqrts/, scalar/logf/ (FRECPE as the range
-   reduction inside log) and scalar/acosf/ (FRSQRTE as the square root inside
-   acos).
+   reduction inside log, log2 and log10), scalar/acosf/ (FRSQRTE as the square
+   root inside acos), scalar/powf/ (FRECPE inside pow's log2) and
+   scalar/asinhf-acoshf/ (FRECPE inside asinh's and acosh's log).
 
    Both put one question to a different function -- does an estimate
    instruction plus Newton steps beat the exact instruction sequence, and at
@@ -88,6 +89,10 @@ inline const Variant CONTROL = { "control", "ctrl", UNCHECKED, false,
 struct Cluster {
     const char* label;
     std::uint32_t (*gen)(std::mt19937&);
+    // For a two-argument function, fixes the second argument (the kernels read
+    // it from memory) before this cluster is timed. Each cluster that has one
+    // also gets its own accuracy pass: every finite x against that argument.
+    void (*enter)() = nullptr;
 };
 
 struct Spec {
@@ -239,7 +244,8 @@ inline int run_epoch(const Spec& s) {
     const auto inputs = make_inputs(s);
     const int nv = (int)s.variants.size();
     std::vector<float> out(BUF_N);
-    for (int c = 0; c < (int)s.clusters.size(); ++c)
+    for (int c = 0; c < (int)s.clusters.size(); ++c) {
+        if (s.clusters[c].enter) s.clusters[c].enter();
         for (int m = 0; m < NMODES; ++m) {
             const Series r = measure(s, cs, (Mode)m, inputs[c].data(), out.data());
             for (int v = 0; v < nv; ++v) {
@@ -248,6 +254,7 @@ inline int run_epoch(const Spec& s) {
                     bench::emit_epoch_row(row_id(s, m, c), nv + v, bench::median_of(r.ins[v]));
             }
         }
+    }
     return 0;
 }
 
@@ -504,43 +511,56 @@ inline int run_main(const Spec& s, int argc, char** argv) {
 
     // -- Exhaustive accuracy ---------------------------------------------------
     // Run after the timings so the all-core load cannot heat the machine first.
-    const auto acc = exhaustive_accuracy(s);
+    // One pass per cluster that fixes a second argument, or one pass in all.
+    std::vector<int> passes;
+    for (int c = 0; c < ncl; ++c)
+        if (s.clusters[c].enter) passes.push_back(c);
+    if (passes.empty()) passes.push_back(-1);
     box("ACCURACY -- every finite float32 vs correctly rounded result");
-    bench::logf("  %llu inputs per variant.\n"
-                "  reference : %s\n"
-                "  'normal'  : only %s, where an estimate's own error shows\n"
-                "              without the subnormal and flush-to-zero cases on top\n"
-                "  'rel'     : the worst |y/f(x) - 1| there\n\n",
-                (unsigned long long)acc[1].n, s.reference_note, s.normal_note);
-    bench::logf("  %-16s %11s %9s %11s %11s   %s\n", "variant", "differ", "max ulp",
-                "ulp normal", "rel normal", "worst input");
     bool ok = true;
-    for (int v = 1; v < nv; ++v) {
-        const Accuracy& a = acc[v];
-        char ulp[24], ulpn[24], rel[24];
-        if (a.nan_mismatches) std::snprintf(ulp, sizeof ulp, "NaN");
-        else std::snprintf(ulp, sizeof ulp, "%llu", (unsigned long long)a.max_ulp);
-        if (a.max_ulp_normal == UINT64_MAX) std::snprintf(ulpn, sizeof ulpn, "NaN");
-        else std::snprintf(ulpn, sizeof ulpn, "%llu", (unsigned long long)a.max_ulp_normal);
-        if (a.max_rel_normal == 0.0)            std::snprintf(rel, sizeof rel, "0");
-        else if (std::isinf(a.max_rel_normal))  std::snprintf(rel, sizeof rel, "inf");
-        else std::snprintf(rel, sizeof rel, "2^%.2f", std::log2(a.max_rel_normal));
-        bench::logf("  %-16s %11llu %9s %11s %11s", s.variants[v].name,
-                    (unsigned long long)a.mismatches, ulp, ulpn, rel);
-        if (a.mismatches) {
-            const float x = from_bits(a.worst);
-            std::vector<float> in8(TPUT_STEP, x), out8(TPUT_STEP), ref8(TPUT_STEP);
-            {
-                const AltFp fp(s.variants[v].alt_fp);
-                s.variants[v].tput(in8.data(), out8.data(), TPUT_STEP);
+    for (std::size_t p = 0; p < passes.size(); ++p) {
+        if (passes[p] >= 0) s.clusters[passes[p]].enter();
+        const auto acc = exhaustive_accuracy(s);
+        if (p == 0)
+            bench::logf("  %llu inputs per variant%s.\n"
+                        "  reference : %s\n"
+                        "  'normal'  : only %s, where an estimate's own error shows\n"
+                        "              without the subnormal and flush-to-zero cases on top\n"
+                        "  'rel'     : the worst |y/f(x) - 1| there\n",
+                        (unsigned long long)acc[1].n,
+                        passes[0] >= 0 ? " per pass: every finite x, the cluster's second argument" : "",
+                        s.reference_note, s.normal_note);
+        if (passes[p] >= 0) bench::logf("\n  -- %s\n", s.clusters[passes[p]].label);
+        else                bench::logf("\n");
+        bench::logf("  %-16s %11s %9s %11s %11s   %s\n", "variant", "differ", "max ulp",
+                    "ulp normal", "rel normal", "worst input");
+        for (int v = 1; v < nv; ++v) {
+            const Accuracy& a = acc[v];
+            char ulp[24], ulpn[24], rel[24];
+            if (a.nan_mismatches) std::snprintf(ulp, sizeof ulp, "NaN");
+            else std::snprintf(ulp, sizeof ulp, "%llu", (unsigned long long)a.max_ulp);
+            if (a.max_ulp_normal == UINT64_MAX) std::snprintf(ulpn, sizeof ulpn, "NaN");
+            else std::snprintf(ulpn, sizeof ulpn, "%llu", (unsigned long long)a.max_ulp_normal);
+            if (a.max_rel_normal == 0.0)            std::snprintf(rel, sizeof rel, "0");
+            else if (std::isinf(a.max_rel_normal))  std::snprintf(rel, sizeof rel, "inf");
+            else std::snprintf(rel, sizeof rel, "2^%.2f", std::log2(a.max_rel_normal));
+            bench::logf("  %-16s %11llu %9s %11s %11s", s.variants[v].name,
+                        (unsigned long long)a.mismatches, ulp, ulpn, rel);
+            if (a.mismatches) {
+                const float x = from_bits(a.worst);
+                std::vector<float> in8(TPUT_STEP, x), out8(TPUT_STEP), ref8(TPUT_STEP);
+                {
+                    const AltFp fp(s.variants[v].alt_fp);
+                    s.variants[v].tput(in8.data(), out8.data(), TPUT_STEP);
+                }
+                s.reference(in8.data(), ref8.data(), TPUT_STEP);
+                bench::logf("   %a -> %a (want %a)", x, out8[0], ref8[0]);
             }
-            s.reference(in8.data(), ref8.data(), TPUT_STEP);
-            bench::logf("   %a -> %a (want %a)", x, out8[0], ref8[0]);
+            bench::logf("\n");
+            const int bound = s.variants[v].max_ulp;
+            if (bound != UNCHECKED && (a.nan_mismatches != 0 || a.max_ulp > (std::uint64_t)bound))
+                ok = false;
         }
-        bench::logf("\n");
-        const int bound = s.variants[v].max_ulp;
-        if (bound != UNCHECKED && (a.nan_mismatches != 0 || a.max_ulp > (std::uint64_t)bound))
-            ok = false;
     }
 
     // Name what each row was held to, so a PASS never reads as covering the
