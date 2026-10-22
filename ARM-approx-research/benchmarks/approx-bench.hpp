@@ -38,9 +38,13 @@
 
 #include <climits>
 #include <cstdlib>
+#include <unistd.h>
+// NOTE: x86-approx-research/ reuses this driver on x86-64 Linux; the Apple
+// pieces are the executable path and the FEAT_* sysctls.
+#if defined(__APPLE__)
 #include <mach-o/dyld.h>
 #include <sys/sysctl.h>
-#include <unistd.h>
+#endif
 
 // approx-common.S: each loop shape with the arithmetic removed, and the
 // cycle-counter calibration chain.
@@ -128,15 +132,20 @@ struct Spec {
 // 12-bit estimates. Scopes wrap whole runs, because a set/restore pair costs
 // ~75 cycles. Everything inside a scope is an opaque kernel call, so no float
 // arithmetic of the compiler's can be moved into or out of the altered mode.
+// x86 has no FPCR.AH; its variants never set alt_fp, so the scope is empty.
 class AltFp {
 public:
     explicit AltFp(bool on) : on_(on) {
+#if defined(__aarch64__)
         if (!on_) return;
         __asm__ volatile("mrs %0, fpcr" : "=r"(saved_));
         __asm__ volatile("msr fpcr, %0" :: "r"(saved_ | 2u) : "memory");   // AH is bit 1
+#endif
     }
     ~AltFp() {
+#if defined(__aarch64__)
         if (on_) __asm__ volatile("msr fpcr, %0" :: "r"(saved_) : "memory");
+#endif
     }
     AltFp(const AltFp&) = delete;
     AltFp& operator=(const AltFp&) = delete;
@@ -151,9 +160,14 @@ private:
 // estimate. The banner prints these so a report cannot hide that. The
 // accuracy table's relative-error column is the direct evidence either way.
 inline int arm_feature(const char* name) {
+#if defined(__APPLE__)
     int v = 0;
     std::size_t sz = sizeof v;
     return sysctlbyname(name, &v, &sz, nullptr, 0) == 0 ? v : 0;
+#else
+    (void)name;
+    return 0;
+#endif
 }
 
 inline float from_bits(std::uint32_t b) { float f; std::memcpy(&f, &b, 4); return f; }
@@ -374,9 +388,14 @@ inline std::vector<Accuracy> exhaustive_accuracy(const Spec& s) {
 // broke every run started anywhere else -- `sudo ./bench-recip` from
 // scalar/frecpe/ could not open its report.
 inline std::string report_path(const char* name) {
-    char exe[PATH_MAX], real[PATH_MAX];
+    char real[PATH_MAX];
+#if defined(__APPLE__)
+    char exe[PATH_MAX];
     std::uint32_t sz = sizeof exe;
     if (_NSGetExecutablePath(exe, &sz) != 0 || !realpath(exe, real)) return name;
+#else
+    if (!realpath("/proc/self/exe", real)) return name;
+#endif
     std::string path = real;
     return path.substr(0, path.rfind('/') + 1) + name;
 }
@@ -440,7 +459,7 @@ inline int run_main(const Spec& s, int argc, char** argv) {
     };
     const bool hw = !at(row_id(s, 0, 0), nv).empty();
     if (hw) {
-        bench::logf("  Cycles        : hardware, kperf fixed counter (validated against a\n");
+        bench::logf("  Cycles        : hardware, %s (validated against a\n", bench::HW_COUNTER_NAME);
         bench::logf("                  dependent ADD chain: 8 cycles, 14 instructions/iter)\n");
     } else {
         bench::logf("  Cycles        : ESTIMATED -- ns / (ns per cycle of a dependent ADD\n");

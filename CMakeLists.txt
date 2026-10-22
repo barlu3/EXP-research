@@ -20,6 +20,7 @@ enable_testing()
 
 add_subdirectory(CORE-research)
 add_subdirectory(ARM-approx-research)
+add_subdirectory(x86-approx-research)
 
 # MPFR presence check — replaces the README's manual `cc -o version version.c`.
 add_executable(mpfr-version version.c)
@@ -48,6 +49,10 @@ if(TARGET run-bench-recip)
                          run-bench-logf run-bench-acosf run-bench-powf
                          run-bench-log2f run-bench-log10f
                          run-bench-asinhf run-bench-acoshf)
+endif()
+# x86-64 Linux only; see x86-approx-research/benchmarks/CMakeLists.txt.
+if(TARGET run-bench-recip-x86)
+  add_dependencies(bench run-bench-recip-x86 run-bench-rsqrt-x86)
 endif()
 
 message(STATUS "")
