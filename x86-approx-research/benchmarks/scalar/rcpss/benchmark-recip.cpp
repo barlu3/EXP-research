@@ -18,9 +18,10 @@
        than 1 ulp off, and if divss or call differ from 1.0f/x anywhere. The
        other estimate rows are reported, never checked.
 
-   Cycle counts: this driver's hardware counters are macOS-only (kperf), so on
-   x86 every report is the timer estimate, labelled as such. Under WSL2 the
-   timer runs inside a Hyper-V guest; treat small differences with suspicion. */
+   Cycle counts: core cycles and retired instructions from perf_event, no root
+   needed, WSL2 included; the report says if it fell back to the timer
+   estimate instead. Under WSL2 the counters are Hyper-V's virtual PMU, which
+   the driver's calibration chain checks before trusting it. */
 
 #include "approx-bench.hpp"
 #include "recip-ref.hpp"
@@ -33,11 +34,13 @@ void  recip_tput_call(const float* in, float* out, std::uint64_t n);
 void  recip_tput_est0(const float* in, float* out, std::uint64_t n);
 void  recip_tput_est1(const float* in, float* out, std::uint64_t n);
 void  recip_tput_est2(const float* in, float* out, std::uint64_t n);
+void  recip_tput_est2u(const float* in, float* out, std::uint64_t n);
 float recip_lat_fdiv(const float* in, std::uint64_t n);
 float recip_lat_call(const float* in, std::uint64_t n);
 float recip_lat_est0(const float* in, std::uint64_t n);
 float recip_lat_est1(const float* in, std::uint64_t n);
 float recip_lat_est2(const float* in, std::uint64_t n);
+float recip_lat_est2u(const float* in, std::uint64_t n);
 }
 
 namespace {
@@ -56,6 +59,9 @@ const approx::Spec SPEC = {
         { "rcpss only",     "rcp",     UNCHECKED, false, recip_tput_est0, recip_lat_est0 },
         { "rcpss + 1 NR",   "rcp+1NR", UNCHECKED, false, recip_tput_est1, recip_lat_est1 },
         { "rcpss + 2 NR",   "rcp+2NR", 1,         false, recip_tput_est2, recip_lat_est2 },
+        // est2 minus its range check: the difference between the two rows is
+        // what the check costs.
+        { "rcp+2NR unchecked", "rcp+2NRu", UNCHECKED, false, recip_tput_est2u, recip_lat_est2u },
     },
     .clusters       = recip_ref::CLUSTERS,
     .reference_note = recip_ref::REFERENCE_NOTE,

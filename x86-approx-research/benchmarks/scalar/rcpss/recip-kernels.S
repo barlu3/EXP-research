@@ -14,6 +14,9 @@
 //   est2    VRCPSS, then two FMA Newton steps, with range fixups off the hot
 //           path. Within 1 ulp of 1/x for every float, held to that by the
 //           driver's accuracy pass.
+//   est2u   est2 without the range check or fixups: the same arithmetic,
+//           timed beside est2 so the check's cost reads off one report. Wrong
+//           outside exponent fields 1..252; reported, never checked.
 //
 // x86 has no FRECPS, so a Newton step is two FMAs instead of FRECPS + FMUL.
 // The residual 1 - x*e comes out of one fused operation, exact to within one
@@ -33,7 +36,10 @@
 //                     rounds once into the subnormals. Error < 0.5 + 1 ulp of
 //                     the subnormal grid, so at most 1 ulp from the correctly
 //                     rounded result.
-// The hot path pays an integer range check and a not-taken branch per element.
+// The throughput kernel checks each 8-element block with one 256-bit compare
+// and a not-taken branch; a block with any out-of-range lane runs the
+// per-element check instead. The latency kernel's chain has one element in
+// flight, so it checks per element, off the FP chain.
 // est1 has no fixups: like the AArch64 est1 it is timed, not a contender.
 
 #include "approx-kernels.inc"
@@ -48,6 +54,15 @@ recip_two64:
     .long   0x5f800000                      // 2^64
 recip_twom64:
     .long   0x1f800000                      // 2^-64
+recip_abs_mask:
+    .long   0x7fffffff
+recip_range_bias:
+    .long   0x7f800000                      // 2^31 - 0x00800000: hot range -> [INT_MIN, -2^25)
+    .p2align 5
+recip_range_last:
+    .rept 8
+    .long   0xfdffffff                      // last biased value in the hot range
+    .endr
 
     .text
 
@@ -186,25 +201,46 @@ recip_tput_est1:
     .globl  recip_tput_est2
     .p2align 4
 recip_tput_est2:
+    // One range check per 8-element block instead of eight: the biased |x| bits
+    // are signed-below recip_range_last exactly on exponent fields 1..252, so
+    // a block with any lane above it takes the per-element path at 3:. ymm14
+    // and ymm15 hold constants here; this kernel needs no sign mask or zero.
+    vmovss  xmm13, dword ptr [rip + recip_one]
+    vpbroadcastd ymm14, dword ptr [rip + recip_abs_mask]
+    vpbroadcastd ymm15, dword ptr [rip + recip_range_bias]
+    .p2align 6
+1:  vpand   ymm8, ymm14, ymmword ptr [rdi]
+    vpaddd  ymm8, ymm8, ymm15
+    vpcmpgtd ymm8, ymm8, ymmword ptr [rip + recip_range_last]
+    vptest  ymm8, ymm8
+    jnz     3f
+    LOAD8
+    .irp i, 0, 1, 2, 3, 4, 5, 6, 7
+    RECIP_EST2 8, \i, 9
+    vmovss  dword ptr [rsi + 4*\i], xmm8
+    .endr
+2:  add     rsi, 32
+    sub     rdx, 8
+    jnz     1b
+    vzeroupper                              // ymm state dirty; callers may run SSE
+    ret
+3:  LOAD8
+    .irp i, 0, 1, 2, 3, 4, 5, 6, 7
+    RECIP_EST2_FULL 8, \i, 9
+    vmovss  dword ptr [rsi + 4*\i], xmm8
+    .endr
+    jmp     2b
+
+    .globl  recip_tput_est2u
+    .p2align 4
+recip_tput_est2u:
     vmovss  xmm13, dword ptr [rip + recip_one]
     .p2align 6
 1:  LOAD8
-    RECIP_EST2_FULL 8, 0, 9
-    vmovss  dword ptr [rsi], xmm8
-    RECIP_EST2_FULL 8, 1, 9
-    vmovss  dword ptr [rsi + 4], xmm8
-    RECIP_EST2_FULL 8, 2, 9
-    vmovss  dword ptr [rsi + 8], xmm8
-    RECIP_EST2_FULL 8, 3, 9
-    vmovss  dword ptr [rsi + 12], xmm8
-    RECIP_EST2_FULL 8, 4, 9
-    vmovss  dword ptr [rsi + 16], xmm8
-    RECIP_EST2_FULL 8, 5, 9
-    vmovss  dword ptr [rsi + 20], xmm8
-    RECIP_EST2_FULL 8, 6, 9
-    vmovss  dword ptr [rsi + 24], xmm8
-    RECIP_EST2_FULL 8, 7, 9
-    vmovss  dword ptr [rsi + 28], xmm8
+    .irp i, 0, 1, 2, 3, 4, 5, 6, 7
+    RECIP_EST2 8, \i, 9
+    vmovss  dword ptr [rsi + 4*\i], xmm8
+    .endr
     add     rsi, 32
     sub     rdx, 8
     jnz     1b
@@ -332,6 +368,23 @@ recip_lat_est2:
     .irp off, 0, 4, 8, 12
     LINK    1, 0, \off
     RECIP_EST2_FULL 0, 1, 4
+    .endr
+    add     rdi, 16
+    sub     rsi, 4
+    jnz     1b
+    ret
+
+    .globl  recip_lat_est2u
+    .p2align 4
+recip_lat_est2u:
+    vmovss  xmm13, dword ptr [rip + recip_one]
+    vxorps  xmm15, xmm15, xmm15
+    vxorps  xmm0, xmm0, xmm0
+    .p2align 6
+1:
+    .irp off, 0, 4, 8, 12
+    LINK    1, 0, \off
+    RECIP_EST2 0, 1, 4
     .endr
     add     rdi, 16
     sub     rsi, 4
