@@ -52,7 +52,7 @@ if(TARGET run-bench-recip)
 endif()
 # x86-64 Linux only; see x86-approx-research/benchmarks/CMakeLists.txt.
 if(TARGET run-bench-recip-x86)
-  add_dependencies(bench run-bench-recip-x86)
+  add_dependencies(bench run-bench-recip-x86 run-bench-rsqrt-x86)
 endif()
 
 message(STATUS "")

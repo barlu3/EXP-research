@@ -22,6 +22,7 @@ ARM-approx-research/benchmarks/scalar/asinhf-acoshf/bench-asinhf
 ARM-approx-research/benchmarks/scalar/asinhf-acoshf/bench-acoshf
 ARM-approx-research/benchmarks/**/bench_results_*.txt
 x86-approx-research/benchmarks/scalar/rcpss/bench-recip-x86
+x86-approx-research/benchmarks/scalar/rsqrtss/bench-rsqrt-x86
 x86-approx-research/benchmarks/**/bench_results_*.txt
 # verifying MPFR library is downloaded and installed correctly
 version
