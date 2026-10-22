@@ -3,6 +3,7 @@
 # ARM-approx-research/benchmarks/, one directory per benchmark with the same
 # layout.
 #   scalar/rcpss/   bench-recip-x86   RCPSS against DIVSS
+#   scalar/rsqrtss/ bench-rsqrt-x86   RSQRTSS against SQRTSS + DIVSS
 #
 # Only the kernels and the control/calibration loops are x86's own. The driver
 # (approx-bench.hpp), cycle source (bench-cycles.hpp) and inputs/reference
@@ -21,4 +22,5 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_
   set(X86_APPROX_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
   add_subdirectory(scalar/rcpss)
+  add_subdirectory(scalar/rsqrtss)
 endif()
