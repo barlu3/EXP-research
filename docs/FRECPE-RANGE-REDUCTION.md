@@ -15,8 +15,8 @@ Apple M5.
 - But a **logarithm** needs exactly a rough 1/x as its first step, and it
   normally gets one from a lookup table. FRECPE gives that same value without
   the table lookup.
-- Across six functions — `logf`, `log2f`, `log10f`, `powf`, `asinhf`,
-  `acoshf` — the FRECPE version is **6.5 to 8 cycles faster per call** on a
+- Across seven functions — `logf`, `log2f`, `log10f`, `log1pf`, `powf`,
+  `asinhf`, `acoshf` — the FRECPE version is **6.5 to 8 cycles faster per call** on a
   dependent chain and **7–10% faster** in a loop of independent calls, with
   **identical results** to the table version.
 
@@ -117,6 +117,7 @@ The same trick works anywhere a logarithm sits inside a function:
 | Function | Where the log is |
 |---|---|
 | `log2f`, `log10f` | Same as `logf`; only the table values and one constant change |
+| `log1pf(x)` | `log(1 + x)`: the log's input is one addition away from `x` |
 | `powf(x, y)` | Computed as `2^(y · log2(x))`, so the log is the first half |
 | `asinhf(x)` | `log(|x| + √(x² + 1))` |
 | `acoshf(x)` | `log(x + √(x² − 1))` |
@@ -187,7 +188,7 @@ Faster is useless if the answer is wrong. Every version is held to **1 ulp**
   (2.2, −1/3, 3 and −20000), about 17 billion pairs. Special `y` values
   (±0, ±∞, NaN, huge, tiny, integer edges) were checked separately.
 
-All versions of all six functions passed. The special-value check also caught
+All versions of all seven functions passed. The special-value check also caught
 a real bug during development: `pow(2^-149, y)` returned 1 for large `y`.
 
 ---
@@ -204,6 +205,7 @@ throughput is per result. Lower is better.
 | `logf` | 29.1 / 30.0 / **22.1** | 5.96 / 2.81 / **2.53** | −7.9 cycles, −10% |
 | `log2f` | 37.0 / 31.2 / **23.0** | 5.11 / 2.81 / **2.53** | −8.2 cycles, −10% |
 | `log10f` | 35.0 / 31.1 / **23.0** | 5.11 / 2.81 / **2.53** | −8.1 cycles, −10% |
+| `log1pf` | 35.4 / 33.1 / **26.6** | 6.90 / 3.43 / **3.03** | −6.5 cycles, −12% |
 | `powf` (y = 2.2) | 63.4 / 56.6 / **48.7** | 8.55 / 5.97 / **5.56** | −7.9 cycles, −7% |
 | `asinhf` | 34.3 / 53.0 / **46.5** | 6.58 / 4.98 / **4.55** | −6.5 cycles, −9% |
 | `acoshf` | 34.7 / 49.0 / **42.5** | 7.80 / 4.45 / **4.06** | −6.5 cycles, −9% |
@@ -214,6 +216,7 @@ throughput is per result. Lower is better.
 |---|---|---|---|
 | `logf` | x in [1, 1 + 2^-8) | 17.8 / 17.8 | 2.13 / 2.12 |
 | `powf` | y = −20000, x just above 1 | 44.0 / 44.2 | 4.84 / 4.83 |
+| `log1pf` | \|x\| < 2^-8 | 15.1 / 15.1 | 2.16 / 2.14 |
 | `asinhf` | \|x\| < 2^-8 | 15.0 / 15.0 | 1.79 / 1.74 |
 | `acoshf` | x − 1 < 2^-18 | 34.0 / 34.0 | 3.42 / 3.45 |
 
@@ -221,7 +224,8 @@ throughput is per result. Lower is better.
 
 1. **The win is consistent.** FRECPE beats the table in every function: about
    8 cycles of latency where the log reads the input directly, about 6.5
-   where the log's input is computed first.
+   where the log's input is computed first (even by a single addition, as in
+   `log1pf`).
 2. **It carries through `powf`.** The ~8-cycle gain survives the extra
    exponential step. In relative terms it is smaller (14% of latency instead
    of 26%) only because `powf` does more work overall.
@@ -280,7 +284,7 @@ The benchmarks live in `ARM-approx-research/benchmarks/scalar/`:
 |---|---|
 | `logf/` | `bench-logf`, `bench-log2f`, `bench-log10f` |
 | `powf/` | `bench-powf` |
-| `asinhf-acoshf/` | `bench-asinhf`, `bench-acoshf` |
+| `asinhf-acoshf/` | `bench-asinhf`, `bench-acoshf`, `bench-log1pf` |
 
 ```bash
 make bench
