@@ -13,6 +13,7 @@
 #   scalar/asinhf-acoshf/
 #                    bench-asinhf      FRECPE as the log's reduction inside asinh
 #                    bench-acoshf      the same, inside acosh
+#                    bench-log1pf      the same, inside log1p
 # Each writes its report beside its binary, whatever the working directory.
 #
 # The kernels are hand-written AArch64 (Mach-O symbol names), so these exist
@@ -45,7 +46,7 @@ if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
 
   # Timing runs must never overlap, so each run-bench-* target depends on the
   # one before: scalar/frecpe, scalar/frsqrte, vector/vrecpe, vector/vrsqrts,
-  # logf, acosf, powf, log2f, log10f, asinhf, acoshf.
+  # logf, acosf, powf, log2f, log10f, asinhf, acoshf, log1pf.
   add_subdirectory(scalar/frecpe)
   add_subdirectory(scalar/frsqrte)
   add_subdirectory(vector)

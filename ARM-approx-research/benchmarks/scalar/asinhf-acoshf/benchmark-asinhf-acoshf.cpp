@@ -1,5 +1,5 @@
-/* Benchmark: FRECPE as the range reduction of the log inside float32 asinh(x)
-   and acosh(x), in cycles.
+/* Benchmark: FRECPE as the range reduction of the log inside float32 asinh(x),
+   acosh(x) and log1p(x) = log(1 + x), in cycles.
 
    ../logf/ found FRECPE beats a table holding its own values as log's range
    reduction, because the table's index has to go from a float register to an
@@ -8,6 +8,7 @@
    sqrt(x^2 +- 1) in double, so the question is whether the win survives a
    reduction on a double that arrives mid-function, behind a square root, with
    both kernels moving it to an integer register anyway for the other table.
+   log1p is the plainest case of a computed argument: w = 1 + x, one add.
 
    The two hand-written kernels (asinhf-acoshf-kernels.S) share everything
    except how ehat(i) is fetched and return bit-identical results -- the
@@ -16,8 +17,9 @@
    by. All three are held to 1 ulp of the correctly rounded result over every
    finite float32.
 
-   CMakeLists.txt builds this file twice: bench-asinhf, and with AHYP_ACOSH
-   defined, bench-acoshf. Both link the one kernel file. Timing, epochs, the
+   CMakeLists.txt builds this file three times: bench-asinhf, and with
+   AHYP_ACOSH or AHYP_LOG1P defined, bench-acoshf and bench-log1pf. All link
+   the one kernel file. Timing, epochs, the
    report and the accuracy pass are the shared driver's, ../../approx-bench.hpp;
    this file describes the kernels, their tables, the input clusters and the
    reference. */
@@ -49,6 +51,12 @@ void  acoshf_tput_frecpe(const float* in, float* out, std::uint64_t n);
 float acoshf_lat_call(const float* in, std::uint64_t n);
 float acoshf_lat_tab(const float* in, std::uint64_t n);
 float acoshf_lat_frecpe(const float* in, std::uint64_t n);
+void  log1pf_tput_call(const float* in, float* out, std::uint64_t n);
+void  log1pf_tput_tab(const float* in, float* out, std::uint64_t n);
+void  log1pf_tput_frecpe(const float* in, float* out, std::uint64_t n);
+float log1pf_lat_call(const float* in, std::uint64_t n);
+float log1pf_lat_tab(const float* in, std::uint64_t n);
+float log1pf_lat_frecpe(const float* in, std::uint64_t n);
 }
 
 #if defined(AHYP_ACOSH)
@@ -56,6 +64,11 @@ float acoshf_lat_frecpe(const float* in, std::uint64_t n);
 #define REF_FN   std::acosh
 #define MPFR_FN  mpfr_acosh
 #define KERNEL(k) acoshf_##k
+#elif defined(AHYP_LOG1P)
+#define AHYP_FN  "log1p"
+#define REF_FN   std::log1p
+#define MPFR_FN  mpfr_log1p
+#define KERNEL(k) log1pf_##k
 #else
 #define AHYP_FN  "asinh"
 #define REF_FN   std::asinh
@@ -106,6 +119,18 @@ const std::vector<approx::Cluster> CLUSTERS = {
     { "x in [1,2)",      one_binade },
     { "x-1 < 2^-18",     near_one   },
 };
+#elif defined(AHYP_LOG1P)
+// Wide x exercises k*ln2 over w up to 2^20; [-1, 1) is where log1p is used
+// most, w from 0 to 2; |x| < 2^-8 is the polynomial on x out of line, where
+// neither kernel fetches anything, so the two must time the same -- a control.
+std::uint32_t wide(std::mt19937& r) {                 // 2^-8 <= x < 2^20
+    return (119u + (std::uint32_t)r() % 28u) << 23 | ((std::uint32_t)r() & 0x007fffffu);
+}
+const std::vector<approx::Cluster> CLUSTERS = {
+    { "2^-8<=x<2^20",   wide        },
+    { "x in [-1,1)",    uniform<0>  },
+    { "|x| < 2^-8",     uniform<-8> },
+};
 #else
 // Wide |x| exercises k*ln2 over w up to 2^21; [-2, 2) is where most of the
 // interesting results lie, both signs at random; |x| < 2^-8 is the polynomial
@@ -122,11 +147,11 @@ const std::vector<approx::Cluster> CLUSTERS = {
 };
 #endif
 
-// Correctly rounded f(x). libm's double asinh and acosh are within an ulp or
-// two of the truth, so rounding to float is right unless the double lies
+// Correctly rounded f(x). libm's double asinh, acosh and log1p are within an
+// ulp or two of the truth, so rounding to float is right unless the double lies
 // within 2^-46 of a float rounding boundary; those go to MPFR, at 24 bits so
 // its own rounding is the float one. Results are never subnormal near a
-// boundary: asinh of a tiny x is x itself in double. Special values follow C.
+// boundary: asinh or log1p of a tiny x is x itself in double. Special values follow C.
 constexpr const char* REFERENCE_NOTE =
     "correctly rounded " AHYP_FN "(x) (double, MPFR near rounding boundaries)";
 void reference(const float* in, float* out, std::size_t n) {
@@ -157,6 +182,12 @@ bool normal_block(std::uint32_t hi) {
     const std::uint32_t e = (hi >> 7) & 0xff;
     return (hi & 0x8000u) == 0 && e >= 127 && e <= 254;
 }
+#elif defined(AHYP_LOG1P)
+constexpr const char* NORMAL_NOTE = "normal x > -1";
+bool normal_block(std::uint32_t hi) {
+    const std::uint32_t e = (hi >> 7) & 0xff;
+    return e >= 1 && (hi & 0x8000u ? e <= 126 : e <= 254);
+}
 #else
 constexpr const char* NORMAL_NOTE = "normal x";
 bool normal_block(std::uint32_t hi) {
@@ -165,7 +196,7 @@ bool normal_block(std::uint32_t hi) {
 }
 #endif
 
-// asinh and acosh in double are off by a few 2^-53 relative, far below anything reported.
+// asinh, acosh and log1p in double are off by a few 2^-53 relative, far below anything reported.
 double rel_error(float x, float y) { return std::fabs((double)y / REF_FN((double)x) - 1.0); }
 
 const approx::Spec SPEC = {

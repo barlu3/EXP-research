@@ -5,6 +5,7 @@
 //
 //   asinh(x) = sign(x) * log(w),  w = |x| + sqrt(x^2 + 1)
 //   acosh(x) = log(w),            w = x + sqrt(x^2 - 1)
+//   log1p(x) = log(w),            w = 1 + x
 //
 //   call    BL to the system libm's asinhf or acoshf: the baseline.
 //   frecpe  log(w) with ../logf/'s reduction, on a double: r = w*FRECPE(w) - 1.
@@ -27,6 +28,9 @@
 //          At or above 2^-8, w >= 1 + 2^-8 and the near-1 cell never comes up.
 //   acosh  w in [1, 1 + 2^-8), x - 1 below about 2^-17: r = (x - 1) +
 //          sqrt(x^2 - 1), which is w - 1 without w's rounding, and y0 = 0.
+//   log1p  |x| < 2^-8: r = x and y0 = 0, the near-1 path's polynomial on x
+//          itself. Elsewhere w = 1 + x is exact in double up to |x| = 2^29,
+//          and beyond that its rounding is negligible against log(w) > 20.
 // Specials too: asinh(+-inf) = +-inf, acosh(x < 1) = NaN, NaN stays NaN. The
 // stubs sit after each kernel's ret, in the same section, because Mach-O cannot
 // relocate a conditional branch into another one.
@@ -35,6 +39,7 @@
 //   w5 = 0x7f800000   x3 = ahyp_logc   x4 = ahyp_recip (tab only)
 //   asinh: w6 = 2^-8 (bits)   w7 = 0x7f800000 - w6   d28 = -1/6
 //   acosh: w6 = 1.0f (bits)   w7 = 0x7f800000 - w6   x13 = 1.0 (bits)   x14 = 2^44
+//   log1p: w6 = 2^-8 (bits)   w7 = 0x7f800000 - w6   w8 = -1.0f (bits)
 //   d24 = 1.0   d25 = ln2   d26 = -1/2   d27 = 1/3
 //   scratch: x9, x10, x15 (i), x16 (k), d16-d20
 // Every element reuses the same scratch registers; renaming makes that free.
@@ -62,11 +67,17 @@
     movk    x10, #0x5555, lsl #32
     movk    x10, #0xbfc5, lsl #48
     fmov    d28, x10                        // -1/6
-.else
+.endif
+.ifc \fn, acoshf
     mov     w6, #0x3f800000                 // 1.0f
     mov     w7, #0x40000000
     mov     x13, #0x3ff0000000000000        // 1.0
     mov     x14, #0x100000000000            // 2^44: w in [1, 1 + 2^-8) below it
+.endif
+.ifc \fn, log1pf
+    mov     w6, #0x3b800000                 // 2^-8
+    mov     w7, #0x44000000
+    mov     w8, #0xbf800000                 // -1.0f
 .endif
     fmov    d24, #1.0
     movz    x10, #0x39ef
@@ -173,6 +184,50 @@ Lnear_\id:
     fadd    d16, d17, d16                   // r = (x - 1) + sqrt(x^2 - 1)
     movi    d18, #0                         // y0 = 0
     b       Lpoly_\id
+.endm
+
+// s\x = log1p(s\x), in place.
+.macro log1pf kind, x, id
+    fmov    w9, s\x
+    and     w10, w9, #0x7fffffff
+    sub     w10, w10, w6
+    cmp     w10, w7                         // lo: 2^-8 <= |x| < inf
+    ccmp    w9, w8, #2, lo                  // then lo: x > -1; else forces hs
+    b.hs    Lcold_\id
+    fcvt    d17, s\x
+    fadd    d19, d17, d24                   // w = 1 + x, exact below 2^29
+    fmov    x9, d19
+    LOGW    \kind, \id
+    fcvt    s\x, d20
+Ldone_\id:
+.endm
+
+.macro log1pf_cold x, id
+Lcold_\id:
+    and     w10, w9, #0x7fffffff
+    cmp     w10, w6
+    b.hs    Lspecial_\id
+    fcmp    s\x, #0.0
+    b.eq    Ldone_\id                       // log1p(+-0) = +-0
+    fcvt    d16, s\x                        // |x| < 2^-8: r = x, y0 = 0
+    movi    d18, #0
+    b       Lpoly_\id
+Lspecial_\id:                               // x <= -1, +-inf or NaN
+    fcmp    s\x, s\x
+    b.vs    Lqnan_\id
+    cmp     w9, w8
+    b.eq    Lminf_\id
+    tbz     w9, #31, Ldone_\id              // log1p(+inf) = +inf
+    mov     w10, #0x7fc00000
+    fmov    s\x, w10                        // x < -1: NaN
+    b       Ldone_\id
+Lminf_\id:
+    mov     w10, #0xff800000
+    fmov    s\x, w10                        // log1p(-1) = -inf
+    b       Ldone_\id
+Lqnan_\id:
+    fadd    s\x, s\x, s\x
+    b       Ldone_\id
 .endm
 
 // ─── Kernels ────────────────────────────────────────────────────────────────
@@ -295,3 +350,8 @@ _\fn\()_lat_call:
     AHYP_LAT  acoshf, frecpe, clf
     AHYP_LAT  acoshf, tab,    clt
     AHYP_CALL acoshf
+    AHYP_TPUT log1pf, frecpe, ptf
+    AHYP_TPUT log1pf, tab,    ptt
+    AHYP_LAT  log1pf, frecpe, plf
+    AHYP_LAT  log1pf, tab,    plt
+    AHYP_CALL log1pf
