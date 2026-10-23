@@ -47,7 +47,7 @@ if(TARGET run-bench-recip)
                          run-bench-recip-vec run-bench-rsqrt-vec
                          run-bench-logf run-bench-acosf run-bench-powf
                          run-bench-log2f run-bench-log10f
-                         run-bench-asinhf run-bench-acoshf)
+                         run-bench-asinhf run-bench-acoshf run-bench-log1pf)
 endif()
 
 message(STATUS "")
