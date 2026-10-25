@@ -29,6 +29,7 @@ foreach(fn IN ITEMS asinhf acoshf log1pf)
 endforeach()
 target_compile_definitions(bench-acoshf PRIVATE AHYP_ACOSH)
 target_compile_definitions(bench-log1pf PRIVATE AHYP_LOG1P)
+target_link_libraries(bench-log1pf PRIVATE gnu-libm)   # its glibc log1pf baseline
 
 # Timing runs must never overlap.
 add_dependencies(run-bench-asinhf run-bench-log10f)

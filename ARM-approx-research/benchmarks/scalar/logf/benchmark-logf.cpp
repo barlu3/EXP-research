@@ -18,13 +18,18 @@
    So the question: inside logf, is FRECPE cheaper than loading the same
    reciprocal from memory? The two hand-written kernels (logf-kernels.S) share
    everything else and return bit-identical results -- the accuracy table must
-   show identical rows -- so any timing difference is the fetch alone. The
-   system libm's logf is the baseline every ratio divides by.
+   show identical rows -- so any timing difference is the fetch alone. glibc
+   2.44's logf, built from its own source in ../../gnu-libm/, is the baseline
+   every ratio divides by, so the ratios do not move with this Mac's
+   libSystem, whose logf stays as a row for comparison.
 
-   All three are held to 1 ulp of the correctly rounded log over every finite
-   float32. Timing, epochs, the report and the accuracy pass are the shared
-   driver's, ../../approx-bench.hpp; this file describes the kernels, their
-   tables, the input clusters and the reference.
+   All are held to 1 ulp of the correctly rounded log over every finite
+   float32, and glibc's log10f to 0: it is CORE-MATH's, correctly rounded, so
+   that row also checks the vendored build. Timing, epochs, the report and the
+   accuracy pass are the shared driver's, ../../approx-bench.hpp, as is the
+   --cache mode that times the kernels with the caches evicted between bursts;
+   this file describes the kernels, their tables, the input clusters and the
+   reference.
 
    CMakeLists.txt builds this file and logf-kernels.S three times: as they are
    for log, and with LOGF_BASE=2 and 10 for log2 and log10 (bench-log2f,
@@ -45,14 +50,17 @@
 #define LOGF_FN  "log"
 #define REF_LOG  std::log
 #define MPFR_LOG mpfr_log
+#define GNU_ULP  1   // glibc's own bound: 0.818 ulp
 #elif LOGF_BASE == 2
 #define LOGF_FN  "log2"
 #define REF_LOG  std::log2
 #define MPFR_LOG mpfr_log2
+#define GNU_ULP  1   // 0.752 ulp
 #else
 #define LOGF_FN  "log10"
 #define REF_LOG  std::log10
 #define MPFR_LOG mpfr_log10
+#define GNU_ULP  0   // CORE-MATH: correctly rounded
 #endif
 
 extern "C" {
@@ -61,9 +69,11 @@ float  logf_recip[256];   // ehat(i)/2: the tab kernel's copy of FRECPE
 double logf_logc[256];    // -log(ehat(i)), correctly rounded to double
 double logf_base[2];      // log(2) and 1/ln(base), correctly rounded to double
 
+void  logf_tput_gnu(const float* in, float* out, std::uint64_t n);
 void  logf_tput_call(const float* in, float* out, std::uint64_t n);
 void  logf_tput_tab(const float* in, float* out, std::uint64_t n);
 void  logf_tput_frecpe(const float* in, float* out, std::uint64_t n);
+float logf_lat_gnu(const float* in, std::uint64_t n);
 float logf_lat_call(const float* in, std::uint64_t n);
 float logf_lat_tab(const float* in, std::uint64_t n);
 float logf_lat_frecpe(const float* in, std::uint64_t n);
@@ -173,6 +183,7 @@ const approx::Spec SPEC = {
     // Index 0 is the control, 1 the baseline every ratio divides by.
     .variants = {
         approx::CONTROL,
+        { LOGF_FN "f (glibc)", "glibc", GNU_ULP, false, logf_tput_gnu, logf_lat_gnu },
         { LOGF_FN "f (libm)", "libm",   1, false, logf_tput_call,   logf_lat_call   },
         { "table + frecpx", "tab",    1, false, logf_tput_tab,    logf_lat_tab    },
         { "frecpe",         "frecpe", 1, false, logf_tput_frecpe, logf_lat_frecpe },

@@ -14,7 +14,11 @@
 #                    bench-asinhf      FRECPE as the log's reduction inside asinh
 #                    bench-acoshf      the same, inside acosh
 #                    bench-log1pf      the same, inside log1p
+#   gnu-libm/        libgnu-libm       glibc 2.44's logf, log2f, log10f and log1pf,
+#                                      built from source: the log benchmarks' baseline
 # Each writes its report beside its binary, whatever the working directory.
+# `make bench-cache` runs the four log benchmarks with --cache, the caches swept
+# between bursts of calls, into bench_results_*_cache.txt.
 #
 # The kernels are hand-written AArch64 (Mach-O symbol names), so these exist
 # only on Apple Silicon. Everything the benchmarks share lives here: the driver
@@ -50,8 +54,23 @@ if(APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
   add_subdirectory(scalar/frecpe)
   add_subdirectory(scalar/frsqrte)
   add_subdirectory(vector)
+  add_subdirectory(gnu-libm)        # glibc 2.44 log family, the log benchmarks' baseline
   add_subdirectory(scalar/logf)
   add_subdirectory(scalar/acosf)
   add_subdirectory(scalar/powf)
   add_subdirectory(scalar/asinhf-acoshf)
+
+  # The log family under cache pressure (approx-bench.hpp's --cache): FRECPE
+  # against the same reciprocals read from memory, with the caches swept between
+  # bursts of calls. One target whose commands run in order, so no two timing
+  # runs overlap. Not part of `bench`.
+  add_custom_target(bench-cache
+    COMMAND bench-logf   --cache
+    COMMAND bench-log2f  --cache
+    COMMAND bench-log10f --cache
+    COMMAND bench-log1pf --cache
+    DEPENDS bench-logf bench-log2f bench-log10f bench-log1pf
+    WORKING_DIRECTORY "${APPROX_DIR}"
+    COMMENT "Running the log benchmarks under cache pressure (--cache)"
+    USES_TERMINAL)
 endif()

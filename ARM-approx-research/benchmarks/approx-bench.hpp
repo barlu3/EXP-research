@@ -15,9 +15,11 @@
 
    A benchmark describes itself in a Spec and hands it to run_main, which
    supplies the FPCR.AH scoping for the 12-bit estimates, the interleaved timing
-   loop, epochs, the report and the exhaustive accuracy pass. Cycle counts come
-   from bench-cycles.hpp; statistics, epochs and report_cluster from the main
-   harness, CORE-research/benchmarks/bench-harness.hpp. */
+   loop, epochs, the report and the exhaustive accuracy pass. With --cache it
+   times the kernels instead with the caches swept between bursts of calls, into
+   a report of its own (run_cache). Cycle counts come from bench-cycles.hpp;
+   statistics, epochs and report_cluster from the main harness,
+   CORE-research/benchmarks/bench-harness.hpp. */
 
 #ifndef APPROX_BENCH_HPP
 #define APPROX_BENCH_HPP
@@ -26,6 +28,7 @@
 #include "bench-harness.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -258,6 +261,131 @@ inline int run_epoch(const Spec& s) {
     return 0;
 }
 
+// ─── Cache pressure (--cache) ───────────────────────────────────────────────
+// Everything above is warm: the inputs and every table stay in L1. Inside a
+// large program a log call finds its table wherever the rest of the program
+// left it. --cache times the kernels that way: bursts of B calls, each after
+// evict() has swept W bytes through the caches, with only the burst counted.
+// tab and frecpe return identical results and differ only in the fetch, so
+// frecpe/tab is the headline: what the estimate instruction saves over the same
+// values read from cold memory. The control loads and stores the same inputs
+// and outputs, so their misses cancel in 'net'. One cluster, the first: its
+// random inputs index the tables at random.
+
+// Bursts per measurement. shortcut: ~3 min a binary on M5, nearly all of it the
+// 64 MiB sweeps; the 64 MiB, B = 32 cells stay noisy at this count, so raise it
+// for a quieter local run.
+inline constexpr int CACHE_BURSTS = 64;
+// Calls per burst: how often the program comes back to log. Multiples of
+// TPUT_STEP and divisors of BUF_N, so a burst never runs off the inputs.
+inline constexpr std::uint64_t CACHE_BURST[] = { 32, 512 };
+inline constexpr int NCACHE_B = sizeof CACHE_BURST / sizeof CACHE_BURST[0];
+inline constexpr int NCACHE_W = 3;
+
+inline std::uint64_t sysctl_u64(const char* name) {
+    std::uint64_t v = 0;   // a 4-byte value fills the low half
+    std::size_t sz = sizeof v;
+    return sysctlbyname(name, &v, &sz, nullptr, 0) == 0 ? v : 0;
+}
+
+// W: nothing (warm), 4x the L1D (the tables come back from L2), 4x the L2 (from
+// the SLC or DRAM). The performance cores', which the epochs prefer.
+inline std::array<std::size_t, NCACHE_W> cache_sizes() {
+    std::uint64_t l1 = sysctl_u64("hw.perflevel0.l1dcachesize");
+    std::uint64_t l2 = sysctl_u64("hw.perflevel0.l2cachesize");
+    if (!l1) l1 = sysctl_u64("hw.l1dcachesize");
+    if (!l2) l2 = sysctl_u64("hw.l2cachesize");
+    return { 0, (std::size_t)(4 * l1), (std::size_t)(4 * l2) };
+}
+
+// Epoch rows are keyed (cell, variant), a cell being one shape, W and B.
+inline int cache_cell(int mode, int w, int b) { return (mode * NCACHE_W + w) * NCACHE_B + b; }
+
+// The rest of the program, between two bursts: push whatever the next burst
+// needs out of every cache smaller than `bytes` by touching each 128-byte line
+// of buf[0, bytes). Never inside a count. bytes is 0 for the warm cells.
+inline void evict(std::uint8_t* buf, std::size_t bytes) {
+    // A linear read: the lines arrive clean, so the burst's misses evict them
+    // without writebacks. The asm keeps -O3 from deleting the unused loads.
+    std::uint8_t sum = 0;
+    for (std::size_t i = 0; i < bytes; i+=128) {
+        sum += buf[i];
+    }
+    __asm__ volatile("" :: "r"(sum));
+}
+
+// Waits for everything before it, memory accesses included, before anything
+// after it starts. A timer read alone does not: without this the end read lands
+// while the tail of a short latency chain is still in flight (a 32-call burst
+// read ~40% short) and the start read before the sweep's last misses are done.
+inline void fence() { __asm__ volatile("dsb sy\n\tisb" ::: "memory"); }
+
+// One cell, per rep: CACHE_BURSTS bursts of b calls on consecutive slices of
+// the inputs, each counted alone so the sweep never enters a count. Variants
+// interleaved and rotated per rep, the first DISCARD_REPS thrown away, as in
+// measure().
+inline Series measure_cold(const Spec& s, const bench::CycleSource& cs, Mode m,
+                           const float* in, float* out,
+                           std::uint8_t* buf, std::size_t w, std::uint64_t b) {
+    const int nv = (int)s.variants.size();
+    Series r{ std::vector<std::vector<double>>(nv), std::vector<std::vector<double>>(nv) };
+    const double per = (double)CACHE_BURSTS *
+                       (m == THROUGHPUT ? (double)b : (double)(b / s.lat_lanes));
+    for (int rep = 0; rep < REPS + bench::DISCARD_REPS; ++rep) {
+        const double ns_per_cyc = cs.hardware() ? 0.0 : cs.ns_per_cycle();
+        for (int p = 0; p < nv; ++p) {
+            const int vi = (rep + p) % nv;
+            const Variant& v = s.variants[vi];
+            const AltFp fp(v.alt_fp);
+            double cyc = 0.0, ins = 0.0;
+            for (int k = 0; k < CACHE_BURSTS; ++k) {
+                const float* at = in + (std::uint64_t)k * b % BUF_N;
+                evict(buf, w);
+                fence();
+                const bench::CounterReading x = cs.read();
+                if (m == THROUGHPUT) v.tput(at, out, b);
+                else                 g_sinkf = v.lat(at, b);
+                fence();
+                const bench::CounterReading y = cs.read();
+                cyc += cs.hardware() ? (double)(y.cycles - x.cycles) : (y.ns - x.ns) / ns_per_cyc;
+                ins += (double)(y.instructions - x.instructions);
+            }
+            r.cyc[vi].push_back(cyc / per);
+            if (cs.hardware()) r.ins[vi].push_back(ins / per);
+        }
+        if (rep == bench::DISCARD_REPS - 1) {
+            for (auto& x : r.cyc) x.clear();
+            for (auto& x : r.ins) x.clear();
+        }
+    }
+    return r;
+}
+
+inline int run_cache_epoch(const Spec& s) {
+    bench::prefer_performance_cores();
+    std::string why;
+    const bench::CycleSource cs = bench::CycleSource::open(approx_calib_chain, &why);
+    const auto inputs = make_inputs(s);
+    if (s.clusters[0].enter) s.clusters[0].enter();
+    const auto ws = cache_sizes();
+    std::vector<std::uint8_t> buf(ws[NCACHE_W - 1], 1);   // written, so every page is mapped
+    std::vector<float> out(BUF_N);
+    const int nv = (int)s.variants.size();
+    for (int m = 0; m < NMODES; ++m)
+        for (int w = 0; w < NCACHE_W; ++w)
+            for (int b = 0; b < NCACHE_B; ++b) {
+                const Series r = measure_cold(s, cs, (Mode)m, inputs[0].data(), out.data(),
+                                              buf.data(), ws[w], CACHE_BURST[b]);
+                const int id = cache_cell(m, w, b);
+                for (int v = 0; v < nv; ++v) {
+                    bench::emit_epoch_row(id, v, bench::median_of(r.cyc[v]));
+                    if (cs.hardware())
+                        bench::emit_epoch_row(id, nv + v, bench::median_of(r.ins[v]));
+                }
+            }
+    return 0;
+}
+
 // ─── Reporting ──────────────────────────────────────────────────────────────
 
 inline void box(const char* title) {
@@ -392,8 +520,145 @@ inline void give_to_sudo_user(const std::string& path) {
         std::fprintf(stderr, "warning: could not chown %s\n", path.c_str());
 }
 
+inline std::string bytes_label(std::size_t n) {
+    char s[16];
+    if (n == 0)                std::snprintf(s, sizeof s, "warm");
+    else if (n >= (1u << 20))  std::snprintf(s, sizeof s, "%zuMiB", n >> 20);
+    else                       std::snprintf(s, sizeof s, "%zuKiB", n >> 10);
+    return s;
+}
+
+// The --cache report: one block per cell with every ratio against tab, then
+// frecpe/tab per cell. Epochs, medians and IQRs are run_main's; so is the
+// reading of the shapes -- latency net of the control, throughput gross.
+inline int run_cache(const Spec& s, const char* self) {
+    std::string name = s.report_name;
+    name.insert(name.rfind(".txt"), "_cache");
+    const std::string report = report_path(name.c_str());
+    bench::open_log(report.c_str());
+    give_to_sudo_user(report);
+    const auto wall_start = bench::Clock::now();
+    const int nv = (int)s.variants.size();
+    auto find = [&](const char* short_) {
+        for (int v = 1; v < nv; ++v)
+            if (std::strcmp(s.variants[v].short_, short_) == 0) return v;
+        return -1;
+    };
+    // tab holds frecpe's own values in memory, so every ratio here divides by
+    // it; a Spec without one falls back to its usual baseline.
+    const int tab = find("tab"), fre = find("frecpe");
+    const int base = tab > 0 ? tab : 1;
+    const auto ws = cache_sizes();
+
+    std::string why;
+    (void)bench::CycleSource::open(approx_calib_chain, &why);
+
+    bench::logf("\n");
+    bench::logf("==================================================================\n");
+    bench::logf("  %s\n", s.title);
+    bench::logf("  under cache pressure (--cache)\n");
+    bench::logf("  Kernels       : hand-written, %s\n", s.kernels);
+    bench::logf("  Cells         : before each burst of B = %llu or %llu calls, evict()\n",
+                (unsigned long long)CACHE_BURST[0], (unsigned long long)CACHE_BURST[1]);
+    bench::logf("                  sweeps W = 0 (warm), %s (4x L1D) or %s (4x L2)\n",
+                bytes_label(ws[1]).c_str(), bytes_label(ws[2]).c_str());
+    bench::logf("  Per cell      : %d bursts per rep, each counted alone, the sweep not;\n",
+                CACHE_BURSTS);
+    bench::logf("                  inputs '%s'\n", s.clusters[0].label);
+    bench::logf("  Replication   : %d reps x %d epochs, variants interleaved and rotated\n",
+                REPS, EPOCHS);
+    bench::logf("  Reported      : median cycles per call with IQR across epochs;\n");
+    bench::logf("                  ratios are medians of per-epoch paired ratios vs %s\n",
+                s.variants[base].short_);
+    bench::logf("  Control       : the same loop with the arithmetic removed, on the same\n");
+    bench::logf("                  cold inputs and outputs\n");
+
+    const bench::EpochTable table = bench::gather_epochs(self, EPOCHS, " --cache");
+    if (table.empty()) {
+        bench::logf("  error: no epoch completed\n");
+        bench::close_log();
+        return 1;
+    }
+    auto at = [&](int id, int v) {
+        auto it = table.find({id, v});
+        return it == table.end() ? std::vector<double>{} : it->second;
+    };
+    if (!at(cache_cell(0, 0, 0), nv).empty()) {
+        bench::logf("  Cycles        : hardware, kperf fixed counter (validated against a\n");
+        bench::logf("                  dependent ADD chain: 8 cycles, 14 instructions/iter)\n");
+    } else {
+        bench::logf("  Cycles        : ESTIMATED -- ns / (ns per cycle of a dependent ADD\n");
+        bench::logf("                  chain, measured each rep). No hardware counters:\n");
+        bench::logf("                  %s\n", why.c_str());
+    }
+    bench::logf("==================================================================\n");
+
+    static const char* TITLE[NMODES] = {
+        "LATENCY -- a dependent chain, caches swept between bursts",
+        "THROUGHPUT -- independent inputs, caches swept between bursts",
+    };
+    auto label = [&](int w, int b) {
+        char l[32];
+        std::snprintf(l, sizeof l, "%s, B=%llu", bytes_label(ws[w]).c_str(),
+                      (unsigned long long)CACHE_BURST[b]);
+        return std::string(l);
+    };
+    const std::size_t nd = distinct(make_inputs(s)[0]);
+    for (int m = 0; m < NMODES; ++m) {
+        box(TITLE[m]);
+        for (int w = 0; w < NCACHE_W; ++w)
+            for (int b = 0; b < NCACHE_B; ++b) {
+                const int id = cache_cell(m, w, b);
+                std::vector<bench::VariantSeries> vs;
+                for (int v = 1; v < nv; ++v) vs.push_back({ s.variants[v].name, at(id, v) });
+                bench::report_cluster(label(w, b).c_str(), nd, at(id, 0), vs,
+                                      (std::size_t)(base - 1), "cyc");
+            }
+    }
+
+    if (tab > 0 && fre > 0) {
+        box("SUMMARY -- frecpe / tab: the estimate against the fetch");
+        bench::logf("  Cycles per call, median across epochs; latency net of the control,\n"
+                    "  throughput gross. frecpe/tab is the median of per-epoch paired\n"
+                    "  ratios, with its IQR; below 1 favours frecpe.\n\n");
+        bench::logf("  %-10s %-14s %9s %9s %11s %7s\n",
+                    "shape", "W, B", "tab", "frecpe", "frecpe/tab", "IQR");
+        for (int m = 0; m < NMODES; ++m)
+            for (int w = 0; w < NCACHE_W; ++w)
+                for (int b = 0; b < NCACHE_B; ++b) {
+                    const int id = cache_cell(m, w, b);
+                    const auto ctl = at(id, 0), t = at(id, tab), f = at(id, fre);
+                    const bench::Stats r = bench::summarize(
+                        m == LATENCY ? bench::paired_net_ratio(f, t, ctl) : bench::paired_ratio(f, t));
+                    char ratio[16] = "n/a", iqr[16] = "n/a";
+                    if (r.n > 0) {
+                        std::snprintf(ratio, sizeof ratio, "%.3f", r.median);
+                        std::snprintf(iqr, sizeof iqr, "%.3f", r.iqr);
+                    }
+                    bench::logf("  %-10s %-14s %9s %9s %11s %7s\n",
+                                m == LATENCY ? "latency" : "throughput", label(w, b).c_str(),
+                                cell(m == LATENCY ? paired_diff(t, ctl) : t).c_str(),
+                                cell(m == LATENCY ? paired_diff(f, ctl) : f).c_str(), ratio, iqr);
+                }
+    }
+
+    const double wall =
+        std::chrono::duration<double>(bench::Clock::now() - wall_start).count();
+    bench::logf("\n  total wall time: %.1f s\n\n", wall);
+    bench::close_log();
+    return 0;
+}
+
+inline bool has_arg(int argc, char** argv, const char* arg) {
+    for (int i = 1; i < argc; ++i)
+        if (std::strcmp(argv[i], arg) == 0) return true;
+    return false;
+}
+
 inline int run_main(const Spec& s, int argc, char** argv) {
-    if (bench::is_epoch_child(argc, argv)) return run_epoch(s);
+    const bool cache = has_arg(argc, argv, "--cache");
+    if (bench::is_epoch_child(argc, argv)) return cache ? run_cache_epoch(s) : run_epoch(s);
+    if (cache) return run_cache(s, argv[0]);
 
     const std::string report = report_path(s.report_name);
     bench::open_log(report.c_str());

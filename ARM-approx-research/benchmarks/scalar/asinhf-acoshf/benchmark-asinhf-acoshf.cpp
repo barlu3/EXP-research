@@ -13,9 +13,12 @@
    The two hand-written kernels (asinhf-acoshf-kernels.S) share everything
    except how ehat(i) is fetched and return bit-identical results -- the
    accuracy table must show identical rows -- so any timing difference is the
-   fetch alone. The system libm's function is the baseline every ratio divides
-   by. All three are held to 1 ulp of the correctly rounded result over every
-   finite float32.
+   fetch alone. For asinh and acosh the system libm's function is the baseline
+   every ratio divides by. For log1p it is glibc 2.44's log1pf, built from its
+   own source in ../../gnu-libm/, with libSystem's as a comparison row; it is
+   CORE-MATH's and correctly rounded, so it is held to 0 ulp, which also checks
+   the vendored build. The rest are held to 1 ulp of the correctly rounded
+   result over every finite float32.
 
    CMakeLists.txt builds this file three times: bench-asinhf, and with
    AHYP_ACOSH or AHYP_LOG1P defined, bench-acoshf and bench-log1pf. All link
@@ -51,9 +54,11 @@ void  acoshf_tput_frecpe(const float* in, float* out, std::uint64_t n);
 float acoshf_lat_call(const float* in, std::uint64_t n);
 float acoshf_lat_tab(const float* in, std::uint64_t n);
 float acoshf_lat_frecpe(const float* in, std::uint64_t n);
+void  log1pf_tput_gnu(const float* in, float* out, std::uint64_t n);   // bench-log1pf only
 void  log1pf_tput_call(const float* in, float* out, std::uint64_t n);
 void  log1pf_tput_tab(const float* in, float* out, std::uint64_t n);
 void  log1pf_tput_frecpe(const float* in, float* out, std::uint64_t n);
+float log1pf_lat_gnu(const float* in, std::uint64_t n);
 float log1pf_lat_call(const float* in, std::uint64_t n);
 float log1pf_lat_tab(const float* in, std::uint64_t n);
 float log1pf_lat_frecpe(const float* in, std::uint64_t n);
@@ -206,6 +211,9 @@ const approx::Spec SPEC = {
     // Index 0 is the control, 1 the baseline every ratio divides by.
     .variants = {
         approx::CONTROL,
+#if defined(AHYP_LOG1P)
+        { AHYP_FN "f (glibc)", "glibc", 0, false, KERNEL(tput_gnu),    KERNEL(lat_gnu)    },
+#endif
         { AHYP_FN "f (libm)", "libm",   1, false, KERNEL(tput_call),   KERNEL(lat_call)   },
         { "table + frecpx",   "tab",    1, false, KERNEL(tput_tab),    KERNEL(lat_tab)    },
         { "frecpe",           "frecpe", 1, false, KERNEL(tput_frecpe), KERNEL(lat_frecpe) },

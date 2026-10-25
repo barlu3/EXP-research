@@ -7,7 +7,10 @@
 //   acosh(x) = log(w),            w = x + sqrt(x^2 - 1)
 //   log1p(x) = log(w),            w = 1 + x
 //
-//   call    BL to the system libm's asinhf or acoshf: the baseline.
+//   gnu     log1p only: BL to glibc 2.44's log1pf, built in ../../gnu-libm/,
+//           the baseline there.
+//   call    BL to the system libm's asinhf, acoshf or log1pf: the baseline for
+//           asinh and acosh, a comparison row for log1p.
 //   frecpe  log(w) with ../logf/'s reduction, on a double: r = w*FRECPE(w) - 1.
 //           Double FRECPE uses the same 256-entry estimate, indexed by w's top
 //           eight fraction bits, and r is still exact: 53 significant bits
@@ -289,11 +292,11 @@ _\fn\()_lat_\kind:
     \fn\()_cold 1, \p\()3
 .endm
 
-// The libm baseline, shaped like ../logf/'s _call pair.
-.macro AHYP_CALL fn
-    .globl  _\fn\()_tput_call
+// A library call, shaped like ../logf/'s LOGF_CALL pair.
+.macro AHYP_CALL fn, kind, sym
+    .globl  _\fn\()_tput_\kind
     .p2align 4
-_\fn\()_tput_call:
+_\fn\()_tput_\kind:
     stp     x29, x30, [sp, #-48]!
     mov     x29, sp
     stp     x19, x20, [sp, #16]
@@ -305,7 +308,7 @@ _\fn\()_tput_call:
 1:
     .rept 8
     ldr     s0, [x19], #4
-    bl      _\fn
+    bl      \sym
     str     s0, [x20], #4
     .endr
     subs    x21, x21, #8
@@ -315,9 +318,9 @@ _\fn\()_tput_call:
     ldp     x29, x30, [sp], #48
     ret
 
-    .globl  _\fn\()_lat_call
+    .globl  _\fn\()_lat_\kind
     .p2align 4
-_\fn\()_lat_call:
+_\fn\()_lat_\kind:
     stp     x29, x30, [sp, #-48]!
     mov     x29, sp
     stp     x19, x20, [sp, #16]
@@ -330,7 +333,7 @@ _\fn\()_lat_call:
 1:
     .rept 4
     LINK    0, 0, 8, x19                    // operand straight into s0, the argument
-    bl      _\fn                            // result back in s0, feeding the next LINK
+    bl      \sym                            // result back in s0, feeding the next LINK
     .endr
     subs    x20, x20, #4
     b.ne    1b
@@ -344,14 +347,17 @@ _\fn\()_lat_call:
     AHYP_TPUT asinhf, tab,    stt
     AHYP_LAT  asinhf, frecpe, slf
     AHYP_LAT  asinhf, tab,    slt
-    AHYP_CALL asinhf
+    AHYP_CALL asinhf, call, _asinhf
     AHYP_TPUT acoshf, frecpe, ctf
     AHYP_TPUT acoshf, tab,    ctt
     AHYP_LAT  acoshf, frecpe, clf
     AHYP_LAT  acoshf, tab,    clt
-    AHYP_CALL acoshf
+    AHYP_CALL acoshf, call, _acoshf
     AHYP_TPUT log1pf, frecpe, ptf
     AHYP_TPUT log1pf, tab,    ptt
     AHYP_LAT  log1pf, frecpe, plf
     AHYP_LAT  log1pf, tab,    plt
-    AHYP_CALL log1pf
+    AHYP_CALL log1pf, call, _log1pf
+#if defined(AHYP_LOG1P)
+    AHYP_CALL log1pf, gnu,  _gnu_log1pf     // only bench-log1pf links gnu-libm
+#endif
