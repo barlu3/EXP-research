@@ -42,7 +42,9 @@ What these benchmarks measure is the other side of the trade: the **arithmetic
 the limb scheme costs** to buy that storage. A result of "1.15×" means the limb
 path costs 15% more time, and the storage saving is real but invisible here.
 Demonstrating the saving needs a different experiment — cache pressure from a
-co-running workload, or the constrained target hardware itself.
+co-running workload, or the constrained target hardware itself. §10.10 runs
+the cache-pressure experiment for the ARM log kernels' tables; the bf16 limb
+tables are not in it yet.
 
 ---
 
@@ -321,7 +323,8 @@ kernels 7% apart — a fact about the machine, not the harness.
 - **`ln`'s ratios are the least reproducible** of the three, because its kernels
   are the fastest relative to loop overhead.
 - **Steady-state only.** The prewarm (§4.3) means these are throughput numbers
-  for repeated calls, not first-call or cold-cache costs.
+  for repeated calls, not first-call or cold-cache costs. §10.10 is the
+  cold-cache counterpart, for the ARM log kernels only.
 - **`i % size` was never the problem.** An earlier hypothesis blamed the runtime
   modulo in the old indexing; measured, it cost 0.031 ns/iter against a mask.
   The power-of-two buffers are tidier, not faster.
@@ -396,17 +399,19 @@ runs over four input ranges.
 division: tan, sec, tanh, the e^-x in sinh and cosh. In log it is not a
 division. It is the range reduction: for every normal x, `FRECPE(x)` is
 exactly 2^-k times one of 256 values picked by x's top fraction bits, and
-x·`FRECPE(x)` − 1 is exact. It times three variants:
+x·`FRECPE(x)` − 1 is exact. It times four variants:
 
 | Variant | What it is |
 |---|---|
-| `logf (libm)` | the system `logf`, called normally: the baseline every ratio divides by |
+| `logf (glibc)` | glibc 2.44's `logf`, built here from its own source (§10.9): the baseline every ratio divides by |
+| `logf (libm)` | the system (libSystem) `logf`, called normally, for comparison |
 | `table + frecpx` | a table-driven log: the reciprocal is loaded from a 256-entry table |
 | `frecpe` | the same algorithm, with the reciprocal from `FRECPE` instead of the table |
 
 The table holds `FRECPE`'s own values, so the two hand kernels compute
 bit-identical results (the accuracy table must show identical rows) and
-differ only in how the reciprocal is fetched. All three are held to 1 ulp.
+differ only in how the reciprocal is fetched. All are held to 1 ulp, except
+glibc's `log10f`, which is correctly rounded and held to 0.
 The four input ranges are positive normals, [0.5, 2), [1, 1 + 2^-8) (where
 the hand kernels take a separate path that skips the lookup) and subnormals.
 
@@ -415,9 +420,11 @@ to 2 or 10. Only the table (−log_b of the estimate) and two constants change,
 and the last FADD becomes an FMADD by 1/ln b, so the three report on one
 reduction in three functions.
 
-The other functions with a log in them reuse the reduction. Each has the same
-three variants — libm, `table + frecpx`, `frecpe` — and the two hand kernels
-again share everything but the fetch and must show identical accuracy rows:
+The other functions with a log in them reuse the reduction. Each has three
+variants — libm, `table + frecpx`, `frecpe` — and `log1pf` has glibc's
+`log1pf` in front of them as its baseline, held to 0 ulp like `log10f`. The
+two hand kernels again share everything but the fetch and must show identical
+accuracy rows:
 
 - **`scalar/powf/`** computes pow(x, y) = exp2(y · log2 x) in double. pow
   multiplies log2's error by |y · log2 x|, up to 150 for any result that is
@@ -507,6 +514,9 @@ ARM-approx-research/benchmarks/
   approx-kernels.inc     shared assembler macros: the loop scaffolding
   approx-common.S        shared kernels: the control loops, the cycle calibration
   bench-cycles.hpp       cycle counting: hardware counters or calibrated timer
+  gnu-libm/              glibc 2.44's logf, log2f, log10f, log1pf: the log rows' baseline (§10.9)
+    glibc/                     verbatim from glibc-2.44 sysdeps/ieee754/flt-32/, with COPYING.LIB
+    shim/                      stand-ins for the glibc-internal headers those files include
   scalar/
     frecpe/                    1/x
       benchmark-recip.cpp      its variants
@@ -634,6 +644,7 @@ them come:
 
 ```sh
 make bench                    # runs all twelve, on Apple Silicon, after the others
+make bench-cache              # the four log benchmarks under cache pressure (§10.10)
 cd build && ctest -R "bench-(recip|rsqrt|log(2|10)?f|acosf|powf|asinhf|acoshf|log1pf)"   # also matches the -vec ones
 
 cd ARM-approx-research/benchmarks             # hardware cycle counts; any
@@ -649,6 +660,7 @@ sudo scalar/asinhf-acoshf/bench-acoshf
 sudo scalar/asinhf-acoshf/bench-log1pf
 sudo vector/vrecpe/bench-recip-vec
 sudo vector/vrsqrts/bench-rsqrt-vec
+sudo scalar/logf/bench-logf --cache           # likewise bench-log2f, bench-log10f, bench-log1pf
 ```
 
 `make bench` runs without `sudo`, so it regenerates every report with
@@ -707,6 +719,159 @@ program under `sudo` afterwards to get hardware counts back.
   dependent chain; they still win throughput. The comparison that matters
   here, `table + frecpx` against `frecpe`, shares that cost. `acoshf`'s near-1
   range has only 32 distinct inputs.
+
+### 10.9 The glibc baseline
+
+libSystem's `logf`, `log2f`, `log10f` and `log1pf` change with the macOS
+release and their source is not published, so a ratio against them cannot be
+reproduced on another machine or OS version. The four log benchmarks therefore
+divide by glibc 2.44's functions — what an up-to-date Linux system runs —
+compiled here from glibc's own files. libSystem's stay as a comparison row.
+
+- **Source.** `gnu-libm/glibc/` is copied verbatim from the glibc-2.44 tarball's
+  `sysdeps/ieee754/flt-32/` (sha256 `37f600f2…cc667`, in
+  `gnu-libm/CMakeLists.txt`), with `COPYING.LIB`. `logf` and `log2f` are the
+  table-and-polynomial ones from ARM's optimized-routines (16-entry table;
+  glibc states 0.818 and 0.752 ulp); `log10f` and `log1pf` are CORE-MATH's and
+  correctly rounded, so the accuracy pass holds them to 0 ulp, which also
+  checks the build.
+- **Shim.** `gnu-libm/shim/` stands in for the glibc-internal headers the files
+  include: symbol aliases and versions become no-ops, and the macOS SDK's
+  missing `roundeven` and `<stdbit.h>` are supplied.
+- **Names.** Each function is renamed `gnu_*` with `-D__logf=gnu_logf` and so
+  on, the way glibc's multiarch builds rename theirs. Nothing exports `logf`, so
+  the libm row's `bl _logf` still binds to libSystem:
+  `xcrun dyld_info -imports scalar/logf/bench-logf` shows `_gnu_logf` from
+  `libgnu-libm` and `_logf` from `libSystem`.
+- **Build.** A shared library, so each call goes through a dyld stub like
+  libSystem's, and like glibc's own `libm.so` through the PLT. `-std=gnu11 -O2
+  -frounding-math` is glibc's own build; `-ffp-contract=fast` is GCC's default
+  for that dialect, which clang's is not.
+- **Refreshing.** `dependencies/fetch-glibc.sh 2.44`, extract it, copy the same
+  files, and `cmp` them against the tree. The default version stays 2.43, which
+  backs the `exp` port.
+- **Not covered.** `asinhf`, `acoshf` and `powf` still divide by libSystem's.
+
+### 10.10 Cache pressure (`--cache`)
+
+Everything above is warm: 16 KB of inputs and every table stay in L1, so the
+load the `frecpe` kernel saves is an L1 hit. Inside a large program a log call
+finds its table wherever the rest of the program left it; on a GPU, where the
+lanes of a warp index a table at different rows, the divergent fetch is worse
+again. `--cache` measures the CPU side of that: a proxy for the cold or
+divergent fetch, not a GPU measurement.
+
+The comparison is `table + frecpx` against `frecpe`. They return identical
+results, so their ratio is the fetch alone, and every ratio in the cache report
+divides by the table kernel. The glibc and libm rows are context: different
+algorithms with different tables and accuracy, so their cold cost says nothing
+about the reduction.
+
+| Kernel | Tables read per call | Bytes | 128-B lines |
+|---|---|---|---|
+| `logf`/`log2f`/`log10f` `frecpe` | `logf_logc[256]` (double) | 2 KiB | 16 |
+| `logf`/`log2f`/`log10f` `table + frecpx` | `logf_logc` and `logf_recip[256]` (float) | 3 KiB | 24 |
+| `log1pf` `frecpe` | `ahyp_logc[256]` (double) | 2 KiB | 16 |
+| `log1pf` `table + frecpx` | `ahyp_logc` and `ahyp_recip[256]` (double) | 4 KiB | 32 |
+| glibc `logf`, `log2f` | `__logf_data` / `__log2f_data`: 16 × {1/c, log c} and coefficients | 288 B | 3 |
+| glibc `log10f` | `tr[65]`, `tl[65]` (double), `st[16]` | ~1.2 KiB | ~10 |
+| glibc `log1pf` | `x0[32]`, `lix[32]` (double) | ~0.6 KiB | ~5 |
+
+`frecpe` removes one of the table kernel's two loads, not both: `-log c` still
+comes from memory. Both of the table kernel's loads are indexed by the same
+bits, so their misses overlap, and the cold gap should be smaller than the
+line counts alone suggest.
+
+**Method.** A cell is one loop shape, a sweep size W and a burst size B.
+Before each burst of B calls, `evict()` reads one byte of every 128-byte line
+of a W-byte buffer, in order, and an empty `asm` consumes the sum so `-O3`
+keeps the loads. Then two counter reads bracket the burst alone, so the sweep
+is never counted. Each read follows a `dsb sy; isb`: a timer read alone does
+not wait for the instructions before it, and a 32-call latency burst read ~40%
+short, its chain's tail still in flight when the end read landed. W is 0
+(warm), 4× the L1D and 4× the L2 of the performance cores, read from
+`hw.perflevel0.*` (512 KiB and 64 MiB on the M5); B is 32 or 512 calls. Each rep is 64 bursts per variant, interleaved and rotated, 5 reps
+after 3 discarded, and 7 epochs; the report gives the median cycles per call
+with its IQR across epochs, as the main report does, and ratios as medians of
+per-epoch paired ratios. Inputs are the first range only (random positive
+normals), so the tables are indexed at random. The control loads and stores
+the same cold inputs and outputs, so those misses cancel in `net`. The summary
+at the end is frecpe/tab per cell: latency net of the control, throughput
+gross.
+
+```sh
+make bench-cache                         # all four, estimated cycles
+sudo scalar/logf/bench-logf --cache      # hardware cycles: bench_results_logf_cache.txt
+```
+
+**Does the sweep evict the table?** A one-off probe, not in the repo, timed a
+dependent chase over 16 random 128-byte lines — `logf_logc`'s 2 KiB — straight
+after each sweep, as the mean of 2000 rounds (M5, ns per load; ~1.6 of it is
+the timer and barriers):
+
+| Sweep | warm | 512 KiB | 2 MiB | 8 MiB | 32 MiB | 64 MiB | 256 MiB |
+|---|---|---|---|---|---|---|---|
+| read, linear (`evict()`) | 1.6–2.4 | 2.8 | 3.1 | 3.2 | 24.0 | 42.6 | 60.2 |
+| read, linear, twice | 1.6 | 2.7 | 3.8 | 4.0 | 39.6 | 42.1 | 60.3 |
+| write, linear | 1.6 | 2.7 | 3.7 | 3.2 | 26.1 | 39.0 | 54.9 |
+| read, scrambled order | 1.6 | 2.7 | 3.6 | 4.7 | 25.5 | 42.7 | 43.7 |
+
+The patterns evict about equally, so the linear read stays. 512 KiB costs the
+table about 1 ns a load (it comes back from L2, close by); 64 MiB about 40 ns,
+from the SLC; only 256 MiB reaches DRAM latency.
+
+**First results** (M5, timer mode, 2026-10-25; frecpe/tab, IQR in brackets
+where it is wide):
+
+| Cell | `logf` | `log2f` | `log10f` | `log1pf` |
+|---|---|---|---|---|
+| latency, warm, B=32 | 0.73 | 0.75 | 0.74 | 0.81 |
+| latency, 512 KiB, B=32 | 0.75 | 0.77 | 0.76 | 0.80 |
+| latency, 64 MiB, B=32 | 0.91 (0.27) | 0.74 (0.16) | 0.73 (0.27) | 0.84 (0.29) |
+| latency, 64 MiB, B=512 | 0.73 | 0.74 | 0.74 | 0.81 |
+| throughput, warm, B=512 | 0.90 | 0.90 | 0.90 | 0.90 |
+| throughput, 64 MiB, B=32 | 0.92 (0.16) | 0.86 | 0.86 (0.10) | 1.02 (0.26) |
+| throughput, 64 MiB, B=512 | 0.89 | 0.91 | 0.93 | 0.94 |
+
+Wherever the IQR is tight — every B = 512 cell, and every 512 KiB cell —
+frecpe/tab stays at its warm value: the cold misses cost both kernels alike.
+The cells where a difference would show, 64 MiB with B = 32, are too noisy in
+timer mode to call either way. Both kernels also pay far less than serialized
+misses would cost: a 32-call burst finds ~14 of `logf_logc`'s 16 lines cold,
+~2500 cycles at 40 ns each if they queued on the latency chain, against about
+520 measured (`logf`, the table kernel: 30.2 → 46.5 cycles a call). The core
+overlaps those misses even on the chain. So far, then, nothing shows the table
+kernel suffering more cache loss than `frecpe`; settling the B = 32 cells needs
+hardware cycles (`sudo`) and more bursts.
+
+Known limits:
+
+- **Hardware cycles need `sudo`.** CI runs `make bench-cache` unprivileged on
+  a hosted VM, where kperf is unlikely to work anyway; its reports are
+  estimates, and the step fails only if no epoch completes.
+- **In hardware mode each counter read is a kperf system call.** Its fixed
+  cost, and whatever lines it touches, are the same for every row including
+  the control, so `net` removes it, but it widens the IQR at B = 32. In timer
+  mode each read has the timer's 42 ns grain, averaged over the 64 bursts.
+- **The sweep evicts more than the tables.** Code leaves the unified L2 and the
+  TLB loses its entries too, for every row alike. The hand kernels also reload
+  their constants (`logf_base`) once per burst, a fixed cost that B = 32 spreads
+  over fewer calls.
+- **Short throughput bursts carry a fixed cost.** The barriers drain the
+  pipeline around every burst, which B = 32 spreads over few calls: every row,
+  the control included, reads about 3 cycles per call higher than at B = 512,
+  and the gross ratio drifts towards 1. Read `net` there.
+- **64 MiB does not reach DRAM.** The probe above puts the table in the SLC
+  after it (~40 ns a load); 256 MiB would, at four times the sweep cost.
+- **It is slow.** About 3 minutes a binary, nearly all of it the 64 MiB sweeps
+  (~2.3 ms each), so `make bench-cache` adds ~11 minutes to every CI run on
+  macOS. `CACHE_BURSTS` (64) trades that against the B = 32 cells' noise.
+- **Whole runs can come out slow in throughput.** Two unprivileged plain runs
+  read every variant's throughput about 1.6× higher than the runs before and
+  after, latency unchanged — consistent with an efficiency core, which the
+  epochs ask macOS to avoid but cannot forbid. Not confirmed; rerun if a
+  report shows it.
+- **`--cache` runs no accuracy pass.** The plain run checks the same kernels.
 
 ---
 

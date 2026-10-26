@@ -137,11 +137,12 @@ first thing the function does.
 
 ### What was compared
 
-Each function was timed in three versions:
+Each function was timed in three versions, and the four logs in a fourth:
 
 | Version | What it is |
 |---|---|
-| **libm** | The system math library's function. The baseline. |
+| **glibc** | glibc 2.44's `logf`, `log2f`, `log10f` or `log1pf`, built here from glibc's own source so the baseline does not change with the Mac it runs on. The baseline for those four. |
+| **libm** | The system (libSystem) math library's function. The baseline for `powf`, `asinhf` and `acoshf`; a comparison row for the logs. |
 | **table** | Hand-written assembly; `c` comes from a 256-entry table |
 | **FRECPE** | The same assembly, with `c` from the FRECPE instruction |
 
@@ -200,23 +201,26 @@ throughput is per result. Lower is better.
 
 ### Main input range of each function
 
-| Function | Latency: libm / table / **FRECPE** | Throughput: libm / table / **FRECPE** | FRECPE vs table |
+| Function | Latency: glibc / libm / table / **FRECPE** | Throughput: glibc / libm / table / **FRECPE** | FRECPE vs table |
 |---|---|---|---|
-| `logf` | 29.1 / 30.0 / **22.1** | 5.96 / 2.81 / **2.53** | −7.9 cycles, −10% |
-| `log2f` | 37.0 / 31.2 / **23.0** | 5.11 / 2.81 / **2.53** | −8.2 cycles, −10% |
-| `log10f` | 35.0 / 31.1 / **23.0** | 5.11 / 2.81 / **2.53** | −8.1 cycles, −10% |
-| `log1pf` | 35.4 / 33.1 / **26.6** | 6.90 / 3.43 / **3.03** | −6.5 cycles, −12% |
-| `powf` (y = 2.2) | 63.4 / 56.6 / **48.7** | 8.55 / 5.97 / **5.56** | −7.9 cycles, −7% |
-| `asinhf` | 34.3 / 53.0 / **46.5** | 6.58 / 4.98 / **4.55** | −6.5 cycles, −9% |
-| `acoshf` | 34.7 / 49.0 / **42.5** | 7.80 / 4.45 / **4.06** | −6.5 cycles, −9% |
+| `logf` | 32.7 / 29.2 / 30.2 / **22.0** | 5.05 / 6.05 / 2.86 / **2.58** | −8.1 cycles, −10% |
+| `log2f` | 32.7 / 37.0 / 31.1 / **23.0** | 5.02 / 5.13 / 2.82 / **2.56** | −8.0 cycles, −9% |
+| `log10f` | 28.6 / 35.1 / 31.1 / **23.0** | 7.37 / 5.12 / 2.82 / **2.54** | −8.1 cycles, −10% |
+| `log1pf` | 45.5 / 35.8 / 33.1 / **26.7** | 10.47 / 6.88 / 3.39 / **3.00** | −6.4 cycles, −12% |
+| `powf` (y = 2.2) | — / 63.4 / 56.6 / **48.7** | — / 8.55 / 5.97 / **5.56** | −7.9 cycles, −7% |
+| `asinhf` | — / 34.3 / 53.0 / **46.5** | — / 6.58 / 4.98 / **4.55** | −6.5 cycles, −9% |
+| `acoshf` | — / 34.7 / 49.0 / **42.5** | — / 7.80 / 4.45 / **4.06** | −6.5 cycles, −9% |
+
+The four log rows were rerun on 2026-10-25 with the glibc baseline; the other
+three are from the earlier libm-only runs.
 
 ### Control ranges (no reciprocal used, so table and FRECPE should match)
 
 | Function | Range | Latency: table / FRECPE | Throughput: table / FRECPE |
 |---|---|---|---|
-| `logf` | x in [1, 1 + 2^-8) | 17.8 / 17.8 | 2.13 / 2.12 |
+| `logf` | x in [1, 1 + 2^-8) | 18.0 / 18.0 | 2.14 / 2.25 |
 | `powf` | y = −20000, x just above 1 | 44.0 / 44.2 | 4.84 / 4.83 |
-| `log1pf` | \|x\| < 2^-8 | 15.1 / 15.1 | 2.16 / 2.14 |
+| `log1pf` | \|x\| < 2^-8 | 15.1 / 15.1 | 2.12 / 2.12 |
 | `asinhf` | \|x\| < 2^-8 | 15.0 / 15.0 | 1.79 / 1.74 |
 | `acoshf` | x − 1 < 2^-18 | 34.0 / 34.0 | 3.42 / 3.45 |
 
@@ -238,6 +242,12 @@ throughput is per result. Lower is better.
    table, but both hand-written versions are slower than libm on latency.
    The square root in front of the log is the cause, not the reduction. They
    are still faster than libm on throughput.
+6. **glibc is a different trade.** glibc's `logf` and `log2f` (a 16-entry
+   table, within 1 ulp) run about 32.7 cycles of latency and 5.0 of
+   throughput, behind FRECPE in both. Its `log10f` and `log1pf` are CORE-MATH's
+   and correctly rounded, which the hand kernels (1 ulp) are not, so their gap
+   to FRECPE is not the reduction alone. The table-against-FRECPE column is the
+   comparison that isolates the fetch.
 
 ---
 
@@ -271,6 +281,10 @@ critical path. A logarithm's range reduction is the clearest case.
 - **Random inputs.** The latency gap assumes inputs vary. When consecutive
   inputs hit the same table entry, the CPU can predict the table load, and
   the gap roughly halves.
+- **Warm caches.** Every table here stays in L1. `make bench-cache` reruns the
+  four logs with the caches swept between bursts of calls, which is where a
+  saved table fetch should matter most; see
+  [BENCHMARKING.md §10.10](BENCHMARKING.md).
 - **`powf` is checked by sample in `y`.** Every `x` is checked, but only for
   the chosen `y` values and the special cases.
 
