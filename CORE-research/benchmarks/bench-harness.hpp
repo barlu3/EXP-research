@@ -398,7 +398,10 @@ using EpochTable = std::map<std::pair<int, int>, std::vector<double>>;
 // child that died between emitting variant 0 and variant 2 of a cluster would
 // leave the series different lengths and silently pair one variant's epoch 3
 // against another's epoch 4.
-inline EpochTable gather_epochs(const char* self, int epochs) {
+//
+// `extra` is appended to each child's command line, so a parent run in another
+// mode (approx-bench.hpp's --cache) spawns children in that mode too.
+inline EpochTable gather_epochs(const char* self, int epochs, const char* extra = "") {
     EpochTable table;
     std::vector<std::pair<int, int>> expected;   // row keys, from the first good epoch
     int committed = 0;
@@ -409,7 +412,7 @@ inline EpochTable gather_epochs(const char* self, int epochs) {
         std::fprintf(stderr, "error: executable path contains a quote; cannot spawn epochs\n");
         return table;
     }
-    const std::string cmd = std::string("\"") + self + "\" --epoch";
+    const std::string cmd = std::string("\"") + self + "\" --epoch" + extra;
 
     for (int e = 0; e < epochs; ++e) {
         std::FILE* pipe = popen(cmd.c_str(), "r");
