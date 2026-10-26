@@ -137,6 +137,17 @@ jobs:
         if: runner.os == 'macOS'
         run: make bench
 
+      - name: bench-cache
+        # The log benchmarks again with the caches swept between bursts of calls
+        # (approx-bench.hpp's --cache): FRECPE against the same values read from
+        # cold memory. Unprivileged like `bench`: `sudo make` would leave
+        # root-owned files for the clean step below, and on the hosted VM kperf
+        # is unlikely to be available anyway, so these cycles are estimates. It
+        # fails only if no epoch completes; the upload below picks up the
+        # *_cache.txt reports.
+        if: runner.os == 'macOS'
+        run: make bench-cache
+
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v7

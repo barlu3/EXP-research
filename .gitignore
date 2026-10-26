@@ -1,5 +1,5 @@
 # verification files used to extract
-glibc-2.43/
+glibc-*/
 dependencies/*.tar.xz
 dependencies/*.sig
 handoff.md
