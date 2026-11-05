@@ -1,6 +1,7 @@
 # Builds everything, runs every CTest test, and runs every Make/CMake target
 # that can run unattended, on Linux x86-64 and macOS arm64 (the ARM
-# estimate-instruction benchmarks exist only on Apple Silicon).
+# estimate-instruction benchmarks exist only on Apple Silicon, their x86
+# counterparts only on x86-64 Linux).
 #
 # Not run on every push, and why:
 #   ln-t1-sweep, ln-t2-sweep  need glpsol and solve the MILP pipeline once per
@@ -137,6 +138,16 @@ jobs:
         if: runner.os == 'macOS'
         run: make bench
 
+      - name: x86 estimate benchmarks
+        # The Linux side of the step above. `make bench` would drag in the
+        # ~30-minute main benchmarks, so these run alone: under a minute, and
+        # each exits non-zero when its exhaustive accuracy check fails (e.g.
+        # rcpss + 2 NR more than 1 ulp off). The kernels need AVX and FMA,
+        # which every hosted x86-64 runner has.
+        if: runner.os == 'Linux'
+        working-directory: build
+        run: ctest --output-on-failure -L benchmark -R '-x86$'
+
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v7
@@ -146,6 +157,7 @@ jobs:
             CORE-research/benchmarks/output/*.txt
             ARM-approx-research/benchmarks/scalar/*/bench_results_*.txt
             ARM-approx-research/benchmarks/vector/*/bench_results_*.txt
+            x86-approx-research/benchmarks/scalar/*/bench_results_*.txt
           if-no-files-found: ignore
 
       - name: help, clean, distclean
@@ -190,5 +202,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: reports-weekly-linux
-          path: CORE-research/benchmarks/output/*.txt
+          path: |
+            CORE-research/benchmarks/output/*.txt
+            x86-approx-research/benchmarks/scalar/*/bench_results_*.txt
           if-no-files-found: ignore
