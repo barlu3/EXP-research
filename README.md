@@ -49,6 +49,7 @@ thin wrapper over CMake; the build tree is configured on first use. Override
 | --- | --- |
 | `make bench` | Build + run the throughput benchmarks |
 | `make bench-cache` | Run the ARM log benchmarks with the caches swept between bursts: FRECPE vs table under cache pressure (Apple Silicon) |
+| `make table-tolerance` | Measure how much error glibc's log table entries tolerate, and whether FRECPE's error fits inside (Apple Silicon; minutes per function) |
 | `make limb-sweep` | Measure the bf16 limb-configuration frontier |
 
 **Environment**
@@ -80,7 +81,8 @@ CORE-research/
   benchmarks/       is it fast?
   log-research/     does a correctly-rounded bf16 ln() exist?  (LP/MILP)
 ARM-approx-research/  ARM estimate instructions (FRECPE, FRSQRTE) vs exact ops;
-                      benchmarks/gnu-libm/ is glibc 2.44's log family, their baseline
+                      benchmarks/gnu-libm/ is glibc 2.44's log family, their baseline;
+                      table-tolerance/ measures how much error its tables tolerate
 docs/                 research writeups
 cmake/                build support
 dependencies/         glibc reference fetch (fetch-glibc.sh [version])

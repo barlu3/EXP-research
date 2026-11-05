@@ -22,6 +22,10 @@ ARM-approx-research/benchmarks/scalar/asinhf-acoshf/bench-asinhf
 ARM-approx-research/benchmarks/scalar/asinhf-acoshf/bench-acoshf
 ARM-approx-research/benchmarks/scalar/asinhf-acoshf/bench-log1pf
 ARM-approx-research/benchmarks/**/bench_results_*.txt
+# The table-tolerance study: binaries, reports and stderr logs land beside its sources.
+ARM-approx-research/table-tolerance/table-tolerance-*
+ARM-approx-research/table-tolerance/table_tolerance_*.txt
+ARM-approx-research/table-tolerance/*.stderr
 # verifying MPFR library is downloaded and installed correctly
 version
 # discrepancy checker for MPFR library

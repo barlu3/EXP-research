@@ -10,6 +10,9 @@
 #   bench on Linux            the timing loops take ~30 minutes on the hosted
 #                             runner; macOS still runs bench on every push
 #   The `weekly` job runs these every Monday and on demand.
+#   table-tolerance           exhaustive per-entry checks of glibc's log tables
+#                             against FRECPE (Apple Silicon only); the
+#                             `weekly-macos` job runs them on the same schedule.
 #
 # Not run at all:
 #   tables                    needs SageMath, which is several GB to install; the
@@ -73,11 +76,13 @@ jobs:
         run: make
 
       - name: Tests
-        # Two labels are left out here (see the CMakeLists that set them):
-        #   research-finding  verify-exp/sin/log, known to fail -- next step
-        #   benchmark         the benchmark programs -- `make bench` runs them
+        # Labels left out here (see the CMakeLists that set them):
+        #   research-finding          verify-exp/sin/log, known to fail -- next step
+        #   benchmark                 the benchmark programs -- `make bench` runs them
+        #   table-tolerance(-finding) exhaustive per-entry table checks, too slow
+        #                             for every push -- the weekly-macos job runs them
         working-directory: build
-        run: ctest --output-on-failure -LE "research-finding|benchmark"
+        run: ctest --output-on-failure -LE "research-finding|benchmark|table-tolerance"
 
       - name: Known research findings (reported, not gating)
         # These fail today by design: open discrepancies in the 16-bit-rounded
@@ -202,4 +207,56 @@ jobs:
         with:
           name: reports-weekly-linux
           path: CORE-research/benchmarks/output/*.txt
+          if-no-files-found: ignore
+
+  weekly-macos:
+    name: Table tolerance (macOS arm64)
+    # How much error glibc's log tables tolerate and whether FRECPE's error fits
+    # inside (ARM-approx-research/table-tolerance/). Exhaustive per-entry checks
+    # over every float, so weekly rather than per push. Correctness only, with
+    # no timing, so a shared VM is fine for it.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: macos-15
+    timeout-minutes: 360
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Report build errors as annotations
+        run: echo "::add-matcher::.github/problem-matchers/compiler.json"
+
+      - name: Install MPFR and GMP
+        run: brew install mpfr gmp
+
+      - name: Configure
+        # Portable code generation, as in build-test.
+        run: |
+          make configure
+          cmake -B build -DEXP_NATIVE_ARCH=OFF
+
+      - name: Build the tolerance tools
+        run: >
+          cmake --build build -j 3 --target
+          table-tolerance-logf table-tolerance-log2f table-tolerance-log10f table-tolerance-log1pf
+
+      - name: table-tolerance
+        # Fails if a self-check does: a replica not bit-identical to gnu-libm,
+        # glibc's own table breaking 1 ulp, or a reported bound that does not
+        # hold or is not tight.
+        working-directory: build
+        run: ctest --output-on-failure -L "^table-tolerance$"
+
+      - name: FRECPE fits (reported, not gating)
+        # Reads the reports the previous step wrote; -FS keeps CTest from
+        # rerunning that step as this one's fixture.
+        continue-on-error: true
+        working-directory: build
+        run: ctest --output-on-failure -L table-tolerance-finding -FS "tol-.*"
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports-weekly-macos
+          path: ARM-approx-research/table-tolerance/table_tolerance_*.txt
           if-no-files-found: ignore
