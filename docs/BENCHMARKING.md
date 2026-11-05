@@ -311,6 +311,19 @@ machine is too loaded for the check to conclude anything and it reports SKIP
 rather than failing. Under 16 competing CPU hogs it measured two identical
 kernels 7% apart — a fact about the machine, not the harness.
 
+The table-tolerance study (`ARM-approx-research/table-tolerance/`, results in
+[FRECPE-RANGE-REDUCTION.md](FRECPE-RANGE-REDUCTION.md) §6) is in CTest under two
+labels, both kept out of the per-push run because each function takes minutes:
+
+| Label | Tests | Fails when | CI |
+|---|---|---|---|
+| `table-tolerance` | `table-tolerance-<fn>f` | a self-check fails: a replica is not bit-identical to gnu-libm, glibc's own table breaks 1 ulp, a FRECPE estimate drifted by 0 changes a result, or a reported bound does not hold or is not tight | `weekly-macos`, gating |
+| `table-tolerance-finding` | `table-tolerance-fits-<fn>f` | the report says `FRECPE fits: NO` | `weekly-macos`, reported only |
+
+The finding tests read the reports the first set wrote, as a CTest fixture;
+`ctest -L table-tolerance-finding -FS "tol-.*"` reads existing reports without
+rerunning them.
+
 ---
 
 ## 8. Known limits
