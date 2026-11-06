@@ -9,9 +9,10 @@
        one cache line and the benchmark could not see a table-footprint change.
 
      noise_floor -- two identical kernels, run through the real timing path,
-       must report a paired median ratio near 1.0 with a tight IQR. The old
-       single-run harness swung this between 0.54x and 1.06x, which is what
-       made the ln ratios untrustworthy in the first place.
+       must report a paired median ratio near 1.0 with a tight IQR, on one of
+       up to three attempts. The old single-run harness swung this between
+       0.54x and 1.06x, which is what made the ln ratios untrustworthy in the
+       first place.
 
    No test framework: cross-eval verifies the same way, with a counter and a
    nonzero exit. */
@@ -363,30 +364,51 @@ static void test_noise_floor() {
     auto buf = bench::make_bf16_cycle_buffer(cps, rng, 4096);
 
     auto k = [](__bf16 x) { return (double)(float)x * 1.000001; };
-    auto series = bench::run_interleaved(buf, 200'000, 21, 50'000, k, k);
-
-    check((int)series[0].size() == 21, "one reading per rep");
-    check(bench::summarize(series[0]).median > 0.0, "variant 0 timed");
-    check(bench::summarize(series[1]).median > 0.0, "variant 1 timed");
 
     // A noise-floor check can only conclude anything on a quiet machine. If the
     // timings themselves are scattered, the machine is loaded and a ratio drawn
     // from them says nothing about the harness -- under contention this test saw
     // two identical kernels 7% apart. Report that as inconclusive rather than as
     // a harness defect, or it fails whenever CI is busy.
-    const bench::Stats a = bench::summarize(series[0]);
-    const double rel_spread = a.median > 0.0 ? a.iqr / a.median : 1.0;
-    if (rel_spread > 0.15) {
+    //
+    // Load also comes in bursts the control's spread misses: a hosted macOS
+    // runner once paired these at an IQR of 0.12 with the control looking quiet.
+    // So it measures up to three times and passes on the first tight attempt. A
+    // harness defect is loose on every attempt, and still fails.
+    constexpr int attempts = 3;
+    bool quiet = false;          // some attempt ran on a quiet machine
+    bench::Stats loose{};        // the last quiet attempt's paired ratio
+    double rel_spread = 1.0;
+    for (int n = 1; n <= attempts; ++n) {
+        auto series = bench::run_interleaved(buf, 200'000, 21, 50'000, k, k);
+        if (n == 1) {
+            check((int)series[0].size() == 21, "one reading per rep");
+            check(bench::summarize(series[0]).median > 0.0, "variant 0 timed");
+            check(bench::summarize(series[1]).median > 0.0, "variant 1 timed");
+        }
+        const bench::Stats a = bench::summarize(series[0]);
+        rel_spread = a.median > 0.0 ? a.iqr / a.median : 1.0;
+        if (rel_spread > 0.15) continue;
+
+        const bench::Stats s = bench::summarize(bench::paired_ratio(series[0], series[1]));
+        if (std::fabs(s.median - 1.0) <= 0.05 && s.iqr < 0.10) {
+            if (n > 1) std::printf("  NOTE  %-32s tight on attempt %d of %d\n", g_case, n, attempts);
+            return;
+        }
+        quiet = true;
+        loose = s;
+    }
+    if (!quiet) {
         skip("machine too loaded to measure a noise floor (control spread %.1f%%)",
              100.0 * rel_spread);
         return;
     }
 
-    const bench::Stats s = bench::summarize(bench::paired_ratio(series[0], series[1]));
-    check_near(s.median, 1.0, 0.05, "identical kernels report ratio ~1.0");
-    check(s.iqr < 0.10, "paired ratio IQR is tight for identical kernels");
-    if (s.iqr >= 0.10)
-        std::printf("        (observed IQR %.4f, median %.4f)\n", s.iqr, s.median);
+    check_near(loose.median, 1.0, 0.05, "identical kernels report ratio ~1.0");
+    check(loose.iqr < 0.10, "paired ratio IQR is tight for identical kernels");
+    if (loose.iqr >= 0.10)
+        std::printf("        (observed IQR %.4f, median %.4f, %d attempts)\n", loose.iqr,
+                    loose.median, attempts);
 }
 
 int main() {
