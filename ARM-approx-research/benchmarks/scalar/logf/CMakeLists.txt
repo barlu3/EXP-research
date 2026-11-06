@@ -14,7 +14,7 @@
 #   cd ARM-approx-research/benchmarks/scalar/logf && sudo ./bench-logf
 foreach(fn IN ITEMS logf log2f log10f)
   add_executable(bench-${fn} benchmark-logf.cpp logf-kernels.S)
-  target_link_libraries(bench-${fn} PRIVATE approx-common MPFR::MPFR)
+  target_link_libraries(bench-${fn} PRIVATE approx-common gnu-libm MPFR::MPFR)
   target_compile_options(bench-${fn} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-O3>)
   set_target_properties(bench-${fn} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")

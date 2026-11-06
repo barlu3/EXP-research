@@ -18,13 +18,18 @@
    So the question: inside logf, is FRECPE cheaper than loading the same
    reciprocal from memory? The two hand-written kernels (logf-kernels.S) share
    everything else and return bit-identical results -- the accuracy table must
-   show identical rows -- so any timing difference is the fetch alone. The
-   system libm's logf is the baseline every ratio divides by.
+   show identical rows -- so any timing difference is the fetch alone. glibc
+   2.44's logf, built from its own source in ../../gnu-libm/, is the baseline
+   every ratio divides by, so the ratios do not move with this Mac's
+   libSystem, whose logf stays as a row for comparison.
 
-   All three are held to 1 ulp of the correctly rounded log over every finite
-   float32. Timing, epochs, the report and the accuracy pass are the shared
-   driver's, ../../approx-bench.hpp; this file describes the kernels, their
-   tables, the input clusters and the reference.
+   All are held to 1 ulp of the correctly rounded log over every finite
+   float32, and glibc's log10f to 0: it is CORE-MATH's, correctly rounded, so
+   that row also checks the vendored build. Timing, epochs, the report and the
+   accuracy pass are the shared driver's, ../../approx-bench.hpp, as is the
+   --cache mode that times the kernels with the caches evicted between bursts;
+   this file describes the kernels, their tables, the input clusters and the
+   reference.
 
    CMakeLists.txt builds this file and logf-kernels.S three times: as they are
    for log, and with LOGF_BASE=2 and 10 for log2 and log10 (bench-log2f,
@@ -32,6 +37,7 @@
    two constants. Below, log means log in the build's base. */
 
 #include "approx-bench.hpp"
+#include "logf-ref.hpp"   // LOGF_FN, REF_LOG, MPFR_LOG and the reference, by base
 
 #include <arm_neon.h>
 #include <cmath>
@@ -42,17 +48,11 @@
 #include <mpfr.h>
 
 #if !defined(LOGF_BASE)
-#define LOGF_FN  "log"
-#define REF_LOG  std::log
-#define MPFR_LOG mpfr_log
+#define GNU_ULP  1   // glibc's own bound: 0.818 ulp
 #elif LOGF_BASE == 2
-#define LOGF_FN  "log2"
-#define REF_LOG  std::log2
-#define MPFR_LOG mpfr_log2
+#define GNU_ULP  1   // 0.752 ulp
 #else
-#define LOGF_FN  "log10"
-#define REF_LOG  std::log10
-#define MPFR_LOG mpfr_log10
+#define GNU_ULP  0   // CORE-MATH: correctly rounded
 #endif
 
 extern "C" {
@@ -61,9 +61,11 @@ float  logf_recip[256];   // ehat(i)/2: the tab kernel's copy of FRECPE
 double logf_logc[256];    // -log(ehat(i)), correctly rounded to double
 double logf_base[2];      // log(2) and 1/ln(base), correctly rounded to double
 
+void  logf_tput_gnu(const float* in, float* out, std::uint64_t n);
 void  logf_tput_call(const float* in, float* out, std::uint64_t n);
 void  logf_tput_tab(const float* in, float* out, std::uint64_t n);
 void  logf_tput_frecpe(const float* in, float* out, std::uint64_t n);
+float logf_lat_gnu(const float* in, std::uint64_t n);
 float logf_lat_call(const float* in, std::uint64_t n);
 float logf_lat_tab(const float* in, std::uint64_t n);
 float logf_lat_frecpe(const float* in, std::uint64_t n);
@@ -123,39 +125,6 @@ const std::vector<approx::Cluster> CLUSTERS = {
     { "subnormal x",     subnormal       },
 };
 
-// Correctly rounded log(x). In double it is within 2^-52 of the truth, so
-// rounding that to float is right unless it lies within that distance of a
-// float rounding boundary; those inputs go to MPFR, at 24 bits so its own
-// rounding is the float one. Special values follow C: +-0 -> -inf, x < 0 ->
-// NaN, +inf -> +inf.
-constexpr const char* REFERENCE_NOTE =
-    "correctly rounded " LOGF_FN "(x) (double, MPFR near rounding boundaries)";
-void reference(const float* in, float* out, std::size_t n) {
-    thread_local struct Mp {
-        mpfr_t v;
-        Mp()  { mpfr_init2(v, 24); }
-        ~Mp() { mpfr_clear(v); }
-    } mp;
-    for (std::size_t i = 0; i < n; ++i) {
-        const float x = in[i];
-        if (std::isnan(x) || x < 0.0f) { out[i] = NAN; continue; }
-        if (x == 0.0f)                 { out[i] = -INFINITY; continue; }
-        if (std::isinf(x))             { out[i] = INFINITY; continue; }
-        const double r = REF_LOG((double)x);
-        float y = (float)r;
-        if ((double)y != r) {
-            const float  nb  = std::nextafter(y, r > y ? INFINITY : -INFINITY);
-            const double mid = ((double)y + (double)nb) * 0.5;
-            if (std::fabs(r - mid) <= 0x1p-50 * std::fabs(r)) {
-                mpfr_set_flt(mp.v, x, MPFR_RNDN);
-                MPFR_LOG(mp.v, mp.v, MPFR_RNDN);
-                y = mpfr_get_flt(mp.v, MPFR_RNDN);
-            }
-        }
-        out[i] = y;
-    }
-}
-
 // Positive normal x. log(x) is then normal too, or 0 at x = 1.
 constexpr const char* NORMAL_NOTE = "normal x > 0";
 bool normal_block(std::uint32_t hi) {
@@ -173,13 +142,14 @@ const approx::Spec SPEC = {
     // Index 0 is the control, 1 the baseline every ratio divides by.
     .variants = {
         approx::CONTROL,
+        { LOGF_FN "f (glibc)", "glibc", GNU_ULP, false, logf_tput_gnu, logf_lat_gnu },
         { LOGF_FN "f (libm)", "libm",   1, false, logf_tput_call,   logf_lat_call   },
         { "table + frecpx", "tab",    1, false, logf_tput_tab,    logf_lat_tab    },
         { "frecpe",         "frecpe", 1, false, logf_tput_frecpe, logf_lat_frecpe },
     },
     .clusters       = CLUSTERS,
-    .reference_note = REFERENCE_NOTE,
-    .reference      = reference,
+    .reference_note = logf_ref::REFERENCE_NOTE,
+    .reference      = logf_ref::reference,
     .normal_block   = normal_block,
     .normal_note    = NORMAL_NOTE,
     .rel_error      = rel_error,
