@@ -50,6 +50,25 @@ if(TARGET run-bench-recip)
                          run-bench-asinhf run-bench-acoshf run-bench-log1pf)
 endif()
 
+# The Lean proof of FRECPE logf's drift bound, and its LaTeX write-up. It needs
+# elan and Tectonic rather than a compiler, so it stays out of `all`.
+find_program(LAKE_EXE lake)
+find_program(TECTONIC_EXE tectonic)
+find_program(PYTHON3_EXE python3)
+if(LAKE_EXE AND TECTONIC_EXE AND PYTHON3_EXE)
+  add_custom_target(proof
+    COMMAND ${CMAKE_COMMAND} -E chdir lean ${LAKE_EXE} build
+    COMMAND ${PYTHON3_EXE} -I gen/check.py
+    COMMAND ${CMAKE_COMMAND} -E chdir tex ${TECTONIC_EXE} -X compile frecpe-logf-proof.tex
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/ARM-approx-research/table-tolerance/proof"
+    COMMENT "Checking the Lean proof and building its write-up"
+    USES_TERMINAL)
+else()
+  add_custom_target(proof
+    COMMAND ${CMAKE_COMMAND} -E echo "make proof needs lake (elan), tectonic and python3"
+    COMMAND ${CMAKE_COMMAND} -E false)
+endif()
+
 message(STATUS "")
 message(STATUS "exp-research configured (${CMAKE_BUILD_TYPE})")
 message(STATUS "  native arch for benchmarks : ${EXP_NATIVE_ARCH}")
@@ -57,6 +76,7 @@ message(STATUS "  make verify      - exhaustive MPFR check (pass = 0 discrepanci
 message(STATUS "  make bench       - build + run benchmarks")
 message(STATUS "  make bench-cache - log benchmarks under cache pressure (Apple Silicon)")
 message(STATUS "  make table-tolerance - glibc log table tolerance vs FRECPE (Apple Silicon)")
+message(STATUS "  make proof       - check the Lean drift-bound proof, build its PDF (needs elan, Tectonic)")
 message(STATUS "  make round       - regenerate 16-bit-rounded tables")
 message(STATUS "  make limb-tables - regenerate the bf16 limb tables (ln, exp, sin)")
 message(STATUS "  make limb-sweep  - measure the limb-configuration frontier")

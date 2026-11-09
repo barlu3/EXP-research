@@ -26,6 +26,8 @@ ARM-approx-research/benchmarks/**/bench_results_*.txt
 ARM-approx-research/table-tolerance/table-tolerance-*
 ARM-approx-research/table-tolerance/table_tolerance_*.txt
 ARM-approx-research/table-tolerance/*.stderr
+# The drift-bound proof's PDF, a build output; CI uploads it. (proof/lean ignores .lake.)
+ARM-approx-research/table-tolerance/proof/tex/*.pdf
 # verifying MPFR library is downloaded and installed correctly
 version
 # discrepancy checker for MPFR library
