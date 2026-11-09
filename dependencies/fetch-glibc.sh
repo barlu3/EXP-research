@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Fetches glibc-2.43 source tarball + signature into this directory.
-# Extract with: tar xf glibc-2.43.tar.xz
+# Fetches a glibc source tarball + signature into this directory: 2.43 by
+# default (the exp port), or the version given, e.g. `fetch-glibc.sh 2.44`
+# for the vendored log family in ARM-approx-research/benchmarks/gnu-libm/.
+# Extract with: tar xf glibc-<version>.tar.xz
 set -euo pipefail
 
-GLIBC_VERSION="2.43"
+GLIBC_VERSION="${1:-2.43}"
 MIRROR="https://ftp.gnu.org/gnu/glibc"
 TARBALL="glibc-${GLIBC_VERSION}.tar.xz"
 SIGFILE="${TARBALL}.sig"

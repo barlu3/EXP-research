@@ -48,7 +48,11 @@ thin wrapper over CMake; the build tree is configured on first use. Override
 | Target | Purpose |
 | --- | --- |
 | `make bench` | Build + run the throughput benchmarks |
+| `make bench-cache` | Run the ARM log benchmarks with the caches swept between bursts: FRECPE vs table under cache pressure (Apple Silicon) |
+| `make table-tolerance` | Measure how much error glibc's log table entries tolerate, and whether FRECPE's error fits inside (Apple Silicon; minutes per function) |
 | `make limb-sweep` | Measure the bf16 limb-configuration frontier |
+| `make proof` | Check the Lean proof of how far FRECPE's reciprocal can drift in `logf`, and build its PDF (needs elan and Tectonic; Mathlib's cache is ~5 GB) |
+| `make proof-hw` | Run the real compiled kernel at the proof's windows (Apple Silicon; under a minute) |
 
 **Environment**
 
@@ -78,10 +82,13 @@ CORE-research/
   table-gen/        build the bf16 limb tables   exp/ sin/ log/ sweep/
   benchmarks/       is it fast?
   log-research/     does a correctly-rounded bf16 ln() exist?  (LP/MILP)
-ARM-approx-research/  ARM estimate instructions (FRECPE, FRSQRTE) vs exact ops
+ARM-approx-research/  ARM estimate instructions (FRECPE, FRSQRTE) vs exact ops;
+                      benchmarks/gnu-libm/ is glibc 2.44's log family, their baseline;
+                      table-tolerance/ measures how much error its tables tolerate,
+                      and table-tolerance/proof/ proves FRECPE logf's bound in Lean
 docs/                 research writeups
 cmake/                build support
-dependencies/         glibc reference fetch
+dependencies/         glibc reference fetch (fetch-glibc.sh [version])
 ```
 
 The tools under `CORE-research/` name each other and their outputs by path

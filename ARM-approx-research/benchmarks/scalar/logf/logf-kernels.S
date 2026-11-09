@@ -1,9 +1,10 @@
 // Hand-written AArch64 kernels for benchmark-logf.cpp.
 //
-// float32 log(x) three ways, each in the two loop shapes described in
+// float32 log(x) four ways, each in the two loop shapes described in
 // approx-kernels.inc:
 //
-//   call    BL to the system libm's logf: the baseline.
+//   gnu     BL to glibc 2.44's logf, built here (../../gnu-libm/): the baseline.
+//   call    BL to the system libm's logf, for comparison.
 //   frecpe  r = x*FRECPE(x) - 1. For every normal x, FRECPE's 8-bit estimate is
 //           exactly 2^-k * ehat(i), where k is x's unbiased exponent and i its
 //           top eight fraction bits: a 256-entry reciprocal table that applies
@@ -49,10 +50,13 @@
 
 #if !defined(LOGF_BASE)
 #define LOGF_LIBM _logf
+#define LOGF_GNU  _gnu_logf
 #elif LOGF_BASE == 2
 #define LOGF_LIBM _log2f
+#define LOGF_GNU  _gnu_log2f
 #elif LOGF_BASE == 10
 #define LOGF_LIBM _log10f
+#define LOGF_GNU  _gnu_log10f
 #else
 #error "LOGF_BASE must be 2 or 10, or undefined for the natural log"
 #endif
@@ -220,12 +224,13 @@ _logf_lat_\kind:
     LOGF_LAT  frecpe, lf
     LOGF_LAT  tab,    lt
 
-// The libm baseline (logf, log2f or log10f), shaped like recip-kernels.S's
+// A call to a library's logf, log2f or log10f, shaped like recip-kernels.S's
 // _call pair: loop state in callee-saved registers, because the call may
-// clobber every caller-saved one.
-    .globl  _logf_tput_call
+// clobber every caller-saved one. Instantiated for glibc's and libSystem's.
+.macro LOGF_CALL kind, sym
+    .globl  _logf_tput_\kind
     .p2align 4
-_logf_tput_call:
+_logf_tput_\kind:
     stp     x29, x30, [sp, #-48]!
     mov     x29, sp
     stp     x19, x20, [sp, #16]
@@ -237,7 +242,7 @@ _logf_tput_call:
 1:
     .rept 8
     ldr     s0, [x19], #4
-    bl      LOGF_LIBM
+    bl      \sym
     str     s0, [x20], #4
     .endr
     subs    x21, x21, #8
@@ -247,9 +252,9 @@ _logf_tput_call:
     ldp     x29, x30, [sp], #48
     ret
 
-    .globl  _logf_lat_call
+    .globl  _logf_lat_\kind
     .p2align 4
-_logf_lat_call:
+_logf_lat_\kind:
     stp     x29, x30, [sp, #-48]!
     mov     x29, sp
     stp     x19, x20, [sp, #16]
@@ -262,7 +267,7 @@ _logf_lat_call:
 1:
     .rept 4
     LINK    0, 0, 8, x19                    // operand straight into s0, the argument
-    bl      LOGF_LIBM                       // result back in s0, feeding the next LINK
+    bl      \sym                            // result back in s0, feeding the next LINK
     .endr
     subs    x20, x20, #4
     b.ne    1b
@@ -270,3 +275,7 @@ _logf_lat_call:
     ldp     x19, x20, [sp, #16]
     ldp     x29, x30, [sp], #48
     ret
+.endm
+
+    LOGF_CALL gnu,  LOGF_GNU
+    LOGF_CALL call, LOGF_LIBM

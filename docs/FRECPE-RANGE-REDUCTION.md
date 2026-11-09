@@ -19,6 +19,10 @@ Apple M5.
   `asinhf`, `acoshf` — the FRECPE version is **6.5 to 8 cycles faster per call** on a
   dependent chain and **7–10% faster** in a loop of independent calls, with
   **identical results** to the table version.
+- FRECPE's 8-bit error fits inside what glibc's own log tables tolerate, with
+  2 to 3 bits to spare, everywhere except the one cell holding 1, where
+  glibc's exact c = 1 entry has to stay. Away from 1, FRECPE's estimates
+  could be 4 to 20 times less accurate and still give 1-ulp results (§6).
 
 ---
 
@@ -137,11 +141,12 @@ first thing the function does.
 
 ### What was compared
 
-Each function was timed in three versions:
+Each function was timed in three versions, and the four logs in a fourth:
 
 | Version | What it is |
 |---|---|
-| **libm** | The system math library's function. The baseline. |
+| **glibc** | glibc 2.44's `logf`, `log2f`, `log10f` or `log1pf`, built here from glibc's own source so the baseline does not change with the Mac it runs on. The baseline for those four. |
+| **libm** | The system (libSystem) math library's function. The baseline for `powf`, `asinhf` and `acoshf`; a comparison row for the logs. |
 | **table** | Hand-written assembly; `c` comes from a 256-entry table |
 | **FRECPE** | The same assembly, with `c` from the FRECPE instruction |
 
@@ -200,23 +205,26 @@ throughput is per result. Lower is better.
 
 ### Main input range of each function
 
-| Function | Latency: libm / table / **FRECPE** | Throughput: libm / table / **FRECPE** | FRECPE vs table |
+| Function | Latency: glibc / libm / table / **FRECPE** | Throughput: glibc / libm / table / **FRECPE** | FRECPE vs table |
 |---|---|---|---|
-| `logf` | 29.1 / 30.0 / **22.1** | 5.96 / 2.81 / **2.53** | −7.9 cycles, −10% |
-| `log2f` | 37.0 / 31.2 / **23.0** | 5.11 / 2.81 / **2.53** | −8.2 cycles, −10% |
-| `log10f` | 35.0 / 31.1 / **23.0** | 5.11 / 2.81 / **2.53** | −8.1 cycles, −10% |
-| `log1pf` | 35.4 / 33.1 / **26.6** | 6.90 / 3.43 / **3.03** | −6.5 cycles, −12% |
-| `powf` (y = 2.2) | 63.4 / 56.6 / **48.7** | 8.55 / 5.97 / **5.56** | −7.9 cycles, −7% |
-| `asinhf` | 34.3 / 53.0 / **46.5** | 6.58 / 4.98 / **4.55** | −6.5 cycles, −9% |
-| `acoshf` | 34.7 / 49.0 / **42.5** | 7.80 / 4.45 / **4.06** | −6.5 cycles, −9% |
+| `logf` | 32.7 / 29.2 / 30.2 / **22.0** | 5.05 / 6.05 / 2.86 / **2.58** | −8.1 cycles, −10% |
+| `log2f` | 32.7 / 37.0 / 31.1 / **23.0** | 5.02 / 5.13 / 2.82 / **2.56** | −8.0 cycles, −9% |
+| `log10f` | 28.6 / 35.1 / 31.1 / **23.0** | 7.37 / 5.12 / 2.82 / **2.54** | −8.1 cycles, −10% |
+| `log1pf` | 45.5 / 35.8 / 33.1 / **26.7** | 10.47 / 6.88 / 3.39 / **3.00** | −6.4 cycles, −12% |
+| `powf` (y = 2.2) | — / 63.4 / 56.6 / **48.7** | — / 8.55 / 5.97 / **5.56** | −7.9 cycles, −7% |
+| `asinhf` | — / 34.3 / 53.0 / **46.5** | — / 6.58 / 4.98 / **4.55** | −6.5 cycles, −9% |
+| `acoshf` | — / 34.7 / 49.0 / **42.5** | — / 7.80 / 4.45 / **4.06** | −6.5 cycles, −9% |
+
+The four log rows were rerun on 2026-10-25 with the glibc baseline; the other
+three are from the earlier libm-only runs.
 
 ### Control ranges (no reciprocal used, so table and FRECPE should match)
 
 | Function | Range | Latency: table / FRECPE | Throughput: table / FRECPE |
 |---|---|---|---|
-| `logf` | x in [1, 1 + 2^-8) | 17.8 / 17.8 | 2.13 / 2.12 |
+| `logf` | x in [1, 1 + 2^-8) | 18.0 / 18.0 | 2.14 / 2.25 |
 | `powf` | y = −20000, x just above 1 | 44.0 / 44.2 | 4.84 / 4.83 |
-| `log1pf` | \|x\| < 2^-8 | 15.1 / 15.1 | 2.16 / 2.14 |
+| `log1pf` | \|x\| < 2^-8 | 15.1 / 15.1 | 2.12 / 2.12 |
 | `asinhf` | \|x\| < 2^-8 | 15.0 / 15.0 | 1.79 / 1.74 |
 | `acoshf` | x − 1 < 2^-18 | 34.0 / 34.0 | 3.42 / 3.45 |
 
@@ -238,6 +246,12 @@ throughput is per result. Lower is better.
    table, but both hand-written versions are slower than libm on latency.
    The square root in front of the log is the cause, not the reduction. They
    are still faster than libm on throughput.
+6. **glibc is a different trade.** glibc's `logf` and `log2f` (a 16-entry
+   table, within 1 ulp) run about 32.7 cycles of latency and 5.0 of
+   throughput, behind FRECPE in both. Its `log10f` and `log1pf` are CORE-MATH's
+   and correctly rounded, which the hand kernels (1 ulp) are not, so their gap
+   to FRECPE is not the reduction alone. The table-against-FRECPE column is the
+   comparison that isolates the fetch.
 
 ---
 
@@ -261,7 +275,146 @@ critical path. A logarithm's range reduction is the clearest case.
 
 ---
 
-## 6. Limits of these results
+## 6. How inaccurate can the entries be?
+
+FRECPE's reciprocal is only 8 bits good. glibc's table method reads correctly
+rounded entries instead: a reciprocal near 1/c and the log of it. So how much
+error do glibc's entries actually tolerate, and does FRECPE's error fit inside
+that tolerance? `ARM-approx-research/table-tolerance/` answers it for glibc
+2.44's `logf`, `log2f`, `log10f` and `log1pf`, by perturbing each entry and
+checking, every time, every float that reads it against 1 ulp of the correctly
+rounded result.
+
+**Two kinds of entry error, and they behave nothing alike:**
+
+- **Matched.** The reciprocal drifts by a factor 1 + ε and its log entry is
+  recomputed to match. Only r = m·c − 1 grows, and the polynomial has to absorb
+  it. FRECPE's error is of this kind.
+- **Unmatched.** The log entry alone is off by δ. That error goes straight into
+  the result.
+
+Each tolerance below is the largest error an entry can carry with every input
+that reads it still within 1 ulp, taken entry by entry and then summarised
+over the entries: the median, and the tightest. δ is absolute, in the log
+entry's own units. ε is relative, a factor 1 + ε on the reciprocal.
+
+| | `logf` | `log2f` | `log10f` | `log1pf` |
+|---|---|---|---|---|
+| glibc's table: entries | 16 | 16 | 65 | 32 |
+| glibc's log entries moved alone (unmatched δ): median / tightest | 2^-26 / 2^-47 | 2^-26 / 2^-47 | 2^-27 / 2^-48.5 | 2^-26 / 2^-29 |
+| … glibc's own rounding error in those entries | ≤ 2^-55 | ≤ 2^-55 | ≤ 2^-55.5 | ≤ 2^-53.6 |
+| glibc's reciprocals drifted, log recomputed (matched ε): median / tightest | 2^-5.8 / 2^-12.6 | 2^-5.7 / 2^-21.8 | 2^-6.5 / 2^-9.4 | 2^-5.2 / 2^-6.4 |
+| FRECPE's \|r\| inside the r each glibc entry tolerated | yes, ≥ 2^3.05 margin | yes, ≥ 2^3.04 | yes, ≥ 2^1.95 | yes, ≥ 2^3.32 |
+| glibc's algorithm with FRECPE as its reciprocal, every float | 2 inputs past 1 ulp | 1746 past 1 ulp | correctly rounded | within 1 ulp |
+| … with c = 1 for m in [1, 1 + 2^-8) | within 1 ulp | within 1 ulp | correctly rounded | — |
+| FRECPE's own 256 estimates drifted, log recomputed (ε on FRECPE's output): median / tightest, away from 1 | 2^-4.7 / 2^-6.4 | 2^-4.7 / 2^-6.2 | 2^-6.1 / 2^-7.2 | 2^-4.8 / 2^-5.4 |
+| … the two estimates beside 1: entry 0, just above (c = 1) / entry 255, just below (c = ½) | 2^-12.1 / 2^-12.6 | 2^-20.3 / 2^-21.9 | 2^-7.7 / 2^-5.5 | — |
+
+What it says:
+
+1. **A log entry tolerates almost nothing on its own.** An unmatched error has
+   to stay within about one float ulp of the smallest result its entry
+   serves: 2^-25 to 2^-29, and 2^-47 at the entry whose inputs give results
+   near 0. glibc rounds its entries to 2^-55 or better, so it spends almost
+   none of that budget.
+2. **A reciprocal tolerates a lot, if its log follows it.** A matched drift of
+   about 2^-6, roughly 1.5%, is tolerated almost everywhere: glibc's
+   polynomial absorbs an |r| about 1.5 to 2 times what its own cells produce.
+   FRECPE's estimates sit at most 2^-9.1 from the exact reciprocal of their
+   cell's centre, and their |r| never exceeds 2^-8.45. That is inside every
+   entry's tolerance, with 2 to 3.3 bits to spare.
+3. **The exception is the cell holding 1.** There results go to 0 and the
+   tolerance collapses: to 2^-12.6 for `logf`, 2^-21.8 for `log2f` and 2^-9.4
+   for `log10f`. glibc meets it by making that entry exactly c = 1, log c = 0.
+   FRECPE's estimate there is 511/512, 2^-9 off, so dropped in as is it breaks
+   right above 1 (worst at x = 1 + 2^-23: 3 ulp in `logf`, 2904 ulp in
+   `log2f`). Given c = 1 for that one cell, as glibc does and as the hand
+   kernels' out-of-line path already does, it holds everywhere. `log10f`'s
+   correctly rounded slow path absorbs even the bare substitution.
+   `log1pf`'s table path never comes near 1.
+4. **FRECPE's own estimates could be much worse.** Each of FRECPE's 256
+   estimates was drifted in turn, with its log entry recomputed and the rest
+   left as FRECPE gives them, inside the same algorithm B3 runs (report
+   section B4). Away from 1 the median estimate tolerates a further drift of
+   2^-4.7 to 2^-4.8, about 4%, in `logf`, `log2f` and `log1pf`, and 2^-6.1 in
+   `log10f`. Even the tightest such entry tolerates 2^-7.2. FRECPE's own
+   error is at most 2^-9.1, so it is 4 to 20 times more accurate than these
+   cells need. Measured against the exact reciprocal, a mid-range `logf`
+   entry could be off by ±4.4%, so an estimate good to about 4.5 bits would
+   do there.
+   - The two cells beside 1 are the exception, and they agree with point 3.
+     In `logf` the estimate must be within 2^-12 of c = 1 just above 1, and in
+     `log2f` within 2^-20. FRECPE's own 511/512 is 2^-9 from 1, outside both,
+     which is the B3 failure. Just below 1, FRECPE's estimate is ½, exact,
+     and the binding input is glibc's own: x = 1 − 2^-24, the input that
+     limits glibc's c = 1 entry. The bound matches too, exactly in `logf` and
+     to within 1% in `log2f`, where the two grids round differently.
+   - `log10f` is far looser in both cells, at 2^-7.7 and 2^-5.5: its rounding
+     test sends results that near 0 to the correctly rounded slow path.
+     511/512 falls inside, which is why bare FRECPE stays correctly rounded
+     there.
+   - `log1pf`'s tightest cells are where its table path starts, |x| ≈ 2^-6,
+     at 2^-5.4.
+5. **So FRECPE's error bound does follow inside glibc's.** Every function
+   reports `FRECPE fits: YES`.
+   - In `log10f`, CORE-MATH's rounding test falls through to the slow path as
+     often with FRECPE as with its own table: 759,787 calls against 760,297.
+   - `log1pf` reaches 1 ulp with FRECPE where glibc's own table gives 0. Its
+     offset and rounding test were tuned for glibc's entries, so it is no
+     longer correctly rounded everywhere. How often was not counted.
+
+How it is measured, and why the numbers can be trusted:
+
+- **Replicas.** glibc's `logf` and `log2f` are their vendored sources compiled
+  a second time with the table renamed to a writable one. `log10f` and
+  `log1pf` keep their tables inside the function, so they are copied. Before
+  anything else each replica must match gnu-libm bit for bit on all 2^32
+  floats, and all four do.
+- **Grid.** A drifted reciprocal stays on its entry's own bit grid: 29 bits
+  for `log10f`, 23 for `log1pf`, so r stays exact as CORE-MATH built it. A
+  drifted FRECPE estimate goes on a 29-bit grid (23 for `log1pf`), which keeps
+  its r exact too. Drifted by 0 it must give FRECPE's results bit for bit.
+- **The unmatched bound** is a bisection over the entry's bit pattern. It is
+  exact, because every result is monotone in the entry.
+- **The matched bound** scans outward and stops at the first failure, then
+  bisects that last step. It is not monotone, and a passing island beyond a
+  failure is not counted.
+- **Self-checks.** Every bound must pass and the step past it must fail; the
+  tool exits nonzero otherwise.
+- **Runtime.** 5–9 minutes per function on the M5. `make table-tolerance`
+  runs all four, CTest has them under the `table-tolerance` labels, and CI's
+  `weekly-macos` job runs them (BENCHMARKING.md §7).
+
+### Proved, for `logf`
+
+The search above checks every input, but only about 40 drifts per entry. A Lean 4
+proof covers the rest for `logf`: every reciprocal in a window around each of
+FRECPE's 256 estimates, not just those on a grid, keeps every input within 1 ulp
+([`table-tolerance/proof/`](../ARM-approx-research/table-tolerance/proof/), with a
+write-up in `tex/`; `make proof`).
+
+- **Tightness.** B4 reports its last passing drift, which stops just short of the
+  true edge, so 478 of the 512 proven sides lie slightly above it, by at most 1.06%.
+  All but 5 of the 512 are within 2% of it. The median tighter side is 3.875%, and
+  over cells 2 to 253 it runs from 2.43% to 4.48%. In cell 68 upward, where every c
+  on the 29-bit grid around the bound was scanned, the proof reaches 3.8706% against
+  an exact edge of 3.87458%.
+- **Against the real code.** `make proof-hw` runs the compiled kernel at ¼, ½, ¾ and
+  all of each side's proven drift, against every input of the cell (2048 points,
+  1.7 × 10¹⁰ evaluations). On the M5 it finds no input past 1 ulp.
+- **The five weak sides** all touch x = 1: cell 0 both ways, cell 1 downward and
+  cell 255 both ways (0.012–0.016% against 0.016–0.025%, and 1.25% against 2.52%).
+  Closing them needs each input's own slack rather than a per-cell bound, which
+  this proof does not attempt.
+- **What it assumes.** IEEE rounding, as hypotheses on the rounding functions; the
+  instruction sequence Apple clang 21 emits for `frecpe_logf`; and FRECPE's outputs,
+  taken from Arm's `RecipEstimate` pseudocode and matched against the hardware in
+  all 256 cells.
+- **What it does not cover.** `log2f`, `log10f` and `log1pf`.
+
+---
+
+## 7. Limits of these results
 
 - **One CPU.** All numbers are from an Apple M5. The win depends on how slow
   the float-to-integer register copy is, which differs between chips.
@@ -271,12 +424,16 @@ critical path. A logarithm's range reduction is the clearest case.
 - **Random inputs.** The latency gap assumes inputs vary. When consecutive
   inputs hit the same table entry, the CPU can predict the table load, and
   the gap roughly halves.
+- **Warm caches.** Every table here stays in L1. `make bench-cache` reruns the
+  four logs with the caches swept between bursts of calls, which is where a
+  saved table fetch should matter most; see
+  [BENCHMARKING.md §10.10](BENCHMARKING.md).
 - **`powf` is checked by sample in `y`.** Every `x` is checked, but only for
   the chosen `y` values and the special cases.
 
 ---
 
-## 7. Reproducing
+## 8. Reproducing
 
 The benchmarks live in `ARM-approx-research/benchmarks/scalar/`:
 

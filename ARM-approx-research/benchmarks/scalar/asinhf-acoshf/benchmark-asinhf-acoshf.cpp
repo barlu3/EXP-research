@@ -13,9 +13,12 @@
    The two hand-written kernels (asinhf-acoshf-kernels.S) share everything
    except how ehat(i) is fetched and return bit-identical results -- the
    accuracy table must show identical rows -- so any timing difference is the
-   fetch alone. The system libm's function is the baseline every ratio divides
-   by. All three are held to 1 ulp of the correctly rounded result over every
-   finite float32.
+   fetch alone. For asinh and acosh the system libm's function is the baseline
+   every ratio divides by. For log1p it is glibc 2.44's log1pf, built from its
+   own source in ../../gnu-libm/, with libSystem's as a comparison row; it is
+   CORE-MATH's and correctly rounded, so it is held to 0 ulp, which also checks
+   the vendored build. The rest are held to 1 ulp of the correctly rounded
+   result over every finite float32.
 
    CMakeLists.txt builds this file three times: bench-asinhf, and with
    AHYP_ACOSH or AHYP_LOG1P defined, bench-acoshf and bench-log1pf. All link
@@ -25,6 +28,7 @@
    reference. */
 
 #include "approx-bench.hpp"
+#include "ahyp-ref.hpp"
 
 #include <arm_neon.h>
 #include <cmath>
@@ -51,9 +55,11 @@ void  acoshf_tput_frecpe(const float* in, float* out, std::uint64_t n);
 float acoshf_lat_call(const float* in, std::uint64_t n);
 float acoshf_lat_tab(const float* in, std::uint64_t n);
 float acoshf_lat_frecpe(const float* in, std::uint64_t n);
+void  log1pf_tput_gnu(const float* in, float* out, std::uint64_t n);   // bench-log1pf only
 void  log1pf_tput_call(const float* in, float* out, std::uint64_t n);
 void  log1pf_tput_tab(const float* in, float* out, std::uint64_t n);
 void  log1pf_tput_frecpe(const float* in, float* out, std::uint64_t n);
+float log1pf_lat_gnu(const float* in, std::uint64_t n);
 float log1pf_lat_call(const float* in, std::uint64_t n);
 float log1pf_lat_tab(const float* in, std::uint64_t n);
 float log1pf_lat_frecpe(const float* in, std::uint64_t n);
@@ -147,33 +153,13 @@ const std::vector<approx::Cluster> CLUSTERS = {
 };
 #endif
 
-// Correctly rounded f(x). libm's double asinh, acosh and log1p are within an
-// ulp or two of the truth, so rounding to float is right unless the double lies
-// within 2^-46 of a float rounding boundary; those go to MPFR, at 24 bits so
-// its own rounding is the float one. Results are never subnormal near a
-// boundary: asinh or log1p of a tiny x is x itself in double. Special values follow C.
+// Correctly rounded f(x): ahyp-ref.hpp, shared with ../../../table-tolerance/.
 constexpr const char* REFERENCE_NOTE =
     "correctly rounded " AHYP_FN "(x) (double, MPFR near rounding boundaries)";
 void reference(const float* in, float* out, std::size_t n) {
-    thread_local struct Mp {
-        mpfr_t v;
-        Mp()  { mpfr_init2(v, 24); }
-        ~Mp() { mpfr_clear(v); }
-    } mp;
-    for (std::size_t i = 0; i < n; ++i) {
-        const double r = REF_FN((double)in[i]);
-        float y = (float)r;
-        if (std::isfinite(r) && (double)y != r) {
-            const float  nb  = std::nextafter(y, r > y ? INFINITY : -INFINITY);
-            const double mid = ((double)y + (double)nb) * 0.5;
-            if (std::fabs(r - mid) <= 0x1p-46 * std::fabs(r)) {
-                mpfr_set_flt(mp.v, in[i], MPFR_RNDN);
-                MPFR_FN(mp.v, mp.v, MPFR_RNDN);
-                y = mpfr_get_flt(mp.v, MPFR_RNDN);
-            }
-        }
-        out[i] = y;
-    }
+    ahyp_ref::reference([](double v) { return REF_FN(v); },
+                        [](mpfr_ptr r, mpfr_srcptr a, mpfr_rnd_t d) { return MPFR_FN(r, a, d); },
+                        in, out, n);
 }
 
 #if defined(AHYP_ACOSH)
@@ -206,6 +192,9 @@ const approx::Spec SPEC = {
     // Index 0 is the control, 1 the baseline every ratio divides by.
     .variants = {
         approx::CONTROL,
+#if defined(AHYP_LOG1P)
+        { AHYP_FN "f (glibc)", "glibc", 0, false, KERNEL(tput_gnu),    KERNEL(lat_gnu)    },
+#endif
         { AHYP_FN "f (libm)", "libm",   1, false, KERNEL(tput_call),   KERNEL(lat_call)   },
         { "table + frecpx",   "tab",    1, false, KERNEL(tput_tab),    KERNEL(lat_tab)    },
         { "frecpe",           "frecpe", 1, false, KERNEL(tput_frecpe), KERNEL(lat_frecpe) },

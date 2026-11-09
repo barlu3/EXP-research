@@ -10,6 +10,12 @@
 #   bench on Linux            the timing loops take ~30 minutes on the hosted
 #                             runner; macOS still runs bench on every push
 #   The `weekly` job runs these every Monday and on demand.
+#   table-tolerance           exhaustive per-entry checks of glibc's log tables
+#                             against FRECPE (Apple Silicon only); the
+#                             `weekly-macos` job runs them on the same schedule.
+#
+# The `proof` job checks the Lean proof of FRECPE logf's drift bound on every push
+# to main and on every pull request.
 #
 # Not run at all:
 #   tables                    needs SageMath, which is several GB to install; the
@@ -73,11 +79,13 @@ jobs:
         run: make
 
       - name: Tests
-        # Two labels are left out here (see the CMakeLists that set them):
-        #   research-finding  verify-exp/sin/log, known to fail -- next step
-        #   benchmark         the benchmark programs -- `make bench` runs them
+        # Labels left out here (see the CMakeLists that set them):
+        #   research-finding          verify-exp/sin/log, known to fail -- next step
+        #   benchmark                 the benchmark programs -- `make bench` runs them
+        #   table-tolerance(-finding) exhaustive per-entry table checks, too slow
+        #                             for every push -- the weekly-macos job runs them
         working-directory: build
-        run: ctest --output-on-failure -LE "research-finding|benchmark"
+        run: ctest --output-on-failure -LE "research-finding|benchmark|table-tolerance"
 
       - name: Known research findings (reported, not gating)
         # These fail today by design: open discrepancies in the 16-bit-rounded
@@ -137,6 +145,17 @@ jobs:
         if: runner.os == 'macOS'
         run: make bench
 
+      - name: bench-cache
+        # The log benchmarks again with the caches swept between bursts of calls
+        # (approx-bench.hpp's --cache): FRECPE against the same values read from
+        # cold memory. Unprivileged like `bench`: `sudo make` would leave
+        # root-owned files for the clean step below, and on the hosted VM kperf
+        # is unlikely to be available anyway, so these cycles are estimates. It
+        # fails only if no epoch completes; the upload below picks up the
+        # *_cache.txt reports.
+        if: runner.os == 'macOS'
+        run: make bench-cache
+
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v7
@@ -192,3 +211,103 @@ jobs:
           name: reports-weekly-linux
           path: CORE-research/benchmarks/output/*.txt
           if-no-files-found: ignore
+
+  weekly-macos:
+    name: Table tolerance (macOS arm64)
+    # How much error glibc's log tables tolerate and whether FRECPE's error fits
+    # inside (ARM-approx-research/table-tolerance/). Exhaustive per-entry checks
+    # over every float, so weekly rather than per push. Correctness only, with
+    # no timing, so a shared VM is fine for it.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: macos-15
+    timeout-minutes: 360
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Report build errors as annotations
+        run: echo "::add-matcher::.github/problem-matchers/compiler.json"
+
+      - name: Install MPFR and GMP
+        run: brew install mpfr gmp
+
+      - name: Configure
+        # Portable code generation, as in build-test.
+        run: |
+          make configure
+          cmake -B build -DEXP_NATIVE_ARCH=OFF
+
+      - name: Build the tolerance tools
+        run: >
+          cmake --build build -j 3 --target
+          table-tolerance-logf table-tolerance-log2f table-tolerance-log10f table-tolerance-log1pf
+
+      - name: table-tolerance
+        # Fails if a self-check does: a replica not bit-identical to gnu-libm,
+        # glibc's own table breaking 1 ulp, or a reported bound that does not
+        # hold or is not tight.
+        working-directory: build
+        run: ctest --output-on-failure -L "^table-tolerance$"
+
+      - name: FRECPE fits (reported, not gating)
+        # Reads the reports the previous step wrote; -FS keeps CTest from
+        # rerunning that step as this one's fixture.
+        continue-on-error: true
+        working-directory: build
+        run: ctest --output-on-failure -L table-tolerance-finding -FS "tol-.*"
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports-weekly-macos
+          path: ARM-approx-research/table-tolerance/table_tolerance_*.txt
+          if-no-files-found: ignore
+
+  proof:
+    name: Lean proof (FRECPE logf drift bound)
+    # Reals and exact rationals, with no FRECPE in sight, so any runner will do.
+    # The kernel re-checks every cell, which is most of the time.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check the proof
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: ARM-approx-research/table-tolerance/proof/lean
+
+      - name: No sorry, and no axioms beyond Lean's own
+        # A sorry or native_decide behind the theorem would show up in this list.
+        working-directory: ARM-approx-research/table-tolerance/proof/lean
+        run: |
+          printf 'import FrecpeLogf.Main\n#print axioms FrecpeLogf.frecpe_logf_drift_bound\n' > "$RUNNER_TEMP/axioms.lean"
+          lake env lean "$RUNNER_TEMP/axioms.lean" | tee "$RUNNER_TEMP/axioms.txt"
+          grep -q "\[propext, Classical.choice, Quot.sound\]" "$RUNNER_TEMP/axioms.txt"
+
+      - name: The windows and table reproduce, and sit inside the measurements
+        # Search.lean only proposes windows, so a drift here is not unsound, but the
+        # committed table should be the one the committed code finds.
+        working-directory: ARM-approx-research/table-tolerance/proof
+        run: |
+          (cd lean && lake env lean --run ../gen/Search.lean)
+          python3 -I gen/check.py
+          git diff --exit-code -- .
+          # git diff ignores untracked files, and a regenerated file that is new
+          # to the repo would slip past it.
+          test -z "$(git status --porcelain --untracked-files=all -- .)"
+
+      - name: Set up Tectonic
+        uses: wtfjoke/setup-tectonic@v4
+
+      - name: Build the write-up
+        working-directory: ARM-approx-research/table-tolerance/proof/tex
+        run: tectonic -X compile frecpe-logf-proof.tex
+
+      - name: Upload the write-up
+        uses: actions/upload-artifact@v7
+        with:
+          name: frecpe-logf-proof
+          path: ARM-approx-research/table-tolerance/proof/tex/frecpe-logf-proof.pdf
