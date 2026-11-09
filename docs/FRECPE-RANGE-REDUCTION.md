@@ -385,6 +385,33 @@ How it is measured, and why the numbers can be trusted:
   runs all four, CTest has them under the `table-tolerance` labels, and CI's
   `weekly-macos` job runs them (BENCHMARKING.md §7).
 
+### Proved, for `logf`
+
+The search above checks every input, but only about 40 drifts per entry. A Lean 4
+proof covers the rest for `logf`: every reciprocal in a window around each of
+FRECPE's 256 estimates, not just those on a grid, keeps every input within 1 ulp
+([`table-tolerance/proof/`](../ARM-approx-research/table-tolerance/proof/), with a
+write-up in `tex/`; `make proof`).
+
+- **Tightness.** B4 reports its last passing drift, which stops just short of the
+  true edge, so 478 of the 512 proven sides lie slightly above it, by at most 1.06%.
+  All but 5 of the 512 are within 2% of it. The median tighter side is 3.875%, and
+  over cells 2 to 253 it runs from 2.43% to 4.48%. In cell 68 upward, where every c
+  on the 29-bit grid around the bound was scanned, the proof reaches 3.8706% against
+  an exact edge of 3.87458%.
+- **Against the real code.** `make proof-hw` runs the compiled kernel at ¼, ½, ¾ and
+  all of each side's proven drift, against every input of the cell (2048 points,
+  1.7 × 10¹⁰ evaluations). On the M5 it finds no input past 1 ulp.
+- **The five weak sides** all touch x = 1: cell 0 both ways, cell 1 downward and
+  cell 255 both ways (0.012–0.016% against 0.016–0.025%, and 1.25% against 2.52%).
+  Closing them needs each input's own slack rather than a per-cell bound, which
+  this proof does not attempt.
+- **What it assumes.** IEEE rounding, as hypotheses on the rounding functions; the
+  instruction sequence Apple clang 21 emits for `frecpe_logf`; and FRECPE's outputs,
+  taken from Arm's `RecipEstimate` pseudocode and matched against the hardware in
+  all 256 cells.
+- **What it does not cover.** `log2f`, `log10f` and `log1pf`.
+
 ---
 
 ## 7. Limits of these results
