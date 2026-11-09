@@ -1,0 +1,333 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs,longtable}
+\usepackage{tikz}
+\usepackage[hidelinks]{hyperref}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+
+\newcommand{\lean}[1]{{\small\texttt{#1}}}
+\newcommand{\RN}{\mathrm{RN}}
+
+\title{How far FRECPE's reciprocal can drift in \texttt{logf}:\\
+a machine-checked bound}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+A \texttt{logf} built on the Arm instruction FRECPE takes its reciprocal from an
+8-bit estimate instead of a table, and stays within one ulp of the correctly
+rounded result over every binary32 input. This note proves how much further that
+reciprocal could drift and keep that guarantee: for each of FRECPE's 256 cells,
+a window of reciprocals within which every input is within one ulp. Away from
+$x = 1$ the windows reach about $\pm 4\%$, against FRECPE's own error of at most
+$0.29\%$ over a cell. The proof is checked by Lean~4 with Mathlib; each statement below names
+its Lean counterpart in \lean{proof/lean/FrecpeLogf/}. It is the \emph{bound-only}
+proof: one analytic bound per cell. Section~\ref{sec:exact} says how it extends to
+an exact one.
+\end{abstract}
+
+\section{The result}
+
+Write $x = 2^k m$ with $m \in [1, 2)$ and let \emph{cell} $i$ hold the significands
+whose top eight fraction bits are $i$. FRECPE returns the same estimate
+$\hat c(i)$ for the whole cell. The kernel uses $c_i = \hat c(i)$, except
+$c_0 = 1$: FRECPE's $511/512$ breaks one ulp just above $x = 1$. It then computes
+$r = m c - 1$ and $\log x \approx k \ln 2 - \log c + P(r)$, where $P$ is glibc 2.44's
+polynomial and $-\log c$ comes from a table.
+
+\begin{theorem}[\lean{frecpe\_logf\_drift\_bound}]\label{thm:main}
+For each cell $i$ there are rationals $\varepsilon^-_i, \varepsilon^+_i \ge 0$,
+listed in Appendix~\ref{app:table}, such that for every real $m$ with
+$1 + \tfrac{i}{256} \le m \le 1 + \tfrac{i+1}{256} - 2^{-23}$ (the significands of cell $i$),
+every exponent $k \in [-149, 127]$ with $m \ge 1 + 2^{-23}$ when $k = 0$ (so $x \ne 1$),
+and every real
+$c \in [c_i(1 - \varepsilon^-_i),\ c_i(1 + \varepsilon^+_i)]$: the kernel run with $c$
+and with the log entry rounded for $c$ returns $\RN_{32}(\log x)$ or a binary32
+adjacent to it.
+\end{theorem}
+
+The theorem holds for every real $c$ in the window, not only those on a particular
+grid, so it covers any reciprocal representable in binary64.
+
+The windows are close to what the kernel actually tolerates. Across the 512 sides
+(256 cells, each way), compared with the search over every input in
+\lean{table-tolerance.cpp}, section B4:
+
+\begin{itemize}
+\item the proven bound is never more than a factor $1 + \tfrac{3}{256}$ past the measured one
+(\lean{gen/check.py} fails otherwise), and all but 5 sides are within 2\% of it;
+\item the median tighter side is $3.875\%$, and over cells 2 to 253 it runs from
+$2.43\%$ to $4.48\%$;
+\item in cell 68 upward, where every $c$ on the 29-bit grid around the bound was
+scanned, the proven $3.8706\%$ sits just under the exact edge of $3.87458\%$;
+\item in a run of the compiled kernel on an M5 (\lean{make proof-hw}), at $\tfrac14$, $\tfrac12$,
+$\tfrac34$ and all of each side's proven drift against every input of the cell (2048
+points, $1.7 \times 10^{10}$ evaluations), no input passed one ulp.
+\end{itemize}
+
+\section{The floating-point model}\label{sec:model}
+
+Nothing is assumed of the hardware beyond the hypotheses below; they are hypotheses of
+the theorem, not axioms of the development.
+
+\paragraph{binary64 (\lean{RN64}).} A function $\RN$ with
+$|\RN(z) - z| \le u|z| + \eta$ for $|z| \le 1024$, where $u = 2^{-53}$ and
+$\eta = 2^{-1075}$ covers the subnormal range. A fused multiply-add is one
+$\RN(ab + c)$.
+
+\paragraph{binary32 (\lean{IsF32}, \lean{Nearest32}).} A binary32 value is $M 2^e$
+with integer $|M| < 2^{24}$ and $-149 \le e \le 104$. $\RN_{32}(Y)$ is a binary32
+nearest to $Y$, under any tie rule.
+
+\paragraph{One ulp (\lean{WithinOneUlp}).} $a$ and $b$ are within one ulp when no
+binary32 lies strictly between them. This is the benchmarks' \texttt{ulps(a, b) <= 1}.
+
+\paragraph{The instructions (\lean{kernel}).} \texttt{frecpe\_logf}, disassembled from
+the object Apple clang 21 builds at \texttt{-O2 -ffp-contract=fast}:
+\begin{align*}
+r &= \RN(\RN(m c) - 1), &
+y_0 &= \RN(k \cdot \mathtt{ln2} + \mathrm{lg}), &
+r_2 &= \RN(r \cdot r), \\
+y_1 &= \RN(A_1 r + A_2), &
+y_2 &= \RN(A_0 r_2 + y_1), &
+s &= \RN(y_0 + r), \\
+Y &= \RN(y_2 r_2 + s), &
+\mathrm{out} &= \RN_{32}(Y), &
+\mathrm{lg} &= \RN(-\log c),
+\end{align*}
+with \texttt{ln2} and $A_0, A_1, A_2$ glibc's exact constants. The proof is tied to
+this sequence: another compiler's fusing would need its own \lean{kernel}.
+
+\paragraph{FRECPE.} Its output is taken as data: Arm's \texttt{RecipEstimate}
+pseudocode, $\hat c(i) = \lfloor(\lfloor 2^{19}/(2(256+i)+1)\rfloor + 1)/2\rfloor / 512$,
+checked against the values the hardware returned in all 256 cells
+(\lean{gen/check.py}).
+
+\section{Acceptance: from an error bound to one ulp}\label{sec:accept}
+
+Let $t = \log x$, and for a binade $[2^E, 2^{E+1})$ let $q = 2^{E-24}$. The binade's
+spacing is $2q$; just below $2^E$ it is $q$.
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[x=1.15cm,y=1cm]
+  \draw[->] (-4.4,0) -- (4.6,0) node[right] {$\mathbb{R}$};
+  \foreach \i in {-4,-3,-2,-1} \draw (\i,-0.1) -- (\i,0.1);
+  \foreach \i in {0,2,4} \draw (\i,-0.13) -- (\i,0.13);
+  \node[below] at (0,-0.15) {$2^E$};
+  \node[below] at (-1,-0.15) {\footnotesize $2^E\!-\!q$};
+  \node[below] at (2,-0.15) {\footnotesize $2^E\!+\!2q$};
+  \node[below] at (4,-0.15) {\footnotesize $2^E\!+\!4q$};
+  \draw (-4,0.45) -- (-0.05,0.45) node[midway,above] {\footnotesize spacing $q$};
+  \draw (0.05,0.45) -- (4,0.45) node[midway,above] {\footnotesize spacing $2q$};
+\end{tikzpicture}
+\caption{The binary32 grid around $2^E$. The grid is finer below it, which is why a
+result near $2^E$ gets less room.}
+\end{figure}
+
+\begin{lemma}[\lean{accept\_pos}, \lean{accept}]\label{lem:accept}
+If $2^E \le |t|$ and $|Y - t| < \tfrac32 q$, then $\RN_{32}(Y)$ and $\RN_{32}(t)$ are
+within one ulp.
+\end{lemma}
+
+\begin{lemma}[\lean{accept\_inner}, \lean{accept\_inner\_ge}]\label{lem:inner}
+If $2^E + 2q \le |t|$ and $|Y - t| < 2q$, then $\RN_{32}(Y)$ and $\RN_{32}(t)$ are
+within one ulp.
+\end{lemma}
+
+\begin{proof}[Proof of Lemma~\ref{lem:accept}]
+Negating $t$, $Y$ and both results changes nothing, so take $t > 0$. A higher binade only
+has a larger $q$, so take $2^E \le t < 2^{E+1}$. (\lean{accept} also requires
+$-100 \le E$ and $|t| < 2^{100}$, which keep every value here in binary32's normal
+range.) Let $a = \RN_{32}(t)$ and $y = \RN_{32}(Y)$. Three facts do the work:
+\begin{enumerate}
+\item rounding keeps order against any binary32 $F$: if $F \le X$ then
+$F \le \RN_{32}(X)$, and likewise for $\ge$;
+\item every binary32 at or above $2^E$ is a multiple of $2q$, and every multiple of $2q$
+in $[2^E, 2^{E+1}]$ is a binary32, so any $X$ in that range rounds to within $q$ of itself;
+\item the binary32 values in $[2^{E-1}, 2^E)$ are the multiples of $q$, so the two below
+$2^E$ are $2^E - q$ and $2^E - 2q$.
+\end{enumerate}
+By (1) and (2), $2^E \le a \le 2^{E+1}$, $a$ is a multiple of $2q$, and $|a - t| \le q$.
+
+\emph{Case $Y \ge 2^E$.} By (1), $y \ge 2^E$, so $y$ is a multiple of $2q$ too. If
+$Y \le 2^{E+1}$, then $|y - Y| \le q$ by (2). If $Y > 2^{E+1}$, the binary32 $2^{E+1}$ lies
+between $t$ and $Y$, so $|y - Y| \le Y - 2^{E+1} < Y - t < \tfrac32 q$. Either way,
+\[
+  |y - a| \le |y - Y| + |Y - t| + |t - a| < \tfrac32 q + \tfrac32 q + q = 4q .
+\]
+Two multiples of $2q$ less than $4q$ apart are equal or neighbours, and any binary32
+between them would also be a multiple of $2q$, so there is none.
+
+\emph{Case $Y < 2^E$.} Now $y$ can land on the finer grid. From the hypotheses,
+$2^E - \tfrac32 q < Y$ and $t < 2^E + \tfrac32 q$. By (1), $y \le 2^E$. If
+$Y \ge 2^E - q$, then (1) gives $y \ge 2^E - q$. Otherwise $Y$ is within $\tfrac12 q$ of
+$2^E - q$ and further than that from $2^E - 2q$ and everything below it. So
+$y \in \{2^E - q,\ 2^E\}$. Also $a \le t + q < 2^E + \tfrac52 q$, and $a$ is a multiple of
+$2q$, so $a \in \{2^E,\ 2^E + 2q\}$.
+
+If $a = 2^E$, then $y$ equals it or is its neighbour below. If $a = 2^E + 2q$, then $a$ is
+at least as near to $t$ as $2^E$ is, so $t \ge 2^E + q$. Then $Y > t - \tfrac32 q \ge
+2^E - \tfrac12 q$, which is nearer to $2^E$ than to $2^E - q$, so $y = 2^E$, the neighbour
+below $a$.
+\end{proof}
+
+The constant cannot be raised. At $t = 2^E$, the value $Y = 2^E - \tfrac32 q$ is a tie that
+round-to-even sends to $2^E - 2q$, leaving $2^E - q$ between it and $a = 2^E$. That is the
+price of the finer grid, and Lemma~\ref{lem:inner} avoids it by keeping $t$ away from $2^E$.
+
+Lemma~\ref{lem:inner} needs its margin only at the bottom of the binade: crossing the
+top lands on a coarser grid, where $y$ can only be $2^{E+1}$, and in any higher binade
+$\tfrac32 q'$ already exceeds $2q$.
+
+\section{The kernel's error}\label{sec:error}
+
+Let $r^* = m c - 1$, the exact value of $r$. Since $\log m = \log(mc) - \log c$,
+\[
+  Y - \log x = \bigl[P(r^*) - \log(1 + r^*)\bigr] + \text{rounding}.
+\]
+The polynomial's own error at $r^*$ is the only term that depends on the drift of $c$.
+
+\begin{lemma}[\lean{kernel\_error}]\label{lem:error}
+Let $|k| \le K \le 150$, $1 \le m \le 2$, $\tfrac{9}{20} \le c \le \tfrac{11}{10}$ and
+$|mc - 1| \le \tfrac1{16}$. Then
+\[
+  |Y - (k \log 2 + \log m)| \le |P(r^*) - \log(1 + r^*)|
+    + (10 + 3K)u + 16\eta + K|\mathtt{ln2} - \log 2|.
+\]
+\end{lemma}
+
+\begin{proof}
+Each instruction's rounding is bounded through the size of its argument, all of which are
+below $110$. Writing each rounded value as its exact argument plus an error, $Y - \log x$
+is a sum of: the term above; $P(r) - P(r^*)$, at most $\tfrac{11}{10}|r - r^*|$ with
+$|r - r^*| \le 3u$; $k(\mathtt{ln2} - \log 2)$; the roundings of the log entry, $y_0$, $s$
+and $Y$; and those of the polynomial's evaluation, which are scaled by $r^2$ and so are
+tiny. The total of the coefficients is below the stated one.
+\end{proof}
+
+\begin{lemma}[\lean{ln2d\_err}]
+$|\mathtt{ln2} - \log 2| \le 2^{-54}$, from
+$\log 2 = \sum_{i \ge 1} 2^{-i}/i$ with 58 terms and Mathlib's bound on the rest.
+\end{lemma}
+
+\section{The polynomial's error}\label{sec:poly}
+
+Let $e(r) = P(r) - \log(1 + r)$. Mathlib's
+\lean{Real.abs\_log\_sub\_add\_sum\_range\_le} splits it into a polynomial and a remainder:
+\[
+  |e(r)| \le |Q(r)| + \frac{|r|^{10}}{1 - |r|},
+  \qquad Q(r) = P(r) - \sum_{j=1}^{9} \frac{(-1)^{j+1} r^j}{j}.
+\]
+The $r$ term cancels, and $Q$ turns only at $r = 0$ and near
+$-0.02023$, $-0.00135$ and $0.01839$ on $[-\tfrac1{16}, \tfrac1{16}]$.
+
+\begin{lemma}[\lean{stretch1}\ldots\lean{stretch5}]
+$Q$ is monotone on each of the five stretches between $\pm\tfrac1{16}$, $0$ and boxes of
+half-width $2^{-20}$ around those three points.
+\end{lemma}
+
+\begin{proof}
+The sign of $Q'$ on each stretch, by interval arithmetic with rational ends (a verified
+Horner's rule, \lean{hornerIv}), bisecting where an interval is too wide. The check runs
+in Lean's kernel.
+\end{proof}
+
+So over any range, the worst $|Q|$ is at the range's ends, clipped to each stretch, or
+inside a box, where interval arithmetic bounds it (\lean{esup}). This is an exact
+evaluation at points, so it loses nothing to a sampling resolution. The bound
+$\mathtt{errSup}(\ell,h)$ is $\mathtt{esup}(\ell,h)$ plus the remainder's bound
+$\rho^{10}/(1-\rho)$, where $\rho = \max(|\ell|, |h|)$.
+
+\begin{theorem}[\lean{err\_sound}]
+For $[\ell, h] \subseteq [-\tfrac1{16}, \tfrac1{16}]$ and $r \in [\ell, h]$,
+$|e(r)| \le \mathtt{errSup}(\ell, h)$.
+\end{theorem}
+
+\section{One cell}\label{sec:cell}
+
+For a box of significands $[m_a, m_b]$ and a window $[c_\ell, c_h]$, $r^*$ lies in
+$[m_a c_\ell - 1,\ m_b c_h - 1]$. The check compares $\mathtt{errSup}$ of that range with
+what acceptance allows, for three cases of the exponent:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Case & Size of $t$ from below & Allowed error \\
+\midrule
+$k = 0$ & $\log m_a$ & \lean{tau} of that bound, minus rounding at $K = 0$ \\
+$k = -1$ & $\log 2 - \log m_b$ & \lean{tau} of that bound, minus rounding at $K = 1$ \\
+any other & $\tfrac12$ & $\tfrac32 2^{-25}$, minus rounding at $K = 150$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Here \lean{tau} takes $E$, the binade of the lower bound, and gives $2q$ when
+Lemma~\ref{lem:inner} applies, $\tfrac32 q$ when the bound reaches $2^E$ but not $2^E + 2q$,
+and $0$ when it is below $2^E$. The first two cases split the box in half on failure, to a
+depth of 24, since a cell can straddle a binade of $t$. Lower bounds on the logs
+come from the same series, summed exactly.
+
+\begin{theorem}[\lean{side\_sound}]
+If \lean{sideOK} returns \lean{true} for a cell and window, the conclusion of
+Theorem~\ref{thm:main} holds for that window.
+\end{theorem}
+
+\lean{cells\_checked} then runs the check on all 512 sides in Lean's kernel, by
+\lean{decide +kernel}, which adds no axioms. The windows themselves come from a search
+(\lean{gen/Search.lean}) that is not trusted: it only proposes them.
+
+\section{What limits the bound}\label{sec:limits}
+
+Away from $x = 1$ the polynomial's error near the end of its range grows like $r^5/5$, and
+the budget is one spacing of the smallest result in the cell. That result's binade sets the
+steps in the bound: each halving of the budget shrinks the allowed $r$ by about
+$2^{-1/5} \approx 0.87$.
+
+Five sides stay well under the measured bound: cell 0 both ways, cell 1 downward, and
+cell 255 both ways. All touch $x = 1$, where the budget is smallest. Two costs are likely
+there, which we have not separated: the proof assumes an input may sit at its worst
+rounding position, and those stretches hold few inputs, which may simply not include one;
+and the rounding term weighs most there, because $c$ is not assumed to make $r$ exact.
+
+\section{Toward the exact proof}\label{sec:exact}
+
+The bound above treats all of a cell's inputs alike. Replacing the per-cell threshold with
+each input's own slack, the distance from $\log x$ to the edge of its one-ulp region, would
+clear almost every input at once for all $c$. The few left, near the edge, form a residue to
+check at every $c$, either in Lean by an exact evaluator of the instructions or with the
+existing scan as a certificate. That is future work.
+
+\section*{Scope}
+
+This proves \texttt{logf} only. \texttt{log2f} has the same structure; \texttt{log10f} and
+\texttt{log1pf} add rounding tests and slow paths. FRECPE's table is taken from Arm's
+pseudocode and matched against the hardware, not proved. The result concerns the instruction
+sequence in Section~\ref{sec:model}.
+
+\appendix
+\section{The windows}\label{app:table}
+
+Drifts in percent. ``Proven'' is $\varepsilon^\pm_i$ from Theorem~\ref{thm:main}; ``measured''
+is B4's last passing drift over every input, on a 29-bit grid, which stops within a factor
+$1 + 3/256$ of the first failure, so a proven value may lie slightly above it.
+
+\begin{small}
+\begin{longtable}{rlrrrr}
+\toprule
+Cell & $\hat c$ & Down, proven & Down, measured & Up, proven & Up, measured \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+\input{cells-table.tex}
+\end{longtable}
+\end{small}
+
+\end{document}

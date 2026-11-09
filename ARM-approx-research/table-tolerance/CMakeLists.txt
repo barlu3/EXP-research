@@ -72,3 +72,29 @@ add_custom_target(table-tolerance
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
   COMMENT "Measuring glibc's log table tolerance against FRECPE's error"
   USES_TERMINAL)
+
+# The two checks behind the drift-bound proof, sources in proof/check/.
+# EXCLUDE_FROM_ALL keeps them out of a plain build; their binaries stay in the
+# build tree. edge-scan takes hours at its default count, so run it small.
+add_executable(edge-scan EXCLUDE_FROM_ALL proof/check/edge-scan.cpp)
+target_link_libraries(edge-scan PRIVATE tol-glibc gnu-libm approx-common MPFR::MPFR)
+target_include_directories(edge-scan PRIVATE
+  "${CMAKE_CURRENT_SOURCE_DIR}"
+  "${CMAKE_SOURCE_DIR}/ARM-approx-research/benchmarks/scalar/logf")            # logf-ref.hpp
+target_compile_options(edge-scan PRIVATE -O3)
+
+add_executable(window-check EXCLUDE_FROM_ALL proof/check/window-check.cpp)
+target_link_libraries(window-check PRIVATE tol-glibc gnu-libm approx-common MPFR::MPFR)
+target_include_directories(window-check PRIVATE
+  "${CMAKE_CURRENT_SOURCE_DIR}"
+  "${CMAKE_SOURCE_DIR}/ARM-approx-research/benchmarks/scalar/logf")            # logf-ref.hpp
+target_compile_options(window-check PRIVATE -O3)
+
+# `make proof-hw`: the compiled frecpe_logf at the windows the Lean proof names,
+# checked against the proof's eps_star.csv (Apple Silicon; under a minute).
+add_custom_target(proof-hw
+  COMMAND $<TARGET_FILE:window-check> proof/gen/eps_star.csv
+  DEPENDS window-check
+  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+  COMMENT "Running the compiled FRECPE logf kernel at the proof's windows"
+  USES_TERMINAL)
